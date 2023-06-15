@@ -1,0 +1,20 @@
+{
+  "name": "vuex",
+  "version": "0.1.0",
+  "description": "A frontend microlibrary with reactivity states and views.",
+  "author": "Anton Skshidlevsky <meefik@gmail.com>",
+  "main": "src/index.js",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meefik/vuex.git"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "rollup -c"
+  },
+  "devDependencies": {
+    "@rollup/plugin-terser": "^0.4.3",
+    "rollup": "^3.25.2"
+  }
+}
