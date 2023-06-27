@@ -40,12 +40,13 @@ function patch(source = {}, target = {}, cleaners) {
 }
 
 function render(config) {
-  if (config?.el) return config.el;
+  if (config?.node) return config.node;
   const attrs = { ...config };
   if (attrs.view) {
-    const { view: View, data, on, children } = attrs;
-    const view = new View({ data, on, children });
-    return view.el;
+    const fn = attrs.view;
+    delete attrs.view;
+    const view = fn(attrs);
+    return render(view);
   }
   const { tagName = 'DIV', attributes, children, on } = attrs;
   delete attrs.tagName;

@@ -160,6 +160,35 @@ createView({
 }, document.body);
 ```
 
+## Component
+
+You can wrap part of the view into a separate component. This is a simple function that returns the markup of a view. To use such a component, you need to pass this function in the "view" parameter.
+
+```js
+const Header = (params) => {
+  return {
+    tagName: 'h1',
+    textContent: params.text
+  };
+};
+const Footer = () => {
+  return {
+    tagName: 'footer',
+    textContent: 'Powered by Veux'
+  }
+};
+createView({
+  children: [{
+    view: Header,
+    text: 'Welcome!'
+  }, {
+    textContent: 'My content'
+  }, {
+    view: Footer
+  }]
+}, document.body);
+```
+
 ## Localization
 
 ```js
