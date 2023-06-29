@@ -226,73 +226,78 @@ function isEqual(newv, oldv) {
   return true;
 }
 
-// deepDiff([
-//   { id: 'a', text: 'Item 1', checked: true },
-//   { id: 'b', text: 'Item 2', list: [{x:2},3,4] },
-//   { id: 'c', text: 'Item 3' },
-//   { text: 'Item 5' }
-// ], [
-//   { id: 'b', text: 'Item 2', checked: true, list: [{x:2},3,4] },
-//   { text: 'Hello' },
-//   { id: 'd', text: 'Item 4' }
-// ])
 function deepDiff(newv, oldv) {
-  const changes = { add: [], del: [], mod: [], changed: false };
   if (oldv === newv || typeof newv !== 'object' || typeof oldv !== 'object') {
-    return changes;
+    return false;
   }
-  const _oldv = {};
-  for (const k in oldv) {
-    const item = oldv[k];
-    if (typeof item !== 'object') continue;
-    if (hasOwnProperty.call(item, 'id')) {
-      _oldv[item.id] = item;
-    }
-  }
-  const _newv = {};
-  for (const k in newv) {
-    const item = newv[k];
-    if (typeof item !== 'object') continue;
-    if (hasOwnProperty.call(item, 'id')) {
-      const id = item.id;
-      _newv[id] = item;
-      if (hasOwnProperty.call(_oldv, id)) {
-        const _item = _oldv[id];
-        const obj = { id };
-        let changed;
-        for (const k in item) {
-          if (!isEqual(item[k], _item[k])) {
-            obj[k] = item[k];
-            changed = true;
-          }
-        }
-        for (const k in _item) {
-          if (!hasOwnProperty.call(item, k)) {
-            obj[k] = null;
-            changed = true;
-          }
-        }
-        if (changed) changes.mod.push(deepClone(obj));
-      } else {
-        changes.add.push(deepClone(item));
+  if (Array.isArray(newv)) {
+    const add = [];
+    const del = [];
+    const mod = [];
+    const _oldv = {};
+    for (const k in oldv) {
+      const item = oldv[k];
+      if (typeof item !== 'object') continue;
+      if (hasOwnProperty.call(item, 'id')) {
+        _oldv[item.id] = item;
       }
-    } else {
-      changes.add.push(deepClone(item));
     }
-  }
-  for (const k in _oldv) {
-    const item = _oldv[k];
-    if (!hasOwnProperty.call(_newv, k)) {
-      changes.del.push(deepClone(item));
+    const _newv = {};
+    for (const k in newv) {
+      const item = newv[k];
+      if (typeof item !== 'object') continue;
+      if (hasOwnProperty.call(item, 'id')) {
+        const id = item.id;
+        _newv[id] = item;
+        if (hasOwnProperty.call(_oldv, id)) {
+          const _item = _oldv[id];
+          const obj = { id };
+          let changed;
+          for (const k in item) {
+            if (!isEqual(item[k], _item[k])) {
+              obj[k] = item[k];
+              changed = true;
+            }
+          }
+          for (const k in _item) {
+            if (!hasOwnProperty.call(item, k)) {
+              obj[k] = null;
+              changed = true;
+            }
+          }
+          if (changed) mod.push(deepClone(obj));
+        } else {
+          add.push(deepClone(item));
+        }
+      } else {
+        add.push(deepClone(item));
+      }
     }
-  }
-  for (const k in changes) {
-    if (changes[k].length) {
-      changes.changed = true;
-      break;
+    for (const k in _oldv) {
+      const item = _oldv[k];
+      if (!hasOwnProperty.call(_newv, k)) {
+        del.push(deepClone(item));
+      }
     }
+    const changed = add.length > 0 || mod.length > 0 || del.length > 0;
+    return changed && { add, mod, del };
+  } else {
+    const obj = {};
+    let changed = false;
+    for (const k in newv) {
+      if (!isEqual(newv[k], oldv[k])) {
+        obj[k] = newv[k];
+        changed = true;
+      }
+    }
+    for (const k in oldv) {
+      if (!hasOwnProperty.call(newv, k)) {
+        obj[k] = null;
+        changed = true;
+      }
+    }
+    return changed && obj;
   }
-  return changes;
 }
 
 function deepClone(obj) {
