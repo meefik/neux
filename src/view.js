@@ -48,12 +48,21 @@ function render(config) {
     const view = fn(attrs);
     return render(view);
   }
-  const { tagName = 'DIV', attributes, children, on } = attrs;
+  const {
+    tagName = 'DIV',
+    namespaceURI,
+    attributes,
+    children,
+    on
+  } = attrs;
   delete attrs.tagName;
+  delete attrs.namespaceURI;
   delete attrs.attributes;
   delete attrs.children;
   delete attrs.on;
-  const el = document.createElement(tagName);
+  const el = namespaceURI
+    ? document.createElementNS(namespaceURI, tagName)
+    : document.createElement(tagName);
   let cleaners = [];
   el.addEventListener(
     'removed',
@@ -71,8 +80,20 @@ function render(config) {
     }
   }
   for (const attr in attributes) {
-    const val = attributes[attr];
-    el.setAttribute(attr, val);
+    let val = attributes[attr];
+    if (typeof val !== 'undefined') {
+      if (typeof val === 'function') {
+        const fn = val;
+        const updater = () => {
+          el.setAttribute(attr, fn());
+        };
+        val = getContext(fn, (obj, prop) => {
+          obj.$on(prop, updater);
+          cleaners.push(() => obj.$off(prop, updater));
+        });
+      }
+      el.setAttribute(attr, val);
+    }
   }
   let _children = children;
   if (typeof children === 'function') {

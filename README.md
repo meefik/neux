@@ -58,7 +58,7 @@ const remoteStore = async (state, changes) => {
   const res = await fetch('/api/todos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(changes)
+    body: JSON.stringify(changes || {})
   });
   return await res.json();
 };
@@ -277,5 +277,6 @@ createView({
 - [x] L10n
 - [x] Router
 - [x] State sync with stores
+- [ ] Pagination
 - [ ] Real-time state sync
 - [ ] P2P state sync
