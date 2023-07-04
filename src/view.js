@@ -31,8 +31,8 @@ function patch(source = {}, target = {}, cleaners) {
       const fn = value;
       const updater = () => setValue(target, key, fn());
       value = getContext(fn, (obj, prop) => {
-        obj.$on(prop, updater);
-        cleaners.push(() => obj.$off(prop, updater));
+        obj.$$on(prop, updater);
+        cleaners.push(() => obj.$$off(prop, updater));
       });
     }
     setValue(target, key, value);
@@ -88,8 +88,8 @@ function render(config) {
           el.setAttribute(attr, fn());
         };
         val = getContext(fn, (obj, prop) => {
-          obj.$on(prop, updater);
-          cleaners.push(() => obj.$off(prop, updater));
+          obj.$$on(prop, updater);
+          cleaners.push(() => obj.$$off(prop, updater));
         });
       }
       el.setAttribute(attr, val);
@@ -110,8 +110,8 @@ function render(config) {
             }
           }
         };
-        obj.$on('#add', add);
-        cleaners.push(() => obj.$off('#add', add));
+        obj.$$on('#add', add);
+        cleaners.push(() => obj.$$off('#add', add));
         const mod = (newv, prop, obj) => {
           if (isNaN(prop)) return;
           const index = parseInt(prop);
@@ -124,8 +124,8 @@ function render(config) {
             }
           }
         };
-        obj.$on('#mod', mod);
-        cleaners.push(() => obj.$off('#mod', mod));
+        obj.$$on('#mod', mod);
+        cleaners.push(() => obj.$$off('#mod', mod));
         const del = (newv, prop, obj) => {
           if (isNaN(prop)) return;
           const index = parseInt(prop);
@@ -134,8 +134,8 @@ function render(config) {
             el.removeChild(oldChild);
           }
         };
-        obj.$on('#del', del);
-        cleaners.push(() => obj.$off('#del', del));
+        obj.$$on('#del', del);
+        cleaners.push(() => obj.$$off('#del', del));
       } else {
         const fn = children;
         const updater = () => {
@@ -146,8 +146,8 @@ function render(config) {
             el.appendChild(child);
           }
         };
-        obj.$on(prop, updater);
-        cleaners.push(() => obj.$off(prop, updater));
+        obj.$$on(prop, updater);
+        cleaners.push(() => obj.$$off(prop, updater));
       }
     });
   }

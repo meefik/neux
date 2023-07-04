@@ -29,30 +29,9 @@ export function getContext(getter, handler) {
  * @param {function} fn 
  */
 export function setContext(obj, prop, fn) {
+  if (!context) return;
   const props = context.get(obj) || {};
   props[prop] = fn || null;
   context.set(obj, props);
-}
-
-/**
- * Check if the context exists.
- * 
- * @returns {boolean}
- */
-export function hasContext() {
-  return !!context;
-}
-
-/**
- * Run the function without setting the context.
- * 
- * @param {function} next 
- * @returns {*}
- */
-export function skipContext(next) {
-  const _context = context;
-  context = null;
-  const res = next();
-  context = _context;
-  return res;
+  // console.log('setContext', prop);
 }

@@ -1,4 +1,4 @@
-import { getContext, setContext, hasContext, skipContext } from './context';
+import { getContext, setContext } from './context';
 
 const hasOwnProperty = Object.prototype.hasOwnProperty;
 const proxyKey = Symbol();
@@ -13,6 +13,7 @@ export function createState(target) {
   if (typeof target !== 'object') target = {};
   if (target === null || target[proxyKey]) return target;
   let updater;
+  const dollarRe = /^\$/;
   const listeners = {};
   const cleaners = {};
   const setUpdater = (obj, prop, getter) => {
@@ -21,13 +22,13 @@ export function createState(target) {
     }
     cleaners[prop] = [];
     const updater = () => {
-      obj[prop] = getter(obj, prop);
+      obj[`$${prop}`] = getter(obj, prop);
     };
     return getContext(
       () => getter(obj, prop),
       (_obj, _prop) => {
-        _obj.$on(_prop, updater);
-        cleaners[prop].push(() => _obj.$off(_prop, updater));
+        _obj.$$on(_prop, updater);
+        cleaners[prop].push(() => _obj.$$off(_prop, updater));
       }
     );
   };
@@ -45,115 +46,123 @@ export function createState(target) {
       if (prop === proxyKey) {
         return true;
       }
-      if (prop === '$on') {
-        return function $on(prop, handler) {
+      if (prop === '$$listeners') {
+        return listeners;
+      }
+      if (prop === '$$on') {
+        return function (prop, handler) {
           if (prop && handler) {
             if (!listeners[prop]) listeners[prop] = new Set();
             listeners[prop].add(handler);
           }
         };
       }
-      if (prop === '$off') {
-        return function $off(prop, handler) {
+      if (prop === '$$off') {
+        return function (prop, handler) {
           if (listeners[prop]) {
             if (handler) listeners[prop].delete(handler);
             else listeners[prop].clear();
           }
         };
       }
-      if (prop === '$clone') {
-        return function $clone() {
-          return skipContext(() => deepClone(target));
+      if (prop === '$$clone') {
+        return function () {
+          return deepClone(target);
         };
       }
-      if (prop === '$sync') {
-        return async function $sync(store, ...args) {
-          return await skipContext(async () => {
-            if (typeof store === 'function') {
-              let data = await store(deepClone(target), null, ...args);
+      if (prop === '$$sync') {
+        return async function (store, ...args) {
+          if (typeof store === 'function') {
+            let data = await store(deepClone(target), null, ...args);
+            deepPatch(this, data);
+            updater = async (...args) => {
+              const changes = deepDiff(target, data);
+              data = await store(deepClone(target), changes, ...args);
               deepPatch(this, data);
-              updater = async (...args) => {
-                const changes = deepDiff(target, data);
-                data = await store(deepClone(target), changes, ...args);
-                deepPatch(this, data);
-                return data;
-              };
               return data;
-            } else if (typeof store === 'object') {
-              deepPatch(this, store);
-              return this;
-            } else if (typeof updater === 'function') {
-              return await updater(...args);
-            }
-          });
+            };
+            return data;
+          } else if (typeof store === 'object') {
+            deepPatch(this, store);
+            return this;
+          } else if (typeof updater === 'function') {
+            return await updater(...args);
+          }
         };
       }
-      if (prop === '$each') {
-        return function $each(fn, _this) {
-          if (hasContext()) setContext(this, '$each', fn);
+      if (prop === '$$each' && Array.isArray(target)) {
+        return function (fn, _this) {
+          setContext(this, '$each', fn);
           return obj.map(fn, _this).filter(e => e);
         };
       }
-      if (prop === '$emit') {
-        return function $emit(key) {
-          skipContext(() => {
-            const value = obj[key];
-            const clone = deepClone(value);
-            dispatchEvent([key, '*'], value, key, clone);
-          });
+      if (prop === '$') {
+        return function (key, value) {
+          const clone = deepClone(obj);
+          if (typeof value === 'function') {
+            obj[key] = value();
+          } if (typeof value !== 'undefined') {
+            obj[key] = value;
+          }
+          value = obj[key];
+          dispatchEvent([key, '*'], value, key, clone);
         };
       }
-      if (hasContext()) {
-        if (typeof obj[prop] === 'function') {
-          if (!hasOwnProperty.call(obj, prop)) {
-            const fn = obj[prop];
-            return function (...args) {
-              // setContext(receiver, '#');
-              return skipContext(() => fn.apply(obj, args));
-            };
-          }
-        } else {
-          setContext(receiver, prop);
+      if (dollarRe.test(prop)) {
+        prop = prop.slice(1);
+        setContext(receiver, prop);
+      } else {
+        if (Array.isArray(obj) && typeof obj[prop] === 'function') {
+          const fn = obj[prop];
+          return function (...args) {
+            return fn.apply(obj, args);
+          };
         }
       }
       return Reflect.get(obj, prop);
     },
     set: (obj, prop, value, receiver) => {
-      if (typeof value === 'function') {
-        if (value.name !== '$raw') {
-          return Reflect.set(obj, prop, value);
+      let changed;
+      if (Array.isArray(obj)) {
+        if (prop === 'length' || obj[prop] !== value) {
+          changed = true;
         }
-        value = setUpdater(receiver, prop, value);
+      } else if (dollarRe.test(prop)) {
+        prop = prop.slice(1);
+        if (typeof value === 'function') {
+          value = setUpdater(receiver, prop, value);
+        }
+        if (obj[prop] !== value) {
+          changed = true;
+        }
       }
       if (typeof value === 'object') {
         value = createState(value);
-        // if (Array.isArray(obj)) {
-        //   const handler = () => {
-        //     const clone = deepClone(target);
-        //     dispatchEvent([prop, '*', '#'], value, prop, clone);
-        //   };
-        //   value.$on('*', handler);
-        //   if (!cleaners[prop]) cleaners[prop] = [];
-        //   cleaners[prop].push(() => value.$off('*', handler));
-        // }
       }
-      const clone = deepClone(obj);
-      const changed = (Array.isArray(obj) && prop === 'length') || obj[prop] !== value;
+      const clone = changed && deepClone(obj);
       const res = Reflect.set(obj, prop, value);
       if (!res) return false;
-      if (changed) {
-        const events = hasOwnProperty.call(clone, prop)
-          ? [prop, '#mod', '*']
-          : [prop, '#add', '*', '#'];
+      if (clone) {
+        const events = [prop, hasOwnProperty.call(clone, prop) ? '#mod' : '#add', '*'];
         dispatchEvent(events, value, prop, clone);
       }
       return true;
     },
     deleteProperty: (obj, prop) => {
-      const clone = deepClone(obj);
+      let changed;
+      if (Array.isArray(obj)) {
+        changed = true;
+      } else if (dollarRe.test(prop)) {
+        prop = prop.slice(1);
+        changed = true;
+      }
+      const clone = changed && deepClone(obj);
       const res = Reflect.deleteProperty(obj, prop);
       if (!res) return false;
-      dispatchEvent(['#del', '*', '#'], undefined, prop, clone);
+      if (clone) {
+        const events = ['#del', '*'];
+        dispatchEvent(events, undefined, prop, clone);
+      }
       if (listeners[prop]) {
         delete listeners[prop];
       }
@@ -168,22 +177,17 @@ export function createState(target) {
     },
   };
   const state = new Proxy(target, handler);
-  for (const key in target) {
-    if (typeof target[key] === 'function') {
-      target[key] = setUpdater(state, key, target[key]);
+  for (let key in target) {
+    if (dollarRe.test(key)) {
+      if (typeof target[key] === 'function') {
+        const fn = target[key];
+        delete target[key];
+        key = key.slice(1);
+        target[key] = setUpdater(state, key, fn);
+      }
     }
     if (typeof target[key] === 'object') {
-      const obj = createState(target[key]);
-      target[key] = obj;
-      // if (Array.isArray(target)) {
-      //   const handler = () => {
-      //     const clone = deepClone(target);
-      //     dispatchEvent([key, '*', '#'], obj, key, clone);
-      //   };
-      //   obj.$on('*', handler);
-      //   if (!cleaners[key]) cleaners[key] = [];
-      //   cleaners[key].push(() => obj.$off('*', handler));
-      // }
+      target[key] = createState(target[key]);
     }
   }
   return state;
@@ -197,25 +201,25 @@ function deepPatch(oldv, newv) {
   for (const k in newv) {
     if (newv[k] !== null && typeof newv[k] === 'object') {
       if (typeof oldv[k] !== 'object') {
-        const obj = Array.isArray(newv[k]) ? [] : {};
+        const obj = createState(Array.isArray(newv[k]) ? [] : {});
         deepPatch(obj, newv[k]);
-        if (isArray) oldv.splice(k, 1, obj);
-        else oldv[k] = obj;
+        if (isArray) oldv.$splice(k, 1, obj);
+        else oldv.$(k, obj);
       }
     } else {
-      if (isArray) oldv.splice(k, 1, newv[k]);
-      else oldv[k] = newv[k];
+      if (isArray) oldv.$splice(k, 1, newv[k]);
+      else oldv.$(k, newv[k]);
     }
   }
   if (isArray) {
     const count = oldv.length - newv.length;
     if (count > 0) {
-      oldv.splice(newv.length, count);
+      oldv.$splice(newv.length, count);
     }
   } else {
     for (const k in oldv) {
       if (!hasOwnProperty.call(newv, k)) {
-        delete oldv[k];
+        delete oldv['$' + k];
       }
     }
   }

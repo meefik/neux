@@ -19,31 +19,29 @@ export function createRouter() {
     if (!state.params) state.params = {};
     for (const k in state.params) {
       if (!Object.prototype.hasOwnProperty.call(params, k)) {
-        delete state.params[k];
+        delete state.params['$' + k];
       }
     }
     for (const k in params) {
       if (state.params[k] !== params[k]) {
-        state.params[k] = params[k];
+        state.params['$' + k] = params[k];
       }
     }
-    state.path = path;
+    state.$path = path;
   }
   const state = createState({
     path: '',
     params: {},
-    show: function $raw() {
-      return navigate;
-    }
+    navigate
   });
   refresh();
-  state.$on('path', () => {
+  state.$$on('path', () => {
     navigate(state.path, state.params);
   });
-  state.$on('params', () => {
+  state.$$on('params', () => {
     navigate(state.path, state.params);
   });
-  state.params.$on('*', () => {
+  state.params.$$on('*', () => {
     navigate(state.path, state.params);
   });
   window.addEventListener('hashchange', () => refresh());

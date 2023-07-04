@@ -15,16 +15,16 @@ const state = createState({
     { text: 'Item 2', checked: true }
   ],
   // the calculated field for an object
-  double: (obj, prop) => obj.counter * obj.multiplier,
+  $double: (obj, prop) => obj.$counter * 2,
   // the calculated field for an array
-  completed: (obj, prop) => {
-    return obj.tasks.filter(item => item.checked);
+  $completed: (obj, prop) => {
+    return obj.$tasks.filter(item => item.checked);
   }  
 });
 // set or change the calculated field
-state.double = (obj, prop) => state.double * state.multiplier
+state.$double = (obj, prop) => state.$double * state.$multiplier
 // delete specified field with all listeners
-delete state.double
+delete state.$double
 ```
 
 Watching for state changes
@@ -35,13 +35,13 @@ const handler = (newv, prop, obj) => {
   console.log(newv, oldv, prop, obj);
 };
 // add specified listener
-state.$on('double', handler);
+state.$$on('double', handler);
 // remove specified listener
-state.$off('double', handler);
+state.$$off('double', handler);
 // remove all listeners for the specified field
-state.$off('double');
+state.$$off('double');
 // add a listener to watch any changes
-state.tasks.$on('*', handler);
+state.tasks.$$on('*', handler);
 ```
 
 Synchronizing state with storage
@@ -63,9 +63,9 @@ const remoteStore = async (state, changes) => {
   return await res.json();
 };
 // bind store with state and sync
-state.list.$sync(localStore);
+state.list.$$sync(localStore);
 // sync state with store
-state.list.$sync();
+state.list.$$sync();
 // unbind store and state
 delete state.list;
 ```
@@ -90,13 +90,13 @@ createView({
   }, {
     tagName: 'input',
     placeholder: 'Enter your task...',
-    value: () => state.input,
+    value: () => state.$input,
     on: {
       keyup: (e) => {
         if (e.keyCode === 13) {
           e.preventDefault();
-          state.list.push({ text: e.target.value });
-          state.input = '';
+          state.list.$push({ text: e.target.value });
+          state.$input = '';
         }
       },
     }
@@ -109,7 +109,7 @@ createView({
         change: (e) => {
           const checked = e.target.checked;
           state.list.forEach((item) => {
-            item.checked = checked;
+            item.$checked = checked;
           });
         }
       }
@@ -120,7 +120,7 @@ createView({
   }, {
     tagName: 'ul',
     children: () => {
-      return state.list.$each(item => {
+      return state.list.$$each(item => {
         return {
           tagName: 'li',
           on: {
@@ -130,15 +130,15 @@ createView({
           children: [{
             tagName: 'input',
             type: 'checkbox',
-            checked: () => item.checked,
+            checked: () => item.$checked,
             on: {
               change: (e) => {
-                item.checked = e.target.checked;
+                item.$checked = e.target.checked;
               }
             }
           }, {
             tagName: 'label',
-            textContent: () => item.text
+            textContent: () => item.$text
           }, {
             tagName: 'a',
             href: '#',
@@ -147,7 +147,7 @@ createView({
               click: (e) => {
                 e.preventDefault();
                 const index = state.list.indexOf(item);
-                state.list.splice(index, 1);
+                state.list.$splice(index, 1);
               }
             }
           }]
@@ -155,7 +155,7 @@ createView({
       });
     }
   }, {
-    textContent: () => `Total items: ${state.list.length}`
+    textContent: () => `Total items: ${state.list.$length}`
   }]
 }, document.body);
 ```
@@ -208,10 +208,10 @@ const fallbackLang = 'en';
 const l10n = createL10n(locales, fallbackLang);
 const msg = l10n.t('say.hello', { name: 'World' }, 'en');
 console.log(msg); // Hello World!
-l10n.lang = 'en'
+l10n.$lang = 'en'
 const msgEn = l10n.t('say.hello', { name: 'World' });
 console.log(msgEn) // Hello World!
-l10n.lang = 'ru'
+l10n.$lang = 'ru'
 const msgRu = l10n.t('say.hello', { name: 'Мир' });
 console.log(msgRu) // Привет Мир!
 ```
@@ -235,13 +235,13 @@ createView({
       textContent: 'Page 3',
       on: {
         click: () => {
-          router.show('#page3', { param1: '1', param2: '2' });
+          router.navigate('#page3', { param1: '1', param2: '2' });
         }
       }
     }]
   }, {
     children: () => {
-      switch (router.path) {
+      switch (router.$path) {
       case '#page1':
         return [{
           tagName: 'p',
@@ -265,7 +265,7 @@ createView({
       }
     }
   }, {
-    textContent: () => `Path: ${router.path} , Params: ${JSON.stringify(router.params)}`
+    textContent: () => `Path: ${router.$path} , Params: ${JSON.stringify(router.$params)}`
   }]
 }, document.body);
 ```

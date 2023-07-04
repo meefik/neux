@@ -18,7 +18,7 @@ export function createL10n(locales, fallback) {
       lang = data;
       data = null;
     }
-    if (!lang) lang = state.lang;
+    if (!lang) lang = state.$lang;
     if (!locales[lang]) lang = fallback;
     const arr = `${path}`.split('.');
     let value = arr.reduce((o, k) => {
@@ -33,9 +33,7 @@ export function createL10n(locales, fallback) {
   }
   const state = createState({
     lang: navigator.language,
-    t: function $raw() {
-      return t;
-    }
+    t
   });
   return state;
 }
