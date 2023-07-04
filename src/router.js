@@ -19,20 +19,20 @@ export function createRouter() {
     if (!state.params) state.params = {};
     for (const k in state.params) {
       if (!Object.prototype.hasOwnProperty.call(params, k)) {
-        delete state.params['$' + k];
+        delete state.params[k];
       }
     }
     for (const k in params) {
       if (state.params[k] !== params[k]) {
-        state.params['$' + k] = params[k];
+        state.params[k] = params[k];
       }
     }
-    state.$path = path;
+    state.path = path;
   }
   const state = createState({
     path: '',
     params: {},
-    navigate
+    navigate: () => navigate
   });
   refresh();
   state.$$on('path', () => {

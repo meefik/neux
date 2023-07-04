@@ -33,7 +33,7 @@ export function createL10n(locales, fallback) {
   }
   const state = createState({
     lang: navigator.language,
-    t
+    t: () => t
   });
   return state;
 }

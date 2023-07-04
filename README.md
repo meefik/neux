@@ -15,16 +15,16 @@ const state = createState({
     { text: 'Item 2', checked: true }
   ],
   // the calculated field for an object
-  $double: (obj, prop) => obj.$counter * 2,
+  double: (obj, prop) => obj.$counter * 2,
   // the calculated field for an array
-  $completed: (obj, prop) => {
+  filtered: (obj, prop) => {
     return obj.$tasks.filter(item => item.checked);
   }  
 });
 // set or change the calculated field
-state.$double = (obj, prop) => state.$double * state.$multiplier
+state.double = (obj, prop) => state.$double * state.$multiplier;
 // delete specified field with all listeners
-delete state.$double
+delete state.double;
 ```
 
 Watching for state changes
@@ -76,7 +76,6 @@ A view is a declarative description of DOM elements.
 
 ```js
 const state = createState({
-  input: '',
   list: [
     { text: 'Item 1'},
     { text: 'Item 2', checked: true },
@@ -90,13 +89,13 @@ createView({
   }, {
     tagName: 'input',
     placeholder: 'Enter your task...',
-    value: () => state.$input,
+    autofocus: true,
     on: {
       keyup: (e) => {
         if (e.keyCode === 13) {
           e.preventDefault();
-          state.list.$push({ text: e.target.value });
-          state.$input = '';
+          state.list.push({ text: e.target.value });
+          e.target.value = '';
         }
       },
     }
@@ -109,7 +108,7 @@ createView({
         change: (e) => {
           const checked = e.target.checked;
           state.list.forEach((item) => {
-            item.$checked = checked;
+            item.checked = checked;
           });
         }
       }
@@ -133,7 +132,7 @@ createView({
             checked: () => item.$checked,
             on: {
               change: (e) => {
-                item.$checked = e.target.checked;
+                item.checked = e.target.checked;
               }
             }
           }, {
@@ -147,7 +146,7 @@ createView({
               click: (e) => {
                 e.preventDefault();
                 const index = state.list.indexOf(item);
-                state.list.$splice(index, 1);
+                state.list.splice(index, 1);
               }
             }
           }]
@@ -171,10 +170,20 @@ const Header = (params) => {
     textContent: params.text
   };
 };
+const Content = () => {
+  return {
+    tagName: 'p',
+    textContent: 'My content'
+  };
+};
 const Footer = () => {
   return {
     tagName: 'footer',
-    textContent: 'Powered by Veux'
+    children: [{
+      tagName: 'hr'
+    }, {
+      textContent: 'Powered by Veux'
+    }]
   }
 };
 createView({
@@ -182,7 +191,7 @@ createView({
     view: Header,
     text: 'Welcome!'
   }, {
-    textContent: 'My content'
+    view: Content
   }, {
     view: Footer
   }]
@@ -208,12 +217,12 @@ const fallbackLang = 'en';
 const l10n = createL10n(locales, fallbackLang);
 const msg = l10n.t('say.hello', { name: 'World' }, 'en');
 console.log(msg); // Hello World!
-l10n.$lang = 'en'
+l10n.lang = 'en';
 const msgEn = l10n.t('say.hello', { name: 'World' });
-console.log(msgEn) // Hello World!
-l10n.$lang = 'ru'
+console.log(msgEn); // Hello World!
+l10n.lang = 'ru';
 const msgRu = l10n.t('say.hello', { name: 'Мир' });
-console.log(msgRu) // Привет Мир!
+console.log(msgRu); // Привет Мир!
 ```
 
 ## Routing

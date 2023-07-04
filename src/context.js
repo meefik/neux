@@ -33,5 +33,4 @@ export function setContext(obj, prop, fn) {
   const props = context.get(obj) || {};
   props[prop] = fn || null;
   context.set(obj, props);
-  // console.log('setContext', prop);
 }
