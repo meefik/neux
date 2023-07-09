@@ -8,7 +8,7 @@ The state is a proxy for objects. States are used to track changes and distribut
 
 ```js
 const state = createState({
-  counter: 0,
+  counter: 1,
   multiplier: 2,
   tasks: [
     { text: 'Item 1' },

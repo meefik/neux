@@ -1,4 +1,5 @@
 import { getContext } from './context';
+import EventListener from './listener';
 
 /**
  * View
@@ -15,28 +16,6 @@ export function createView(config, target) {
   const el = render(config);
   if (target) target.appendChild(el);
   return el;
-}
-
-function patch(source = {}, target = {}, cleaners) {
-  const setValue = (obj, key, val) => {
-    if (val !== null && typeof val === 'object') {
-      patch(val, obj[key], cleaners);
-    } else {
-      obj[key] = val;
-    }
-  };
-  for (const key in source) {
-    let value = source[key];
-    if (typeof value === 'function') {
-      const fn = value;
-      const updater = () => setValue(target, key, fn());
-      value = getContext(fn, (obj, prop) => {
-        obj.$$on(prop, updater);
-        cleaners.push(() => obj.$$off(prop, updater));
-      });
-    }
-    setValue(target, key, value);
-  }
 }
 
 function render(config) {
@@ -63,20 +42,17 @@ function render(config) {
   const el = namespaceURI
     ? document.createElementNS(namespaceURI, tagName)
     : document.createElement(tagName);
-  let cleaners = [];
+  const cleaner = new EventListener();
   el.addEventListener(
     'removed',
-    () => {
-      for (const fn of cleaners) fn();
-      cleaners = [];
-    },
+    () => cleaner.emit('*'),
     false
   );
-  patch(attrs, el, cleaners);
+  patch(attrs, el, cleaner);
   for (const ev in on) {
     const handler = on[ev];
     if (typeof handler === 'function') {
-      el.addEventListener(ev, handler, false);
+      el.addEventListener(ev, handler);
     }
   }
   for (const attr in attributes) {
@@ -89,7 +65,7 @@ function render(config) {
         };
         val = getContext(fn, (obj, prop) => {
           obj.$$on(prop, updater);
-          cleaners.push(() => obj.$$off(prop, updater));
+          cleaner.once('*', () => obj.$$off(prop, updater));
         });
       }
       el.setAttribute(attr, val);
@@ -111,7 +87,7 @@ function render(config) {
           }
         };
         obj.$$on('#add', add);
-        cleaners.push(() => obj.$$off('#add', add));
+        cleaner.once('*', () => obj.$$off('#add', add));
         const mod = (newv, prop, obj) => {
           if (isNaN(prop)) return;
           const index = parseInt(prop);
@@ -125,7 +101,7 @@ function render(config) {
           }
         };
         obj.$$on('#mod', mod);
-        cleaners.push(() => obj.$$off('#mod', mod));
+        cleaner.once('*', () => obj.$$off('#mod', mod));
         const del = (newv, prop, obj) => {
           if (isNaN(prop)) return;
           const index = parseInt(prop);
@@ -135,7 +111,7 @@ function render(config) {
           }
         };
         obj.$$on('#del', del);
-        cleaners.push(() => obj.$$off('#del', del));
+        cleaner.once('*', () => obj.$$off('#del', del));
       } else {
         const fn = children;
         const updater = () => {
@@ -147,7 +123,7 @@ function render(config) {
           }
         };
         obj.$$on(prop, updater);
-        cleaners.push(() => obj.$$off(prop, updater));
+        cleaner.once('*', () => obj.$$off(prop, updater));
       }
     });
   }
@@ -159,6 +135,28 @@ function render(config) {
     }
   }
   return el;
+}
+
+function patch(source = {}, target = {}, cleaner) {
+  const setValue = (obj, key, val) => {
+    if (val !== null && typeof val === 'object') {
+      patch(val, obj[key], cleaner);
+    } else {
+      obj[key] = val;
+    }
+  };
+  for (const key in source) {
+    let value = source[key];
+    if (typeof value === 'function') {
+      const fn = value;
+      const updater = () => setValue(target, key, fn());
+      value = getContext(fn, (obj, prop) => {
+        obj.$$on(prop, updater);
+        cleaner.once('*', () => obj.$$off(prop, updater));
+      });
+    }
+    setValue(target, key, value);
+  }
 }
 
 function createObserver(el) {

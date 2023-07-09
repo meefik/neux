@@ -1,4 +1,5 @@
 import { getContext, setContext } from './context';
+import EventListener from './listener';
 
 const hasOwnProperty = Object.prototype.hasOwnProperty;
 const proxyKey = Symbol();
@@ -11,67 +12,46 @@ const proxyKey = Symbol();
  */
 export function createState(target) {
   if (typeof target !== 'object') target = {};
-  if (target === null || target[proxyKey]) return target;
-  let updater;
+  if (target === null || target[proxyKey] ||
+    (target.constructor !== Object &&
+    target.constructor !== Array)) return target;
+  let syncer;
   const dollarRe = /^\$/;
-  const listeners = {};
-  const cleaners = {};
-  const setUpdater = (obj, prop, getter) => {
-    if (cleaners[prop]) {
-      for (const fn of cleaners[prop]) fn();
-    }
-    cleaners[prop] = [];
-    const updater = () => {
-      obj[prop] = getter(obj, prop);
-    };
-    return getContext(
-      () => getter(obj, prop),
-      (_obj, _prop) => {
-        _obj.$$on(_prop, updater);
-        cleaners[prop].push(() => _obj.$$off(_prop, updater));
-      }
-    );
-  };
-  const dispatchEvent = (ev, value, prop, obj) => {
-    ['*'].concat(ev).forEach(e => {
-      if (listeners[e]) {
-        for (const fn of listeners[e]) {
-          fn(value, prop, obj);
-        }
-      }
-    });
-  };
+  const listener = new EventListener();
+  const cleaner = new EventListener();
   const handler = {
     get: (obj, prop, receiver) => {
       if (prop === proxyKey) {
         return true;
       }
-      if (prop === '$$on') {
+      if (prop === '$') {
+        return function (key) {
+          return receiver['$' + key];
+        };
+      } else if (prop === '$$on') {
         return function (prop, handler) {
-          if (prop && handler) {
-            if (!listeners[prop]) listeners[prop] = new Set();
-            listeners[prop].add(handler);
-          }
+          listener.on(prop, handler);
+        };
+      } else if (prop === '$$once') {
+        return function (prop, handler) {
+          listener.once(prop, handler);
         };
       } else if (prop === '$$off') {
         return function (prop, handler) {
-          if (listeners[prop]) {
-            if (handler) listeners[prop].delete(handler);
-            else listeners[prop].clear();
-          }
+          listener.off(prop, handler);
         };
       } else if (prop === '$$emit') {
         return function (key) {
           const clone = deepClone(obj);
           const value = obj[key];
-          dispatchEvent([key], value, key, clone);
+          listener.emit([key], value, key, clone);
         };
       } else if (prop === '$$sync') {
         return async function (store, ...args) {
           if (typeof store === 'function') {
             let data = await store(deepClone(obj), null, ...args);
             deepPatch(this, data);
-            updater = async (...args) => {
+            syncer = async (...args) => {
               const changes = deepDiff(obj, data);
               data = await store(deepClone(obj), changes, ...args);
               deepPatch(this, data);
@@ -81,8 +61,8 @@ export function createState(target) {
           } else if (typeof store === 'object') {
             deepPatch(this, store);
             return this;
-          } else if (typeof updater === 'function') {
-            return await updater(...args);
+          } else if (typeof syncer === 'function') {
+            return await syncer(...args);
           }
         };
       } else if (prop === '$$each' && Array.isArray(obj)) {
@@ -100,7 +80,7 @@ export function createState(target) {
     },
     set: (obj, prop, value, receiver) => {
       if (typeof value === 'function') {
-        value = setUpdater(receiver, prop, value);
+        value = setUpdater(receiver, prop, value, cleaner);
       }
       if (typeof value === 'object') {
         value = createState(value);
@@ -111,7 +91,7 @@ export function createState(target) {
       if (!res) return false;
       if (changed) {
         const events = [prop, hasOwnProperty.call(clone, prop) ? '#mod' : '#add'];
-        dispatchEvent(events, value, prop, clone);
+        listener.emit(events, value, prop, clone);
       }
       return true;
     },
@@ -119,16 +99,11 @@ export function createState(target) {
       const clone = deepClone(obj);
       const res = Reflect.deleteProperty(obj, prop);
       if (!res) return false;
-      dispatchEvent(['#del'], undefined, prop, clone);
-      if (listeners[prop]) {
-        delete listeners[prop];
-      }
-      if (cleaners[prop]) {
-        for (const fn of cleaners[prop]) fn();
-        delete cleaners[prop];
-      }
+      listener.emit(['#del'], undefined, prop, clone);
+      listener.off(prop);
+      cleaner.emit(prop);
       if (Array.isArray(clone[prop])) {
-        updater = null;
+        syncer = null;
       }
       return true;
     },
@@ -136,7 +111,7 @@ export function createState(target) {
   const state = new Proxy(target, handler);
   for (const key in target) {
     if (typeof target[key] === 'function') {
-      target[key] = setUpdater(state, key, target[key]);
+      target[key] = setUpdater(state, key, target[key], cleaner);
     }
     if (typeof target[key] === 'object') {
       target[key] = createState(target[key]);
@@ -144,6 +119,20 @@ export function createState(target) {
   }
   return state;
 }
+
+function setUpdater(obj, prop, getter, cleaner) {
+  cleaner.emit(prop);
+  const updater = () => {
+    obj[prop] = getter(obj, prop);
+  };
+  return getContext(
+    () => getter(obj, prop),
+    (_obj, _prop) => {
+      _obj.$$on(_prop, updater);
+      cleaner.once(prop, () => _obj.$$off(_prop, updater));
+    }
+  );
+};
 
 function deepPatch(oldv, newv) {
   if (oldv === newv || typeof newv !== 'object' || typeof oldv !== 'object') {
