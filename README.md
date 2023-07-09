@@ -1,4 +1,4 @@
-# veux
+# neux
 
 A frontend microlibrary with reactivity states and views.
 

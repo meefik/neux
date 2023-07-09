@@ -1,5 +1,5 @@
 {
-  "name": "vuex",
+  "name": "neux",
   "version": "0.1.0",
   "description": "A frontend microlibrary with reactivity states and views.",
   "author": "Anton Skshidlevsky <meefik@gmail.com>",
@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/meefik/vuex.git"
+    "url": "https://github.com/neux-dev/neux.git"
   },
   "type": "module",
   "scripts": {
