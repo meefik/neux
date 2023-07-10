@@ -27,6 +27,10 @@ state.double = (obj, prop) => state.$double * state.$multiplier;
 delete state.double;
 ```
 
+> **Attention!**
+>
+> When deleting or replacing the tracking object/array in the calculated field, all binding is lost.
+
 Watching for state changes
 
 ```js

@@ -1,48 +1,58 @@
 export default class EventListener {
   constructor() {
-    this._listeners = {};
-    this._once = {};
+    this._list = {};
   }
-  on(prop, handler) {
-    if (prop && handler) {
-      const listeners = this._listeners;
-      if (!listeners[prop]) {
-        listeners[prop] = new Set();
+  on(event, handler) {
+    if (event && handler) {
+      const list = this._list;
+      if (!list[event]) {
+        list[event] = new Map();
       }
-      listeners[prop].add(handler);
+      list[event].set(handler, false);
     }
   }
-  once(prop, handler) {
-    if (prop && handler) {
-      this.on(prop, handler);
-      this._once[prop] = true;
+  once(event, handler) {
+    if (event && handler) {
+      const list = this._list;
+      if (!list[event]) {
+        list[event] = new Map();
+      }
+      list[event].set(handler, true);
     }
   }
-  off(prop, handler) {
-    const listeners = this._listeners;
-    const once = this._once;
-    if (listeners[prop]) {
+  off(event, handler) {
+    const list = this._list;
+    if (list[event]) {
       if (handler) {
-        listeners[prop].delete(handler);
+        list[event].delete(handler);
+        if (!list[event].size) {
+          delete list[event];
+        }
       } else {
-        listeners[prop].clear();
-        delete listeners[prop];
-        delete once[prop];
+        list[event].clear();
+        delete list[event];
       }
     }
   }
-  emit(ev, value, prop, obj) {
-    const listeners = this._listeners;
-    const once = this._once;
-    ['*'].concat(ev).forEach(e => {
-      if (listeners[e]) {
-        for (const fn of listeners[e]) {
-          fn(value, prop, obj);
-        }
-        if (once[prop]) {
-          this.off(prop);
+  emit(event, ...args) {
+    const list = this._list;
+    if (event === '*') {
+      for (const event in list) {
+        for (const [fn, once] of list[event]) {
+          fn(...args);
+          if (once) this.off(event, fn);
         }
       }
-    });
+    } else {
+      const events = new Set(['*'].concat(event));
+      for (const event of events) {
+        if (list[event]) {
+          for (const [fn, once] of list[event]) {
+            fn(...args);
+            if (once) this.off(event, fn);
+          }
+        }
+      }
+    }
   }
 }

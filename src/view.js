@@ -60,12 +60,10 @@ function render(config) {
     if (typeof val !== 'undefined') {
       if (typeof val === 'function') {
         const fn = val;
-        const updater = () => {
-          el.setAttribute(attr, fn());
-        };
+        const updater = () => el.setAttribute(attr, fn());
         val = getContext(fn, (obj, prop) => {
           obj.$$on(prop, updater);
-          cleaner.once('*', () => obj.$$off(prop, updater));
+          cleaner.once(attr, () => obj.$$off(prop, updater));
         });
       }
       el.setAttribute(attr, val);
@@ -87,7 +85,7 @@ function render(config) {
           }
         };
         obj.$$on('#add', add);
-        cleaner.once('*', () => obj.$$off('#add', add));
+        cleaner.once(prop, () => obj.$$off('#add', add));
         const mod = (newv, prop, obj) => {
           if (isNaN(prop)) return;
           const index = parseInt(prop);
@@ -101,7 +99,7 @@ function render(config) {
           }
         };
         obj.$$on('#mod', mod);
-        cleaner.once('*', () => obj.$$off('#mod', mod));
+        cleaner.once(prop, () => obj.$$off('#mod', mod));
         const del = (newv, prop, obj) => {
           if (isNaN(prop)) return;
           const index = parseInt(prop);
@@ -111,7 +109,7 @@ function render(config) {
           }
         };
         obj.$$on('#del', del);
-        cleaner.once('*', () => obj.$$off('#del', del));
+        cleaner.once(prop, () => obj.$$off('#del', del));
       } else {
         const fn = children;
         const updater = () => {
@@ -123,7 +121,7 @@ function render(config) {
           }
         };
         obj.$$on(prop, updater);
-        cleaner.once('*', () => obj.$$off(prop, updater));
+        cleaner.once(prop, () => obj.$$off(prop, updater));
       }
     });
   }
@@ -141,7 +139,7 @@ function patch(source = {}, target = {}, cleaner) {
   const setValue = (obj, key, val) => {
     if (val !== null && typeof val === 'object') {
       patch(val, obj[key], cleaner);
-    } else {
+    } else if (obj[key] !== val) {
       obj[key] = val;
     }
   };
@@ -152,7 +150,7 @@ function patch(source = {}, target = {}, cleaner) {
       const updater = () => setValue(target, key, fn());
       value = getContext(fn, (obj, prop) => {
         obj.$$on(prop, updater);
-        cleaner.once('*', () => obj.$$off(prop, updater));
+        cleaner.once(key, () => obj.$$off(prop, updater));
       });
     }
     setValue(target, key, value);
@@ -172,12 +170,10 @@ function createObserver(el) {
     for (const mutation of mutationList) {
       mutation.addedNodes.forEach((node) => {
         if (node.nodeType !== Node.ELEMENT_NODE) return;
-        // console.log('node.mounted', node.nodeName);
         dispatchEvent(node, 'mounted');
       });
       mutation.removedNodes.forEach((node) => {
         if (node.nodeType !== Node.ELEMENT_NODE) return;
-        // console.log('node.removed', node.nodeName);
         dispatchEvent(node, 'removed');
       });
     }
