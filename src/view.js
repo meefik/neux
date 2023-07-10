@@ -18,7 +18,7 @@ export function createView(config, target) {
   return el;
 }
 
-function render(config) {
+function render(config, ns) {
   if (config?.node) return config.node;
   const attrs = { ...config };
   if (attrs.view) {
@@ -27,9 +27,12 @@ function render(config) {
     const view = fn(attrs);
     return render(view);
   }
+  if (!ns && `${attrs.tagName}`.toUpperCase() === 'SVG') {
+    ns = 'http://www.w3.org/2000/svg';
+  }
   const {
     tagName = 'DIV',
-    namespaceURI,
+    namespaceURI = ns,
     attributes,
     children,
     on
@@ -78,7 +81,7 @@ function render(config) {
           const index = parseInt(prop);
           const newView = fn(newv, index, obj);
           if (newView) {
-            const newChild = render(newView);
+            const newChild = render(newView, namespaceURI);
             if (newChild) {
               el.appendChild(newChild);
             }
@@ -92,7 +95,7 @@ function render(config) {
           const oldChild = el.children[index];
           const newView = fn(newv, index, obj);
           if (newView) {
-            const newChild = render(newView);
+            const newChild = render(newView, namespaceURI);
             if (newChild && oldChild) {
               el.replaceChild(newChild, oldChild);
             }
@@ -116,7 +119,7 @@ function render(config) {
           const views = [].concat(fn());
           el.innerHTML = '';
           for (const view of views) {
-            const child = render(view);
+            const child = render(view, namespaceURI);
             el.appendChild(child);
           }
         };
@@ -128,7 +131,7 @@ function render(config) {
   if (typeof _children === 'object') {
     const views = [].concat(_children);
     for (const view of views) {
-      const child = render(view);
+      const child = render(view, namespaceURI);
       el.appendChild(child);
     }
   }
