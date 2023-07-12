@@ -56,8 +56,8 @@ function decodeQueryString(qs) {
     params[decodeURIComponent(tokens[1])] = decodeURIComponent(tokens[2]);
     tokens = re.exec(qs);
   }
-  const match = /^([^?]+)/.exec(qs) || [];
-  const path = decodeURIComponent(match[1] || '#');
+  const match = /^#([^?]+)/.exec(qs) || [];
+  const path = decodeURIComponent(match[1] || '');
   return { path, params };
 }
 
@@ -66,7 +66,7 @@ function encodeQueryString(path, params) {
   for (const k in params) {
     tokens.push(`${k}=${params[k]}`);
   }
-  let qs = path || '#';
+  let qs = path ? `#${path}` : '#';
   if (tokens.length) {
     qs += `?${tokens.join('&')}`;
   }
