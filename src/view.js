@@ -3,29 +3,37 @@ import EventListener from './listener';
 
 /**
  * View
- * 
- * @param {object} config 
- * @param {HTMLElement} target 
+ *
+ * @param {object} config
+ * @param {HTMLElement} target
  * @returns {HTMLElement}
  */
-export function createView(config, target) {
-  if (target) {
-    const observer = createObserver(target);
-    target.addEventListener('removed', () => observer.disconnect(), false);
-  }
+export function createView (config, target) {
   const el = render(config);
-  if (target) target.appendChild(el);
+  const node = target || el;
+  const observer = createObserver(node);
+  node.addEventListener('removed', () => observer.disconnect(), false);
+  if (target && el) {
+    target.appendChild(el);
+  }
   return el;
 }
 
-function render(config, ns) {
-  if (config?.node) return config.node;
+function render (config, ns) {
+  if (typeof config !== 'object') return;
   const attrs = { ...config };
+  let node;
   if (attrs.view) {
-    const fn = attrs.view;
+    node = attrs.view;
     delete attrs.view;
-    const view = fn(attrs);
-    return render(view);
+    if (typeof node === 'function') {
+      return render(node(attrs));
+    } else if (typeof node === 'string') {
+      const el = document.createElement('div');
+      el.innerHTML = node;
+      attrs.view = el.firstChild;
+      return render(attrs);
+    }
   }
   if (!ns && `${attrs.tagName}`.toUpperCase() === 'SVG') {
     ns = 'http://www.w3.org/2000/svg';
@@ -34,42 +42,40 @@ function render(config, ns) {
     tagName = 'DIV',
     namespaceURI = ns,
     attributes,
-    children,
-    on
+    on,
+    children
   } = attrs;
   delete attrs.tagName;
   delete attrs.namespaceURI;
   delete attrs.attributes;
-  delete attrs.children;
   delete attrs.on;
-  const el = namespaceURI
-    ? document.createElementNS(namespaceURI, tagName)
-    : document.createElement(tagName);
-  const cleaner = new EventListener();
-  el.addEventListener(
-    'removed',
-    () => cleaner.emit('*'),
-    false
-  );
-  patch(attrs, el, cleaner);
-  for (const ev in on) {
-    const handler = on[ev];
-    if (typeof handler === 'function') {
-      el.addEventListener(ev, handler);
-    }
+  delete attrs.children;
+  if (!node) {
+    node = namespaceURI
+      ? document.createElementNS(namespaceURI, tagName)
+      : document.createElement(tagName);
   }
+  const cleaner = new EventListener();
+  node.addEventListener('removed', () => cleaner.emit('*'), false);
+  patch(attrs, node, cleaner);
   for (const attr in attributes) {
     let val = attributes[attr];
     if (typeof val !== 'undefined') {
       if (typeof val === 'function') {
         const fn = val;
-        const updater = () => el.setAttribute(attr, fn());
+        const updater = () => node.setAttribute(attr, fn());
         val = getContext(fn, (obj, prop) => {
           obj.$$on(prop, updater);
           cleaner.once(attr, () => obj.$$off(prop, updater));
         });
       }
-      el.setAttribute(attr, val);
+      node.setAttribute(attr, val);
+    }
+  }
+  for (const ev in on) {
+    const handler = on[ev];
+    if (typeof handler === 'function') {
+      node.addEventListener(ev, handler);
     }
   }
   let _children = children;
@@ -83,7 +89,7 @@ function render(config, ns) {
           if (newView) {
             const newChild = render(newView, namespaceURI);
             if (newChild) {
-              el.appendChild(newChild);
+              node.appendChild(newChild);
             }
           }
         };
@@ -92,12 +98,12 @@ function render(config, ns) {
         const mod = (newv, prop, obj) => {
           if (isNaN(prop)) return;
           const index = parseInt(prop);
-          const oldChild = el.children[index];
+          const oldChild = node.children[index];
           const newView = fn(newv, index, obj);
           if (newView) {
             const newChild = render(newView, namespaceURI);
             if (newChild && oldChild) {
-              el.replaceChild(newChild, oldChild);
+              node.replaceChild(newChild, oldChild);
             }
           }
         };
@@ -106,9 +112,9 @@ function render(config, ns) {
         const del = (newv, prop, obj) => {
           if (isNaN(prop)) return;
           const index = parseInt(prop);
-          const oldChild = el.children[index];
+          const oldChild = node.children[index];
           if (oldChild) {
-            el.removeChild(oldChild);
+            node.removeChild(oldChild);
           }
         };
         obj.$$on('#del', del);
@@ -117,10 +123,12 @@ function render(config, ns) {
         const fn = children;
         const updater = () => {
           const views = [].concat(fn());
-          el.innerHTML = '';
+          node.innerHTML = '';
           for (const view of views) {
             const child = render(view, namespaceURI);
-            el.appendChild(child);
+            if (child) {
+              node.appendChild(child);
+            }
           }
         };
         obj.$$on(prop, updater);
@@ -132,18 +140,23 @@ function render(config, ns) {
     const views = [].concat(_children);
     for (const view of views) {
       const child = render(view, namespaceURI);
-      el.appendChild(child);
+      if (child) {
+        node.appendChild(child);
+      }
     }
   }
-  return el;
+  return node;
 }
 
-function patch(source = {}, target = {}, cleaner) {
+function patch (source, target, cleaner, level = 0) {
   const setValue = (obj, key, val) => {
+    if (key === 'classList' && !level) {
+      val = val.join(' ');
+    }
     if (val !== null && typeof val === 'object') {
-      patch(val, obj[key], cleaner);
-    } else if (obj[key] !== val) {
-      obj[key] = val;
+      patch(val, obj[key], cleaner, level + 1);
+    } else {
+      if (obj[key] !== val) obj[key] = val;
     }
   };
   for (const key in source) {
@@ -160,7 +173,7 @@ function patch(source = {}, target = {}, cleaner) {
   }
 }
 
-function createObserver(el) {
+function createObserver (el) {
   const observer = new MutationObserver(function (mutationList) {
     const dispatchEvent = (node, event) => {
       const children = node.children;

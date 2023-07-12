@@ -2,12 +2,12 @@ let context;
 
 /**
  * Get data rendering functions from the current context.
- * 
- * @param {function} getter 
- * @param {function} handler 
+ *
+ * @param {function} getter
+ * @param {function} handler
  * @returns {*}
  */
-export function getContext(getter, handler) {
+export function getContext (getter, handler) {
   if (context) throw Error('Collision in state binding');
   const _context = (context = new Map());
   const val = getter();
@@ -23,12 +23,12 @@ export function getContext(getter, handler) {
 
 /**
  * Add a data rendering function for the current context.
- * 
- * @param {object} obj 
- * @param {string} prop 
- * @param {function} fn 
+ *
+ * @param {object} obj
+ * @param {string} prop
+ * @param {function} fn
  */
-export function setContext(obj, prop, fn) {
+export function setContext (obj, prop, fn) {
   if (!context) return;
   const props = context.get(obj) || {};
   props[prop] = fn || null;

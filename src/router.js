@@ -6,15 +6,15 @@ import { createState } from './state';
  * @param {object} state
  * @returns {Proxy}
  */
-export function createRouter() {
-  function navigate(path, params) {
+export function createRouter () {
+  function navigate (path, params) {
     if (typeof path === 'object') {
       params = path;
       path = null;
     }
     location.hash = encodeQueryString(path, params);
   }
-  function refresh() {
+  function refresh () {
     const { path, params } = decodeQueryString(location.hash);
     if (!state.params) state.params = {};
     for (const k in state.params) {
@@ -48,7 +48,7 @@ export function createRouter() {
   return state;
 }
 
-function decodeQueryString(qs) {
+function decodeQueryString (qs) {
   const params = {};
   const re = /[?&]([^=]+)=([^&]*)/g;
   let tokens = re.exec(qs);
@@ -61,7 +61,7 @@ function decodeQueryString(qs) {
   return { path, params };
 }
 
-function encodeQueryString(path, params) {
+function encodeQueryString (path, params) {
   const tokens = [];
   for (const k in params) {
     tokens.push(`${k}=${params[k]}`);

@@ -2,15 +2,15 @@ import { getContext, setContext } from './context';
 import EventListener from './listener';
 
 const hasOwnProperty = Object.prototype.hasOwnProperty;
-const proxyKey = Symbol();
+const proxyKey = Symbol('isProxy');
 
 /**
  * State
- * 
+ *
  * @param {object} target
  * @returns {Proxy}
  */
-export function createState(target) {
+export function createState (target) {
   if (typeof target !== 'object') target = {};
   if (target === null || target[proxyKey] ||
     (target.constructor !== Object &&
@@ -106,7 +106,7 @@ export function createState(target) {
         syncer = null;
       }
       return true;
-    },
+    }
   };
   const state = new Proxy(target, handler);
   for (const key in target) {
@@ -120,7 +120,7 @@ export function createState(target) {
   return state;
 }
 
-function setUpdater(obj, prop, getter, cleaner) {
+function setUpdater (obj, prop, getter, cleaner) {
   cleaner.emit(prop);
   const updater = () => {
     obj[prop] = getter(obj, prop);
@@ -134,7 +134,7 @@ function setUpdater(obj, prop, getter, cleaner) {
   );
 };
 
-function deepPatch(oldv, newv) {
+function deepPatch (oldv, newv) {
   if (oldv === newv || typeof newv !== 'object' || typeof oldv !== 'object') {
     return;
   }
@@ -166,7 +166,7 @@ function deepPatch(oldv, newv) {
   }
 }
 
-function isEqual(newv, oldv) {
+function isEqual (newv, oldv) {
   if (typeof newv === 'object' && typeof oldv === 'object') {
     for (const k in oldv) {
       if (!hasOwnProperty.call(newv, k)) {
@@ -184,7 +184,7 @@ function isEqual(newv, oldv) {
   return true;
 }
 
-function deepDiff(newv, oldv) {
+function deepDiff (newv, oldv) {
   if (oldv === newv || typeof newv !== 'object' || typeof oldv !== 'object') {
     return false;
   }
@@ -258,7 +258,7 @@ function deepDiff(newv, oldv) {
   }
 }
 
-function deepClone(obj) {
+function deepClone (obj) {
   if (typeof obj !== 'object' || obj === null) {
     return obj;
   }

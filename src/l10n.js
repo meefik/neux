@@ -9,11 +9,11 @@ import { createState } from './state';
  * @param {string} fallback
  * @returns {Proxy}
  */
-export function createL10n(locales, fallback) {
+export function createL10n (locales, fallback) {
   if (!fallback) {
     for (fallback in locales) break;
   }
-  function t(path, data, lang) {
+  function t (path, data, lang) {
     if (typeof data === 'string') {
       lang = data;
       data = null;
@@ -22,11 +22,11 @@ export function createL10n(locales, fallback) {
     if (!locales[lang]) lang = fallback;
     const arr = `${path}`.split('.');
     let value = arr.reduce((o, k) => {
-      if (typeof o === 'object') return o[k];
+      return typeof o === 'object' && o[k];
     }, locales[lang]);
     if (!value) return path;
     for (const k in data) {
-      const re = new RegExp(`%\{${k}\}`, 'g');
+      const re = new RegExp(`%{${k}}`, 'g');
       value = value.replace(re, data[k]);
     }
     return value;

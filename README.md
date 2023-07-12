@@ -19,7 +19,7 @@ const state = createState({
   // the calculated field for an array
   filtered: (obj, prop) => {
     return obj.$tasks.filter(item => item.checked);
-  }  
+  }
 });
 // set or change the calculated field
 state.double = (obj, prop) => state.$double * state.$multiplier;
@@ -29,7 +29,9 @@ delete state.double;
 
 > **Attention!**
 >
-> When deleting or replacing the tracking object/array in the calculated field, all binding is lost.
+> 1. When deleting or replacing the tracking object/array in the calculated field, all binding is lost.
+> 2. In calculated fields, binding occurs only with those fields that are called during initialization.
+
 
 Watching for state changes
 
@@ -170,34 +172,24 @@ You can wrap part of the view into a separate component. This is a simple functi
 ```js
 const Header = (params) => {
   return {
-    tagName: 'h1',
-    textContent: params.text
-  };
-};
-const Content = () => {
-  return {
-    tagName: 'p',
-    textContent: 'My content'
-  };
-};
-const Footer = () => {
-  return {
-    tagName: 'footer',
+    tagName: 'header',
     children: [{
-      tagName: 'hr'
-    }, {
-      textContent: 'Powered by Veux'
+      tagName: 'h1',
+      textContent: params.text
     }]
-  }
+  };
 };
 createView({
   children: [{
+    // create view from function
     view: Header,
     text: 'Welcome!'
   }, {
-    view: Content
+    // create view from HTMLElement
+    view: document.createElement('br')
   }, {
-    view: Footer
+    // create view from HTML markup
+    view: '<main>My content</main>'
   }]
 }, document.body);
 ```

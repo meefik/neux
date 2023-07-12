@@ -1,8 +1,9 @@
 export default class EventListener {
-  constructor() {
+  constructor () {
     this._list = {};
   }
-  on(event, handler) {
+
+  on (event, handler) {
     if (event && handler) {
       const list = this._list;
       if (!list[event]) {
@@ -11,7 +12,8 @@ export default class EventListener {
       list[event].set(handler, false);
     }
   }
-  once(event, handler) {
+
+  once (event, handler) {
     if (event && handler) {
       const list = this._list;
       if (!list[event]) {
@@ -20,7 +22,8 @@ export default class EventListener {
       list[event].set(handler, true);
     }
   }
-  off(event, handler) {
+
+  off (event, handler) {
     const list = this._list;
     if (list[event]) {
       if (handler) {
@@ -34,7 +37,8 @@ export default class EventListener {
       }
     }
   }
-  emit(event, ...args) {
+
+  emit (event, ...args) {
     const list = this._list;
     if (event === '*') {
       for (const event in list) {
