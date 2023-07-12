@@ -22,9 +22,8 @@ export function createL10n (locales, fallback) {
     if (!locales[lang]) lang = fallback;
     const arr = `${path}`.split('.');
     let value = arr.reduce((o, k) => {
-      return typeof o === 'object' && o[k];
+      return typeof o === 'object' ? o[k] : '';
     }, locales[lang]);
-    if (!value) return path;
     for (const k in data) {
       const re = new RegExp(`%{${k}}`, 'g');
       value = value.replace(re, data[k]);
