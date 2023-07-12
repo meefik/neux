@@ -139,7 +139,7 @@ function render (config, ns) {
       }
     });
   }
-  if (typeof _children === 'object') {
+  if (typeof _children !== 'undefined') {
     const views = [].concat(_children);
     for (const view of views) {
       const child = render(view, namespaceURI);
