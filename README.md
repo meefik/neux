@@ -174,7 +174,7 @@ const Header = (params) => {
   return {
     tagName: 'header',
     children: [{
-      tagName: 'h1',
+      tagName: 'strong',
       textContent: params.text
     }]
   };
@@ -185,11 +185,15 @@ createView({
     view: Header,
     text: 'Welcome!'
   }, {
-    // create view from HTMLElement
-    view: document.createElement('br')
-  }, {
     // create view from HTML markup
-    view: '<main>My content</main>'
+    view: '<main><p>My content</p></main>',
+    style: {
+      color: 'red'
+    }
+  }, {
+    // create view from HTMLElement
+    view: document.createElement('footer'),
+    textContent: 'Powered by Neux'
   }]
 }, document.body);
 ```
