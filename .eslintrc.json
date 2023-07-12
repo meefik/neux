@@ -25,15 +25,6 @@
     "quotes": [
       "error",
       "single"
-    ],
-    "no-unreachable-loop": [
-      "error",
-      {
-        "ignore": [
-          "ForInStatement",
-          "ForOfStatement"
-        ]
-      }
     ]
   }
 }

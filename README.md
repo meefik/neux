@@ -201,20 +201,22 @@ createView({
 ## Localization
 
 ```js
-const locales = {
-  en: {
-    say: {
-      hello: "Hello %{name}!"
+const l10n = createL10n({
+  locales: {
+    en: {
+      say: {
+        hello: "Hello %{name}!"
+      }
+    },
+    ru: {
+      say: {
+        hello: "Привет %{name}!"
+      }
     }
   },
-  ru: {
-    say: {
-      hello: "Привет %{name}!"
-    }
-  }
-};
-const fallbackLang = 'en';
-const l10n = createL10n(locales, fallbackLang);
+  fallback: 'en',
+  lang: navigator.language
+});
 const msg = l10n.t('say.hello', { name: 'World' }, 'en');
 console.log(msg); // Hello World!
 l10n.lang = 'en';
@@ -228,7 +230,9 @@ console.log(msgRu); // Привет Мир!
 ## Routing
 
 ```js
-const router = createRouter();
+const router = createRouter({
+  home: 'page1'
+});
 createView({
   children: [{
     children: [{
@@ -244,24 +248,24 @@ createView({
       textContent: 'Page 3',
       on: {
         click: () => {
-          router.navigate('#page3', { param1: '1', param2: '2' });
+          router.navigate('page3', { param1: '1', param2: '2' });
         }
       }
     }]
   }, {
     children: () => {
       switch (router.$path) {
-      case '#page1':
+      case 'page1':
         return [{
           tagName: 'p',
           textContent: 'Page 1'
         }];
-      case '#page2':
+      case 'page2':
         return [{
           tagName: 'p',
           textContent: 'Page 2'
         }];
-      case '#page3':
+      case 'page3':
         return [{
           tagName: 'p',
           textContent: 'Page 3'

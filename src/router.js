@@ -3,10 +3,11 @@ import { createState } from './state';
 /**
  * Router
  *
- * @param {object} state
+ * @param {object} options
+ * @param {string} [options.home]
  * @returns {Proxy}
  */
-export function createRouter () {
+export function createRouter (options) {
   function navigate (path, params) {
     if (typeof path === 'object') {
       params = path;
@@ -15,6 +16,9 @@ export function createRouter () {
     location.hash = encodeQueryString(path, params);
   }
   function refresh () {
+    if ((!location.hash || location.hash === '#') && state.home) {
+      return navigate(state.home);
+    }
     const { path, params } = decodeQueryString(location.hash);
     if (!state.params) state.params = {};
     for (const k in state.params) {
@@ -30,6 +34,7 @@ export function createRouter () {
     state.path = path;
   }
   const state = createState({
+    ...options,
     path: '',
     params: {},
     navigate: () => navigate

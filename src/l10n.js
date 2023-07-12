@@ -3,23 +3,28 @@ import { createState } from './state';
 /**
  * Localization
  *
- * locales = { en: {}, ru: {} }
- *
- * @param {object} locales
- * @param {string} fallback
+ * @param {object} options
+ * @param {object} options.locales
+ * @param {string} [options.lang=navigator.language]
+ * @param {string} [options.fallback="en"]
  * @returns {Proxy}
  */
-export function createL10n (locales, fallback) {
-  if (!fallback) {
-    for (fallback in locales) break;
-  }
+export function createL10n (options) {
+  const state = createState({
+    lang: navigator.language,
+    fallback: 'en',
+    locales: {},
+    ...options,
+    t: () => t
+  });
   function t (path, data, lang) {
     if (typeof data === 'string') {
       lang = data;
       data = null;
     }
+    const locales = state.locales || {};
     if (!lang) lang = state.$lang;
-    if (!locales[lang]) lang = fallback;
+    if (!locales[lang]) lang = state.fallback;
     const arr = `${path}`.split('.');
     let value = arr.reduce((o, k) => {
       return typeof o === 'object' ? o[k] : '';
@@ -30,9 +35,5 @@ export function createL10n (locales, fallback) {
     }
     return value;
   }
-  const state = createState({
-    lang: navigator.language,
-    t: () => t
-  });
   return state;
 }
