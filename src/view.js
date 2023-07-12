@@ -20,6 +20,9 @@ export function createView (config, target) {
 }
 
 function render (config, ns) {
+  if (typeof config === 'function') {
+    return render(config());
+  }
   if (typeof config !== 'object') return;
   const attrs = { ...config };
   let node;
