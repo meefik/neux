@@ -153,8 +153,12 @@ function render (config, ns) {
 
 function patch (source, target, cleaner, level = 0) {
   const setValue = (obj, key, val) => {
-    if (key === 'classList' && !level) {
-      val = val.join(' ');
+    if (key === 'classList' && Array.isArray(val) && !level) {
+      const arr = [];
+      for (const cls of val) {
+        if (cls) arr.push(cls);
+      }
+      val = arr.join(' ');
     }
     if (val !== null && typeof val === 'object') {
       patch(val, obj[key], cleaner, level + 1);
