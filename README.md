@@ -50,30 +50,63 @@ state.$$off('double');
 state.tasks.$$on('*', handler);
 ```
 
-Synchronizing state with storage
+Synchronizing state with `localStorage`
 
 ```js
-const localStore = (state, changes) => {
-  if (!changes) {
+const store = (newv, oldv, diff) => {
+  if (!diff) {
     return JSON.parse(localStorage.getItem('todos') || '[]');
   } else {
     localStorage.setItem('todos', JSON.stringify(state));
   }
 };
-const remoteStore = async (state, changes) => {
+// bind state with store
+state.tasks.$$sync = store;
+// sync state with store
+state.tasks.$$sync();
+// unbind state and store 
+delete state.tasks.$$sync;
+```
+
+Synchronizing state with remote store
+
+```js
+const store = async (newv, oldv, diff) => {
   const res = await fetch('/api/todos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(changes || {})
+    body: JSON.stringify(diff || {})
   });
   return await res.json();
 };
-// bind store with state and sync
-state.list.$$sync(localStore);
+// bind state with store
+state.tasks.$$sync = store;
 // sync state with store
-state.list.$$sync();
-// unbind store and state
-delete state.list;
+state.tasks.$$sync();
+```
+
+Undo last changes
+
+```js
+const store = async (newv, oldv, diff, action) => {
+  if (action === 'undo') return oldv;
+  if (action === 'clear') return [];
+  return newv;
+};
+// bind state with store
+state.tasks.$$sync = store;
+// sync state with store
+state.tasks.$$sync();
+// change state
+state.tasks[0].checked = false;
+// commit changes
+state.tasks.$$sync();
+// change state again
+state.tasks[0].checked = true;
+// undo last change
+state.tasks.$$sync('undo');
+// delete all data
+state.tasks.$$sync('clear');
 ```
 
 ## View

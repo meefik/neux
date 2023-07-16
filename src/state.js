@@ -47,24 +47,7 @@ export function createState (target) {
           listener.emit([key], value, key, clone);
         };
       } else if (prop === '$$sync') {
-        return async function (store, ...args) {
-          if (typeof store === 'function') {
-            let data = await store(deepClone(obj), null, ...args);
-            deepPatch(this, data);
-            syncer = async (...args) => {
-              const changes = deepDiff(obj, data);
-              data = await store(deepClone(obj), changes, ...args);
-              deepPatch(this, data);
-              return data;
-            };
-            return data;
-          } else if (typeof store === 'object') {
-            deepPatch(this, store);
-            return this;
-          } else if (typeof syncer === 'function') {
-            return await syncer(...args);
-          }
-        };
+        return syncer;
       } else if (prop === '$$each' && Array.isArray(obj)) {
         return function (fn, _this) {
           setContext(this, '$each', fn);
@@ -79,6 +62,22 @@ export function createState (target) {
       return Reflect.get(obj, prop);
     },
     set: (obj, prop, value, receiver) => {
+      if (prop === '$$sync') {
+        if (typeof value !== 'function') {
+          return false;
+        }
+        let data;
+        const fn = value;
+        syncer = async (...args) => {
+          const oldv = data;
+          const newv = deepClone(obj);
+          const diff = deepDiff(newv, oldv);
+          data = await fn(newv, oldv, diff, ...args);
+          deepPatch(receiver, data);
+          return data;
+        };
+        return true;
+      }
       if (typeof value === 'function') {
         value = setUpdater(receiver, prop, value, cleaner);
       }
@@ -99,11 +98,10 @@ export function createState (target) {
       const clone = deepClone(obj);
       const res = Reflect.deleteProperty(obj, prop);
       if (!res) return false;
-      listener.emit(['#del'], undefined, prop, clone);
-      listener.off(prop);
+      listener.emit([prop, '#del'], undefined, prop, clone);
       cleaner.emit(prop);
-      if (Array.isArray(clone[prop])) {
-        syncer = null;
+      if (prop === '$$sync') {
+        syncer = undefined;
       }
       return true;
     }
@@ -135,27 +133,27 @@ function setUpdater (obj, prop, getter, cleaner) {
 };
 
 function deepPatch (oldv, newv) {
-  if (oldv === newv || typeof newv !== 'object' || typeof oldv !== 'object') {
-    return;
-  }
-  const isArray = Array.isArray(oldv);
+  const isOldArray = Array.isArray(oldv);
   for (const k in newv) {
     if (newv[k] !== null && typeof newv[k] === 'object') {
-      if (typeof oldv[k] !== 'object') {
+      if (oldv[k] !== null && typeof oldv[k] === 'object') {
+        deepPatch(oldv[k], newv[k]);
+      } else {
         const obj = createState(Array.isArray(newv[k]) ? [] : {});
         deepPatch(obj, newv[k]);
-        if (isArray) oldv.splice(k, 1, obj);
+        if (isOldArray) oldv.splice(k, 1, obj);
         else oldv[k] = obj;
       }
-    } else {
-      if (isArray) oldv.splice(k, 1, newv[k]);
+    } else if (typeof newv[k] !== 'undefined') {
+      if (isOldArray) oldv.splice(k, 1, newv[k]);
       else oldv[k] = newv[k];
     }
   }
-  if (isArray) {
-    const count = oldv.length - newv.length;
+  if (isOldArray) {
+    const newvLength = Array.isArray(newv) ? newv.length : 0;
+    const count = oldv.length - newvLength;
     if (count > 0) {
-      oldv.splice(newv.length, count);
+      oldv.splice(newvLength, count);
     }
   } else {
     for (const k in oldv) {
@@ -185,48 +183,50 @@ function isEqual (newv, oldv) {
 }
 
 function deepDiff (newv, oldv) {
-  if (oldv === newv || typeof newv !== 'object' || typeof oldv !== 'object') {
-    return false;
-  }
   if (Array.isArray(newv)) {
     const add = [];
     const del = [];
     const mod = [];
     const _oldv = {};
-    for (const k in oldv) {
-      const item = oldv[k];
+    if (!Array.isArray(oldv)) oldv = [];
+    for (let i = 0; i < oldv.length; i++) {
+      const item = oldv[i];
       if (typeof item !== 'object') continue;
       if (hasOwnProperty.call(item, 'id')) {
         _oldv[item.id] = item;
+      } else {
+        _oldv[i] = item;
       }
     }
     const _newv = {};
-    for (const k in newv) {
-      const item = newv[k];
+    for (let i = 0; i < newv.length; i++) {
+      const item = newv[i];
       if (typeof item !== 'object') continue;
+      let id;
       if (hasOwnProperty.call(item, 'id')) {
-        const id = item.id;
+        id = item.id;
         _newv[id] = item;
-        if (hasOwnProperty.call(_oldv, id)) {
-          const _item = _oldv[id];
-          const obj = { id };
-          let changed;
-          for (const k in item) {
-            if (!isEqual(item[k], _item[k])) {
-              obj[k] = item[k];
-              changed = true;
-            }
+      } else {
+        id = i;
+        _newv[id] = item;
+      }
+      if (hasOwnProperty.call(_oldv, id)) {
+        const _item = _oldv[id];
+        const obj = { id };
+        let changed;
+        for (const k in item) {
+          if (!isEqual(item[k], _item[k])) {
+            obj[k] = item[k];
+            changed = true;
           }
-          for (const k in _item) {
-            if (!hasOwnProperty.call(item, k)) {
-              obj[k] = null;
-              changed = true;
-            }
-          }
-          if (changed) mod.push(deepClone(obj));
-        } else {
-          add.push(deepClone(item));
         }
+        for (const k in _item) {
+          if (!hasOwnProperty.call(item, k)) {
+            obj[k] = null;
+            changed = true;
+          }
+        }
+        if (changed) mod.push(deepClone(obj));
       } else {
         add.push(deepClone(item));
       }
