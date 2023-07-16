@@ -10,8 +10,8 @@
   },
   "ignorePatterns": [
     "*.min.js",
-    "dist/**/*.js",
-    "node_modules/**/*.js"
+    "dist/**/*",
+    "node_modules/**/*"
   ],
   "rules": {
     "semi": [

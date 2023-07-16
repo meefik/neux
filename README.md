@@ -32,7 +32,6 @@ delete state.double;
 > 1. When deleting or replacing the tracking object/array in the calculated field, all binding is lost.
 > 2. In calculated fields, binding occurs only with those fields that are called during initialization.
 
-
 Watching for state changes
 
 ```js
@@ -64,7 +63,7 @@ const store = (newv, oldv, diff) => {
 state.tasks.$$sync = store;
 // sync state with store
 state.tasks.$$sync();
-// unbind state and store 
+// unbind state and store
 delete state.tasks.$$sync;
 ```
 
@@ -88,7 +87,7 @@ state.tasks.$$sync();
 Undo last changes
 
 ```js
-const store = async (newv, oldv, diff, action) => {
+const store = (newv, oldv, diff, action) => {
   if (action === 'undo') return oldv;
   if (action === 'clear') return [];
   return newv;
@@ -98,11 +97,11 @@ state.tasks.$$sync = store;
 // sync state with store
 state.tasks.$$sync();
 // change state
-state.tasks[0].checked = false;
+state.tasks[0].checked = true;
 // commit changes
 state.tasks.$$sync();
 // change state again
-state.tasks[0].checked = true;
+state.tasks[0].checked = false;
 // undo last change
 state.tasks.$$sync('undo');
 // delete all data
@@ -322,6 +321,7 @@ createView({
 - [x] View
 - [x] L10n
 - [x] Router
+- [x] View components
 - [x] State sync with stores
 - [ ] Pagination
 - [ ] Real-time state sync
