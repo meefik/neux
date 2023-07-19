@@ -41,10 +41,8 @@ export function createState (target) {
           listener.off(prop, handler);
         };
       } else if (prop === '$$emit') {
-        return function (key) {
-          const clone = deepClone(obj);
-          const value = obj[key];
-          listener.emit([key], value, key, clone);
+        return function (event, ...args) {
+          listener.emit(event, ...args);
         };
       } else if (prop === '$$sync') {
         return syncer;

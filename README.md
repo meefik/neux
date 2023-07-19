@@ -56,7 +56,7 @@ const store = (newv, oldv, diff) => {
   if (!diff) {
     return JSON.parse(localStorage.getItem('todos') || '[]');
   } else {
-    localStorage.setItem('todos', JSON.stringify(state));
+    localStorage.setItem('todos', JSON.stringify(newv));
   }
 };
 // bind state with store
