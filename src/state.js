@@ -30,19 +30,19 @@ export function createState (target) {
         };
       } else if (prop === '$$on') {
         return function (prop, handler) {
-          listener.on(prop, handler);
+          return listener.on(prop, handler);
         };
       } else if (prop === '$$once') {
         return function (prop, handler) {
-          listener.once(prop, handler);
+          return listener.once(prop, handler);
         };
       } else if (prop === '$$off') {
         return function (prop, handler) {
-          listener.off(prop, handler);
+          return listener.off(prop, handler);
         };
       } else if (prop === '$$emit') {
         return function (event, ...args) {
-          listener.emit(event, ...args);
+          return listener.emit(event, ...args);
         };
       } else if (prop === '$$sync') {
         return syncer;
@@ -104,11 +104,12 @@ export function createState (target) {
       const clone = deepClone(obj);
       const res = Reflect.deleteProperty(obj, prop);
       if (!res) return false;
-      listener.emit([prop, '#del', '*'], undefined, prop, clone);
-      cleaner.emit(prop);
       if (prop === '$$sync') {
         syncer = undefined;
       }
+      cleaner.emit(prop);
+      const events = [prop, '#del', '*'];
+      listener.emit(events, undefined, prop, clone);
       return true;
     }
   };
