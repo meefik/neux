@@ -15,7 +15,6 @@ export function createState (target) {
   if (target === null || target[proxyKey] ||
     (target.constructor !== Object &&
     target.constructor !== Array)) return target;
-  let syncer;
   const dollarRe = /^\$/;
   const listener = new EventListener();
   const cleaner = new EventListener();
@@ -44,8 +43,6 @@ export function createState (target) {
         return function (event, ...args) {
           return listener.emit(event, ...args);
         };
-      } else if (prop === '$$sync') {
-        return syncer;
       } else if (prop === '$$each' && Array.isArray(obj)) {
         return function (fn, _this) {
           setContext(this, '$each', fn);
@@ -60,29 +57,22 @@ export function createState (target) {
       return Reflect.get(obj, prop);
     },
     set: (obj, prop, value, receiver) => {
-      if (prop === '$$sync') {
-        if (typeof value !== 'function') {
-          return false;
-        }
-        let data;
-        const fn = value;
-        syncer = async (...args) => {
-          const oldv = data;
-          const newv = deepClone(obj);
-          const diff = deepDiff(newv, oldv);
-          data = await fn(newv, oldv, diff, ...args);
-          deepPatch(receiver, data);
-          return data;
-        };
-        return true;
-      }
-      cleaner.emit(prop);
       if (typeof value === 'function') {
+        cleaner.emit(prop);
         value = setUpdater(receiver, prop, value, cleaner);
       }
-      if (typeof value === 'object') {
+      // FIXME: clear old bindings
+      // else if (typeof obj[prop] === 'object' && obj[prop] !== null) {
+      //   const val = obj[prop];
+      //   if (val[proxyKey]) {
+      //     cleaner.emit(prop);
+      //   }
+      // }
+      if (typeof value === 'object' && value !== null) {
         value = createState(value);
-        setNotifier(receiver, prop, value, cleaner);
+        if (value[proxyKey]) {
+          setNotifier(receiver, prop, value, cleaner);
+        }
       }
       const changed = (Array.isArray(obj) && prop === 'length') || obj[prop] !== value;
       const clone = changed && deepClone(obj);
@@ -96,7 +86,8 @@ export function createState (target) {
         } else {
           events.push(typedEvent, '*');
         }
-        listener.emit(events, value, prop, clone);
+        const notify = async () => listener.emit(events, value, prop, clone);
+        notify();
       }
       return true;
     },
@@ -104,12 +95,10 @@ export function createState (target) {
       const clone = deepClone(obj);
       const res = Reflect.deleteProperty(obj, prop);
       if (!res) return false;
-      if (prop === '$$sync') {
-        syncer = undefined;
-      }
       cleaner.emit(prop);
       const events = [prop, '#del', '*'];
-      listener.emit(events, undefined, prop, clone);
+      const notify = async () => listener.emit(events, undefined, prop, clone);
+      notify();
       return true;
     }
   };
@@ -118,10 +107,12 @@ export function createState (target) {
     if (typeof target[key] === 'function') {
       target[key] = setUpdater(state, key, target[key], cleaner);
     }
-    if (typeof target[key] === 'object') {
-      const obj = createState(target[key]);
-      target[key] = obj;
-      setNotifier(state, key, obj, cleaner);
+    if (typeof target[key] === 'object' && target[key] !== null) {
+      const value = createState(target[key]);
+      target[key] = value;
+      if (value[proxyKey]) {
+        setNotifier(state, key, value, cleaner);
+      }
     }
   }
   return state;
@@ -148,7 +139,7 @@ function setNotifier (obj, prop, val, cleaner) {
   cleaner.once(prop, () => val.$$off('*', notifier));
 }
 
-function deepPatch (oldv, newv) {
+export function deepPatch (oldv, newv) {
   const isOldArray = Array.isArray(oldv);
   for (const k in newv) {
     if (newv[k] !== null && typeof newv[k] === 'object') {
@@ -180,7 +171,7 @@ function deepPatch (oldv, newv) {
   }
 }
 
-function isEqual (newv, oldv) {
+export function isEqual (newv, oldv) {
   if (typeof newv === 'object' && typeof oldv === 'object') {
     for (const k in oldv) {
       if (!hasOwnProperty.call(newv, k)) {
@@ -198,7 +189,7 @@ function isEqual (newv, oldv) {
   return true;
 }
 
-function deepDiff (newv, oldv) {
+export function deepDiff (newv, oldv) {
   if (Array.isArray(newv)) {
     const add = [];
     const del = [];
@@ -274,7 +265,7 @@ function deepDiff (newv, oldv) {
   }
 }
 
-function deepClone (obj) {
+export function deepClone (obj) {
   if (typeof obj !== 'object' || obj === null) {
     return obj;
   }

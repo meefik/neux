@@ -49,12 +49,12 @@ export default class EventListener {
     }
   }
 
-  async emit (event, ...args) {
+  emit (event, ...args) {
     const list = this._list;
     if (event === '*') {
       for (const event in list) {
         for (const [fn, once] of list[event]) {
-          await fn(...args);
+          fn(...args);
           if (once) this.off(event, fn);
         }
       }
@@ -63,7 +63,7 @@ export default class EventListener {
       for (const event of events) {
         if (list[event]) {
           for (const [fn, once] of list[event]) {
-            await fn(...args);
+            fn(...args);
             if (once) this.off(event, fn);
           }
         }

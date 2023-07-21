@@ -50,28 +50,30 @@ state.$$off('double');
 state.tasks.$$on('*', handler);
 ```
 
+## Sync
+
 Synchronizing state with `localStorage`
 
 ```js
-const store = (newv, oldv, diff) => {
-  if (!diff) {
+const syncer = (newv, oldv, diff) => {
+  if (!oldv) {
     return JSON.parse(localStorage.getItem('todos') || '[]');
   } else {
     localStorage.setItem('todos', JSON.stringify(newv));
   }
+  return newv;
 };
-// bind state with store
-state.tasks.$$sync = store;
-// sync state with store
-state.tasks.$$sync();
-// unbind state and store
-delete state.tasks.$$sync;
+// create a synchronization with state
+// slippage (in ms) helps group and reduce call frequency
+const sync = createSync(state.tasks, syncer, { slippage: 100 });
+// sync state with local storage
+sync();
 ```
 
 Synchronizing state with remote store
 
 ```js
-const store = async (newv, oldv, diff) => {
+const syncer = async (newv, oldv, diff) => {
   const res = await fetch('/api/todos', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -79,34 +81,34 @@ const store = async (newv, oldv, diff) => {
   });
   return await res.json();
 };
-// bind state with store
-state.tasks.$$sync = store;
-// sync state with store
-state.tasks.$$sync();
+// create a synchronization with state
+const sync = createSync(state.tasks, syncer);
+// sync state with remote store
+sync();
 ```
 
-Undo last changes
+Undo last changes or clear
 
 ```js
-const store = (newv, oldv, diff, action) => {
+const syncer = (newv, oldv, diff, action) => {
   if (action === 'undo') return oldv;
   if (action === 'clear') return [];
   return newv;
 };
-// bind state with store
-state.tasks.$$sync = store;
-// sync state with store
-state.tasks.$$sync();
+// create a synchronization with state
+const sync = createSync(state.tasks, syncer);
+// commit current state
+sync();
 // change state
 state.tasks[0].checked = true;
 // commit changes
-state.tasks.$$sync();
+sync();
 // change state again
 state.tasks[0].checked = false;
 // undo last change
-state.tasks.$$sync('undo');
+sync('undo');
 // delete all data
-state.tasks.$$sync('clear');
+sync('clear');
 ```
 
 ## View
@@ -158,6 +160,8 @@ createView({
   }, {
     tagName: 'ul',
     children: () => {
+      // redraw the list if any child element is added, replaced or removed
+      // any updates inside children are ignored
       return state.list.$$each(item => {
         return {
           tagName: 'li',
