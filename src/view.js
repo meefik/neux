@@ -86,7 +86,6 @@ function render (config, ns) {
     _children = getContext(children, (obj, prop, fn) => {
       if (Array.isArray(obj) && prop === '$each' && typeof fn === 'function') {
         const add = (newv, prop, obj) => {
-          if (isNaN(prop)) return;
           const index = parseInt(prop);
           const newView = fn(newv, index, obj);
           if (newView) {
@@ -99,7 +98,6 @@ function render (config, ns) {
         obj.$$on('#add', add);
         cleaner.once(prop, () => obj.$$off('#add', add));
         const mod = (newv, prop, obj) => {
-          if (isNaN(prop)) return;
           const index = parseInt(prop);
           const oldChild = node.children[index];
           const newView = fn(newv, index, obj);
@@ -113,7 +111,6 @@ function render (config, ns) {
         obj.$$on('#mod', mod);
         cleaner.once(prop, () => obj.$$off('#mod', mod));
         const del = (newv, prop, obj) => {
-          if (isNaN(prop)) return;
           const index = parseInt(prop);
           const oldChild = node.children[index];
           if (oldChild) {

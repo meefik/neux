@@ -46,6 +46,7 @@ state.$$off('double', handler);
 // remove all listeners for the specified field
 state.$$off('double');
 // add a listener to watch any changes
+// on this object and all children
 state.tasks.$$on('*', handler);
 ```
 

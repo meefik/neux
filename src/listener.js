@@ -59,7 +59,7 @@ export default class EventListener {
         }
       }
     } else {
-      const events = new Set(['*'].concat(event));
+      const events = new Set([].concat(event));
       for (const event of events) {
         if (list[event]) {
           for (const [fn, once] of list[event]) {

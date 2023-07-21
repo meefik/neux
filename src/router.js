@@ -40,13 +40,7 @@ export function createRouter (options) {
     navigate: () => navigate
   });
   refresh();
-  state.$$on('path', () => {
-    navigate(state.path, state.params);
-  });
-  state.$$on('params', () => {
-    navigate(state.path, state.params);
-  });
-  state.params.$$on('*', () => {
+  state.$$on('*', () => {
     navigate(state.path, state.params);
   });
   window.addEventListener('hashchange', () => refresh());

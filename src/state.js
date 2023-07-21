@@ -76,18 +76,26 @@ export function createState (target) {
         };
         return true;
       }
+      cleaner.emit(prop);
       if (typeof value === 'function') {
         value = setUpdater(receiver, prop, value, cleaner);
       }
       if (typeof value === 'object') {
         value = createState(value);
+        setNotifier(receiver, prop, value, cleaner);
       }
       const changed = (Array.isArray(obj) && prop === 'length') || obj[prop] !== value;
       const clone = changed && deepClone(obj);
       const res = Reflect.set(obj, prop, value);
       if (!res) return false;
       if (changed) {
-        const events = [prop, hasOwnProperty.call(clone, prop) ? '#mod' : '#add'];
+        const events = [prop];
+        const typedEvent = hasOwnProperty.call(clone, prop) ? '#mod' : '#add';
+        if (Array.isArray(obj)) {
+          if (!isNaN(prop)) events.push(typedEvent, '*');
+        } else {
+          events.push(typedEvent, '*');
+        }
         listener.emit(events, value, prop, clone);
       }
       return true;
@@ -96,7 +104,7 @@ export function createState (target) {
       const clone = deepClone(obj);
       const res = Reflect.deleteProperty(obj, prop);
       if (!res) return false;
-      listener.emit([prop, '#del'], undefined, prop, clone);
+      listener.emit([prop, '#del', '*'], undefined, prop, clone);
       cleaner.emit(prop);
       if (prop === '$$sync') {
         syncer = undefined;
@@ -110,14 +118,15 @@ export function createState (target) {
       target[key] = setUpdater(state, key, target[key], cleaner);
     }
     if (typeof target[key] === 'object') {
-      target[key] = createState(target[key]);
+      const obj = createState(target[key]);
+      target[key] = obj;
+      setNotifier(state, key, obj, cleaner);
     }
   }
   return state;
 }
 
 function setUpdater (obj, prop, getter, cleaner) {
-  cleaner.emit(prop);
   const updater = () => {
     obj[prop] = getter(obj, prop);
   };
@@ -128,7 +137,15 @@ function setUpdater (obj, prop, getter, cleaner) {
       cleaner.once(prop, () => _obj.$$off(_prop, updater));
     }
   );
-};
+}
+
+function setNotifier (obj, prop, val, cleaner) {
+  const notifier = (...args) => {
+    obj.$$emit(['*'], ...args);
+  };
+  val.$$on('*', notifier);
+  cleaner.once(prop, () => val.$$off('*', notifier));
+}
 
 function deepPatch (oldv, newv) {
   const isOldArray = Array.isArray(oldv);
