@@ -1,4 +1,5 @@
 import { createState } from './state';
+import { isObject, isString } from './utils';
 
 /**
  * Localization
@@ -18,7 +19,7 @@ export function createL10n (options) {
     t: () => t
   });
   function t (path, data, lang) {
-    if (typeof data === 'string') {
+    if (isString(data)) {
       lang = data;
       data = null;
     }
@@ -27,7 +28,7 @@ export function createL10n (options) {
     if (!locales[lang]) lang = state.fallback;
     const arr = `${path}`.split('.');
     let value = arr.reduce((o, k) => {
-      return typeof o === 'object' ? o[k] : '';
+      return isObject(o) ? o[k] : '';
     }, locales[lang]);
     for (const k in data) {
       const re = new RegExp(`%{${k}}`, 'g');

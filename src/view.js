@@ -1,5 +1,6 @@
 import { getContext } from './context';
 import EventListener from './listener';
+import { isObject, isArray, isFunction, isString, isUndefined } from './utils';
 
 /**
  * View
@@ -20,18 +21,18 @@ export function createView (config, target) {
 }
 
 function render (config, ns) {
-  if (typeof config === 'function') {
+  if (isFunction(config)) {
     return render(config());
   }
-  if (typeof config !== 'object') return;
+  if (!isObject(config)) return;
   const attrs = { ...config };
   let node;
   if (attrs.view) {
     node = attrs.view;
     delete attrs.view;
-    if (typeof node === 'function') {
+    if (isFunction(node)) {
       return render(node(attrs));
-    } else if (typeof node === 'string') {
+    } else if (isString(node)) {
       const el = document.createElement('div');
       el.innerHTML = node;
       attrs.view = el.firstChild;
@@ -63,8 +64,8 @@ function render (config, ns) {
   patch(attrs, node, cleaner);
   for (const attr in attributes) {
     let val = attributes[attr];
-    if (typeof val !== 'undefined') {
-      if (typeof val === 'function') {
+    if (!isUndefined(val)) {
+      if (isFunction(val)) {
         const fn = val;
         const updater = () => node.setAttribute(attr, fn());
         val = getContext(fn, (obj, prop) => {
@@ -77,14 +78,14 @@ function render (config, ns) {
   }
   for (const ev in on) {
     const handler = on[ev];
-    if (typeof handler === 'function') {
+    if (isFunction(handler)) {
       node.addEventListener(ev, handler);
     }
   }
   let _children = children;
-  if (typeof children === 'function') {
+  if (isFunction(children)) {
     _children = getContext(children, (obj, prop, fn) => {
-      if (Array.isArray(obj) && prop === '$each' && typeof fn === 'function') {
+      if (isArray(obj) && prop === '$each' && isFunction(fn)) {
         const add = (newv, prop, obj) => {
           const index = parseInt(prop);
           const newView = fn(newv, index, obj);
@@ -136,7 +137,7 @@ function render (config, ns) {
       }
     });
   }
-  if (typeof _children !== 'undefined') {
+  if (!isUndefined(_children)) {
     const views = [].concat(_children);
     for (const view of views) {
       const child = render(view, namespaceURI);
@@ -150,14 +151,14 @@ function render (config, ns) {
 
 function patch (source, target, cleaner, level = 0) {
   const setValue = (obj, key, val) => {
-    if (key === 'classList' && Array.isArray(val) && !level) {
+    if (key === 'classList' && isArray(val) && !level) {
       const arr = [];
       for (const cls of val) {
         if (cls) arr.push(cls);
       }
       val = arr.join(' ');
     }
-    if (val !== null && typeof val === 'object') {
+    if (isObject(val)) {
       patch(val, obj[key], cleaner, level + 1);
     } else {
       if (obj[key] !== val) obj[key] = val;
@@ -165,7 +166,7 @@ function patch (source, target, cleaner, level = 0) {
   };
   for (const key in source) {
     let value = source[key];
-    if (typeof value === 'function') {
+    if (isFunction(value)) {
       const fn = value;
       const updater = () => setValue(target, key, fn());
       value = getContext(fn, (obj, prop) => {

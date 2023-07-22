@@ -1,4 +1,5 @@
 import { deepPatch, deepClone, deepDiff } from './state';
+import { isObject, isNumber } from './utils';
 
 /**
  * Sync.
@@ -16,13 +17,13 @@ export function createSync (state, handler, options) {
     const newv = deepClone(state);
     const diff = deepDiff(newv, oldv);
     data = await handler(newv, oldv, diff, ...args);
-    if (typeof data === 'object') {
+    if (isObject(data)) {
       deepPatch(state, data);
     }
     return data;
   };
   let timer;
-  if (typeof slippage === 'number') {
+  if (isNumber(slippage)) {
     return async function (...args) {
       return new Promise(resolve => {
         clearTimeout(timer);

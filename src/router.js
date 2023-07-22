@@ -1,4 +1,5 @@
 import { createState } from './state';
+import { isObject } from './utils';
 
 /**
  * Router
@@ -9,7 +10,7 @@ import { createState } from './state';
  */
 export function createRouter (options) {
   function navigate (path, params) {
-    if (typeof path === 'object') {
+    if (isObject(path)) {
       params = path;
       path = null;
     }
