@@ -39,9 +39,11 @@ const handler = (newv, prop, obj) => {
   const oldv = obj[prop];
   console.log(newv, oldv, prop, obj);
 };
-// add specified listener
+// add a specified listener
 state.$$on('double', handler);
-// remove specified listener
+// add a specified listener that only calls once
+state.$$once('double', handler);
+// remove a specified listener
 state.$$off('double', handler);
 // remove all listeners for the specified field
 state.$$off('double');

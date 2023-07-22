@@ -15,7 +15,8 @@ export function createState (target) {
   if (target[proxyKey] || !isObject(target)) return target;
   const dollarRe = /^\$/;
   const listener = new EventListener();
-  const cleaner = new EventListener();
+  const updater = new EventListener();
+  const notifier = new EventListener();
   const handler = {
     get: (obj, prop, receiver) => {
       if (prop === proxyKey) {
@@ -56,14 +57,11 @@ export function createState (target) {
     },
     set: (obj, prop, value, receiver) => {
       if (isFunction(value)) {
-        cleaner.emit(prop);
-        value = setUpdater(receiver, prop, value, cleaner);
-      } else if (isObject(obj[prop]) && obj[prop][proxyKey]) {
-        cleaner.emit(prop);
+        value = setUpdater(receiver, prop, value, updater);
       }
       if (isObject(value)) {
         value = createState(value);
-        setNotifier(receiver, prop, value, cleaner);
+        setNotifier(receiver, prop, value, notifier);
       }
       const changed = (isArray(obj) && prop === 'length') || obj[prop] !== value;
       const clone = changed && deepClone(obj);
@@ -86,7 +84,8 @@ export function createState (target) {
       const clone = deepClone(obj);
       const res = Reflect.deleteProperty(obj, prop);
       if (!res) return false;
-      cleaner.emit(prop);
+      updater.emit(prop);
+      notifier.emit(prop);
       const events = [prop, '#del', '*'];
       const notify = async () => listener.emit(events, undefined, prop, clone);
       notify();
@@ -96,37 +95,39 @@ export function createState (target) {
   const state = new Proxy(target, handler);
   for (const key in target) {
     if (isFunction(target[key])) {
-      target[key] = setUpdater(state, key, target[key], cleaner);
+      target[key] = setUpdater(state, key, target[key], updater);
     }
     if (isObject(target[key])) {
       const value = createState(target[key]);
       target[key] = value;
-      setNotifier(state, key, value, cleaner);
+      setNotifier(state, key, value, notifier);
     }
   }
   return state;
 }
 
-function setUpdater (obj, prop, getter, cleaner) {
-  const updater = () => {
+function setUpdater (obj, prop, getter, listener) {
+  listener.emit(prop);
+  const handler = () => {
     obj[prop] = getter(obj, prop);
   };
   return getContext(
     () => getter(obj, prop),
     (_obj, _prop) => {
-      _obj.$$on(_prop, updater);
-      cleaner.once(prop, () => _obj.$$off(_prop, updater));
+      _obj.$$on(_prop, handler);
+      listener.once(prop, () => _obj.$$off(_prop, handler));
     }
   );
 }
 
-function setNotifier (obj, prop, val, cleaner) {
+function setNotifier (obj, prop, val, listener) {
   if (!val[proxyKey]) return;
-  const notifier = (...args) => {
+  listener.emit(prop);
+  const handler = (...args) => {
     obj.$$emit(['*'], ...args);
   };
-  val.$$on('*', notifier);
-  cleaner.once(prop, () => val.$$off('*', notifier));
+  val.$$on('*', handler);
+  listener.once(prop, () => val.$$off('*', handler));
 }
 
 export function deepPatch (oldv, newv) {
