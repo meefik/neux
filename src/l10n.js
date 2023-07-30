@@ -11,13 +11,19 @@ import { isObject, isString } from './utils';
  * @returns {Proxy}
  */
 export function createL10n (options) {
-  const state = createState({
-    lang: navigator.language,
-    fallback: 'en',
-    locales: {},
-    ...options,
+  const {
+    lang = navigator.language,
+    fallback = 'en',
+    locales = {}
+  } = options || {};
+  const target = {
+    lang,
+    fallback,
+    locales,
     t: () => t
-  });
+  };
+  Object.seal(target);
+  const state = createState(target);
   function t (path, data, lang) {
     if (isString(data)) {
       lang = data;

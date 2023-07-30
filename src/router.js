@@ -34,12 +34,15 @@ export function createRouter (options) {
     }
     state.path = path;
   }
-  const state = createState({
-    ...options,
+  const { home } = options || {};
+  const target = {
+    home,
     path: '',
     params: {},
     navigate: () => navigate
-  });
+  };
+  Object.seal(target);
+  const state = createState(target);
   refresh();
   state.$$on('*', () => {
     navigate(state.path, state.params);

@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/neux-dev/neux.git"
+    "url": "https://github.com/meefik/neux.git"
   },
   "type": "module",
   "scripts": {

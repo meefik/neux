@@ -54,7 +54,9 @@ state.tasks.$$on('*', handler);
 
 ## Sync
 
-Synchronizing state with `localStorage`
+State synchronization is used to save their data to persistent storage.
+
+Synchronizing state with `localStorage`:
 
 ```js
 const syncer = (newv, oldv, diff) => {
@@ -72,7 +74,7 @@ const sync = createSync(state.tasks, syncer, { slippage: 100 });
 sync();
 ```
 
-Synchronizing state with remote store
+Synchronizing state with remote store:
 
 ```js
 const syncer = async (newv, oldv, diff) => {
@@ -89,7 +91,7 @@ const sync = createSync(state.tasks, syncer);
 sync();
 ```
 
-Undo last changes or clear
+Undo last changes or clear:
 
 ```js
 const syncer = (newv, oldv, diff, action) => {
@@ -239,6 +241,8 @@ createView({
 
 ## Localization
 
+Localization is used to display the application interface in different languages.
+
 ```js
 const l10n = createL10n({
   locales: {
@@ -267,6 +271,8 @@ console.log(msgRu); // Привет Мир!
 ```
 
 ## Routing
+
+Routing is used to link separate states or pages of a web application to the address bar in the browser.
 
 ```js
 const router = createRouter({
@@ -322,6 +328,86 @@ createView({
 }, document.body);
 ```
 
+## RPC
+
+RPC is short for Remote Procedure Call. This abstraction allows you to execute code on the backend by calling normal functions on the frontend.
+
+Here is an example of calling some function:
+
+```js
+// create RPC client
+const rpc = createRPC({ url: '/api/rpc' });
+// define input parameters
+const text = 'Text'; // as text
+const object = { text }; // as object
+const blob = new Blob([text]); // as blob
+const file = new File([blob], 'file.txt'); // as file
+const formData = new FormData(); // as form-data
+formData.append('file', file);
+// call the remote function named "hello"
+const response = await rpc.hello(/* params */);
+console.log(response);
+```
+
+The function can accept input parameters in the formats `String`, `Object`, `Blob`, `File` or `FormData`. The function response can be one of three types `String`, `Object` or `Blob`.
+
+The default backend request HTTP method is `POST`. The API address on the backend has the format `/api/rpc/:method`, where `:method` is the name of the function to run.
+
+The request can be of the following types:
+
+- `application/json` - format for passing JavaScript objects.
+- `multipart/from-data` - file transfer format.
+- `text/plain` - all non-objects are passed as text.
+
+The response need be of the following types:
+
+- `application/json` - format for passing JavaScript objects.
+- `application/octet-stream` - file transfer format.
+- `text/plain` - all non-objects are passed as text.
+
+Below is an example of using RPC for some imaginary backend:
+
+```js
+let token = '';
+// create RPC client
+const rpc = createRPC({
+  // RPC backend endpoint
+  url: '/api/rpc',
+  // include headers for every request
+  headers: {
+    // getter for authorization header
+    get Authorization() {
+      return token && `Bearer ${token}`;
+    }
+  },
+  // include cookies for every request
+  // credentials: 'include',
+  // enable CORS for requests
+  // mode: 'cors'
+});
+// authorize and get the session token
+token = await rpc.login({ username, password });
+// upload file from <input id="file" type="file" />
+const file = document.getElementById('file').files[0];
+const { id, name, type, size } = await rpc.upload(file);
+// send json data
+const res = await rpc.addComment({
+  author: 'John Doe',
+  text: 'Hello World!',
+  time: new Date(),
+  attachments: [id]
+});
+// update data
+await rpc.updateComment({
+  id: res.id,
+  text: 'Edited message'
+});
+// receive json data
+const comment = await rpc.getComment({
+  id: res.id
+});
+```
+
 ## To do
 
 - [x] State
@@ -329,7 +415,8 @@ createView({
 - [x] L10n
 - [x] Router
 - [x] View components
-- [x] State sync with stores
+- [x] State synchronization
+- [x] RPC
 - [ ] Pagination
 - [ ] Real-time state sync
 - [ ] P2P state sync
