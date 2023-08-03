@@ -5,7 +5,7 @@ export default {
   output: [{
     file: 'dist/neux.min.js',
     format: 'umd',
-    name: 'Neux'
+    name: 'NEUX'
   }],
   plugins: [terser()]
 };
