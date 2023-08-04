@@ -13,6 +13,7 @@ Here are the main concepts behind NEUX:
   - synchronization of states with persistent storage,
   - calling remote procedures on the backend.
 - Small library size ~ 8kb (4kb gzipped).
+- It is open source software under MIT license.
 
 ## Content
 
@@ -25,6 +26,7 @@ Here are the main concepts behind NEUX:
 7. [Remote procedure call](#remote-procedure-call)
 8. [State synchronization](#state-synchronization)
 9. [Use with Tailwind CSS](#use-with-tailwind-css)
+10. [Examples](#examples)
 
 ## Installation
 
@@ -438,6 +440,7 @@ const comment = await rpc.getComment({
 Below is an example implementation of the server API for RPC on Node.js:
 
 ```js
+// server.js
 import http from 'node:http';
 import os from 'node:os';
 import fs from 'node:fs';
@@ -651,7 +654,7 @@ createView({
         type: 'button',
         classList: ['inline-flex', 'items-center', 'rounded-md', 'bg-indigo-600', 'px-3', 'py-2', 
           'text-sm', 'font-semibold', 'text-white', 'shadow-sm', 'hover:bg-indigo-500', 
-          'focus-visible:outline', 'focus-visible:outline-2', 'focus-visible:outline-offset-2','focus-visible:outline-indigo-500']
+          'focus-visible:outline', 'focus-visible:outline-2', 'focus-visible:outline-offset-2','focus-visible:outline-indigo-500'],
         textContent: 'Change plan'
       }]
     }]
@@ -662,9 +665,3 @@ createView({
 ## Examples
 
 You can find more development examples with the NEUX library in a separate [neux-demo](https://github.com/meefik/neux-demo) repository.
-
-## License
-
-MIT License
-
-Copyright (c) 2023 Anton Skshidlevsky
