@@ -17,7 +17,7 @@ export function createL10n (options) {
     locales = {}
   } = options || {};
   const target = {
-    lang,
+    lang: locales[lang] ? lang : fallback,
     fallback,
     locales,
     t: () => t

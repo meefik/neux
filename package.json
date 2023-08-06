@@ -1,6 +1,6 @@
 {
   "name": "neux",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "A frontend microlibrary with reactivity states and views.",
   "author": "Anton Skshidlevsky <meefik@gmail.com>",
   "main": "src/index.js",
