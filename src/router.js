@@ -1,5 +1,5 @@
 import { createState } from './state';
-import { isObject } from './utils';
+import { isObject, hasOwnProperty, isString } from './utils';
 
 /**
  * Router
@@ -14,16 +14,20 @@ export function createRouter (options) {
       params = path;
       path = null;
     }
+    if (!isString(path)) {
+      const { path: _path } = decodeQueryString(location.hash);
+      path = _path;
+    }
     location.hash = encodeQueryString(path, params);
   }
   function refresh () {
     if ((!location.hash || location.hash === '#') && state.home) {
-      return navigate(state.home);
+      return (location.hash = state.home);
     }
     const { path, params } = decodeQueryString(location.hash);
     if (!state.params) state.params = {};
     for (const k in state.params) {
-      if (!Object.prototype.hasOwnProperty.call(params, k)) {
+      if (!hasOwnProperty(params, k)) {
         delete state.params[k];
       }
     }
