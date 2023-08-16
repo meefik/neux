@@ -1,11 +1,12 @@
+/**
+ * Event listener.
+ */
 export default class EventListener {
-  constructor () {
-    this._list = {};
-  }
+  #list = {};
 
   on (event, handler) {
     if (event && handler) {
-      const list = this._list;
+      const list = this.#list;
       const events = [].concat(event);
       for (const event of events) {
         if (!list[event]) {
@@ -18,7 +19,7 @@ export default class EventListener {
 
   once (event, handler) {
     if (event && handler) {
-      const list = this._list;
+      const list = this.#list;
       const events = [].concat(event);
       for (const event of events) {
         if (!list[event]) {
@@ -31,7 +32,7 @@ export default class EventListener {
 
   off (event, handler) {
     if (event) {
-      const list = this._list;
+      const list = this.#list;
       const events = [].concat(event);
       for (const event of events) {
         if (list[event]) {
@@ -50,7 +51,7 @@ export default class EventListener {
   }
 
   emit (event, ...args) {
-    const list = this._list;
+    const list = this.#list;
     if (event === '*') {
       for (const event in list) {
         for (const [fn, once] of list[event]) {

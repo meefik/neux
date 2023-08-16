@@ -2,11 +2,12 @@ import { deepPatch, deepClone, deepDiff } from './state';
 import { isObject, isNumber } from './utils';
 
 /**
- * Sync.
+ * Create a synchronization function.
  *
- * @param {object} state
+ * @param {Proxy} state
  * @param {function} handler
  * @param {object} [options]
+ * @param {object} [options.slippage]
  * @returns {function}
  */
 export function createSync (state, handler, options) {

@@ -3,19 +3,21 @@ import EventListener from './listener';
 import { isObject, isArray, isFunction, isString, isUndefined } from './utils';
 
 /**
- * View
+ * Create a view.
  *
  * @param {object} config
- * @param {HTMLElement} target
+ * @param {HTMLElement} [target]
  * @returns {HTMLElement}
  */
 export function createView (config, target) {
   const el = render(config);
   const node = target || el;
-  const observer = createObserver(node);
-  node.addEventListener('removed', () => observer.disconnect(), false);
-  if (target && el) {
-    target.appendChild(el);
+  if (node) {
+    const observer = createObserver(node);
+    node.addEventListener('removed', () => observer.disconnect(), false);
+    if (target && el) {
+      target.appendChild(el);
+    }
   }
   return el;
 }
@@ -111,7 +113,7 @@ function render (config, ns) {
         };
         obj.$$on('#mod', mod);
         cleaner.once(prop, () => obj.$$off('#mod', mod));
-        const del = (newv, prop, obj) => {
+        const del = (_newv, prop) => {
           const index = parseInt(prop);
           const oldChild = node.children[index];
           if (oldChild) {

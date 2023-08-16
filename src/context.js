@@ -26,7 +26,7 @@ export function getContext (getter, handler) {
  *
  * @param {object} obj
  * @param {string} prop
- * @param {function} fn
+ * @param {function} [fn]
  */
 export function setContext (obj, prop, fn) {
   if (!context) return;

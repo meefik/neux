@@ -5,9 +5,9 @@ import { isUndefined, isObject, isArray, isString, isFunction, hasOwnProperty } 
 const proxyKey = Symbol('isProxy');
 
 /**
- * State
+ * Create a state.
  *
- * @param {object} target
+ * @param {object} [target]
  * @returns {Proxy}
  */
 export function createState (target) {
@@ -43,9 +43,9 @@ export function createState (target) {
           return listener.emit(event, ...args);
         };
       } else if (prop === '$$each' && isArray(obj)) {
-        return function (fn, _this) {
-          setContext(this, '$each', fn);
-          return obj.map(fn, _this).filter(e => e);
+        return function (callbackFn, thisArg) {
+          setContext(receiver, '$each', callbackFn);
+          return obj.map(callbackFn, thisArg).filter(item => item);
         };
       } else if (isString(prop) && dollarRe.test(prop)) {
         prop = prop.slice(1);
@@ -139,11 +139,11 @@ export function deepPatch (oldv, newv) {
       } else {
         const obj = createState(isArray(newv[k]) ? [] : {});
         deepPatch(obj, newv[k]);
-        if (isOldArray) oldv.splice(k, 1, obj);
+        if (isOldArray) oldv.splice(parseInt(k), 1, obj);
         else oldv[k] = obj;
       }
     } else if (!isUndefined(newv[k])) {
-      if (isOldArray) oldv.splice(k, 1, newv[k]);
+      if (isOldArray) oldv.splice(parseInt(k), 1, newv[k]);
       else oldv[k] = newv[k];
     }
   }

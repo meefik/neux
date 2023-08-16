@@ -2,24 +2,13 @@ import { createState } from './state';
 import { isObject, hasOwnProperty, isString } from './utils';
 
 /**
- * Router
+ * Create a router.
  *
- * @param {object} options
+ * @param {object} [options]
  * @param {string} [options.home]
  * @returns {Proxy}
  */
 export function createRouter (options) {
-  function navigate (path, params) {
-    if (isObject(path)) {
-      params = path;
-      path = null;
-    }
-    if (!isString(path)) {
-      const { path: _path } = decodeQueryString(location.hash);
-      path = _path;
-    }
-    location.hash = encodeQueryString(path, params);
-  }
   function refresh () {
     if ((!location.hash || location.hash === '#') && state.home) {
       return (location.hash = state.home);
@@ -55,12 +44,25 @@ export function createRouter (options) {
   return state;
 }
 
+function navigate (path, params) {
+  if (isObject(path)) {
+    params = path;
+    path = null;
+  }
+  if (!isString(path)) {
+    const { path: _path } = decodeQueryString(location.hash);
+    path = _path;
+  }
+  location.hash = encodeQueryString(path, params);
+}
+
 function decodeQueryString (qs) {
   const params = {};
   const re = /[?&]([^=]+)=([^&]*)/g;
   let tokens = re.exec(qs);
   while (tokens) {
-    params[decodeURIComponent(tokens[1])] = decodeURIComponent(tokens[2]);
+    const param = decodeURIComponent(tokens[1]);
+    params[param] = decodeURIComponent(tokens[2]);
     tokens = re.exec(qs);
   }
   const match = /^#([^?]+)/.exec(qs) || [];

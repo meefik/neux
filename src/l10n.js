@@ -2,7 +2,7 @@ import { createState } from './state';
 import { isObject, isString } from './utils';
 
 /**
- * Localization
+ * Create a localization.
  *
  * @param {object} options
  * @param {object} options.locales
@@ -31,7 +31,8 @@ export function createL10n (options) {
     }
     const locales = state.locales || {};
     if (!lang) lang = state.$lang;
-    if (!locales[lang]) lang = state.fallback;
+    if (!lang || !locales[lang]) lang = state.fallback;
+    if (!lang) return '';
     const arr = `${path}`.split('.');
     let value = arr.reduce((o, k) => {
       return isObject(o) ? o[k] : '';
