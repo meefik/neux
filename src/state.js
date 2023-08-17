@@ -27,16 +27,16 @@ export function createState (target) {
           return receiver['$' + key];
         };
       } else if (prop === '$$on') {
-        return function (prop, handler) {
-          return listener.on(prop, handler);
+        return function (event, handler) {
+          return listener.on(event, handler);
         };
       } else if (prop === '$$once') {
-        return function (prop, handler) {
-          return listener.once(prop, handler);
+        return function (event, handler) {
+          return listener.once(event, handler);
         };
       } else if (prop === '$$off') {
-        return function (prop, handler) {
-          return listener.off(prop, handler);
+        return function (event, handler) {
+          return listener.off(event, handler);
         };
       } else if (prop === '$$emit') {
         return function (event, ...args) {

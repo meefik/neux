@@ -216,6 +216,12 @@ createView({
 }, document.body);
 ```
 
+Additional events for each element:
+
+- `mounted` - the element was mounted in the DOM;
+- `removed` - the element was removed from the DOM;
+- `changed` - an element attribute has been changed.
+
 ## Components
 
 You can wrap part of the view into a separate component. It is a simple function that returns the markup of the view. To use such a component, you need to pass this function in the "view" parameter.

@@ -187,20 +187,38 @@ function createObserver (el) {
       for (let i = 0; i < children.length; i++) {
         dispatchEvent(children[i], event);
       }
-      const ev = new Event(event);
+      const ev = new CustomEvent(event);
       node.dispatchEvent(ev);
     };
     for (const mutation of mutationList) {
-      mutation.addedNodes.forEach((node) => {
-        if (node.nodeType !== Node.ELEMENT_NODE) return;
-        dispatchEvent(node, 'mounted');
-      });
-      mutation.removedNodes.forEach((node) => {
-        if (node.nodeType !== Node.ELEMENT_NODE) return;
-        dispatchEvent(node, 'removed');
-      });
+      if (mutation.type === 'childList') {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            dispatchEvent(node, 'mounted');
+          }
+        });
+        mutation.removedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            dispatchEvent(node, 'removed');
+          }
+        });
+      } else if (mutation.type === 'attributes') {
+        const node = mutation.target;
+        const ev = new CustomEvent('changed', {
+          detail: {
+            attributeName: mutation.attributeName,
+            oldValue: mutation.oldValue,
+            newValue: node.getAttribute(mutation.attributeName)
+          }
+        });
+        node.dispatchEvent(ev);
+      }
     }
   });
-  observer.observe(el, { childList: true, subtree: true });
+  observer.observe(el, {
+    childList: true,
+    subtree: true,
+    attributeOldValue: true
+  });
   return observer;
 }
