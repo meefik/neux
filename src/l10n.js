@@ -4,22 +4,20 @@ import { isObject, isString } from './utils';
 /**
  * Create a localization.
  *
- * @param {object} options
- * @param {object} options.locales
+ * @param {object} locales
+ * @param {object} [options]
  * @param {string} [options.lang=navigator.language]
  * @param {string} [options.fallback="en"]
  * @returns {Proxy}
  */
-export function createL10n (options) {
+export function createL10n (locales, options) {
   const {
     lang = navigator.language,
-    fallback = 'en',
-    locales = {}
+    fallback = 'en'
   } = options || {};
   const target = {
     lang: locales[lang] ? lang : fallback,
-    fallback,
-    locales,
+    locales: Object.keys(locales),
     t: () => t
   };
   Object.seal(target);
@@ -29,10 +27,9 @@ export function createL10n (options) {
       lang = data;
       data = null;
     }
-    const locales = state.locales || {};
     if (!lang) lang = state.$lang;
-    if (!lang || !locales[lang]) lang = state.fallback;
-    if (!lang) return '';
+    if (!lang || !locales[lang]) lang = fallback;
+    if (!lang) return path;
     const arr = `${path}`.split('.');
     let value = arr.reduce((o, k) => {
       return isObject(o) ? o[k] : '';

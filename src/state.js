@@ -7,12 +7,12 @@ const proxyKey = Symbol('isProxy');
 /**
  * Create a state.
  *
- * @param {object} [target]
+ * @param {object} [data]
  * @returns {Proxy}
  */
-export function createState (target) {
-  if (isUndefined(target)) target = {};
-  if (target[proxyKey] || !isObject(target)) return target;
+export function createState (data) {
+  if (isUndefined(data)) data = {};
+  if (data[proxyKey] || !isObject(data)) return data;
   const dollarRe = /^\$/;
   const listener = new EventListener();
   const updater = new EventListener();
@@ -92,14 +92,14 @@ export function createState (target) {
       return true;
     }
   };
-  const state = new Proxy(target, handler);
-  for (const key in target) {
-    if (isFunction(target[key])) {
-      target[key] = setUpdater(state, key, target[key], updater);
+  const state = new Proxy(data, handler);
+  for (const key in data) {
+    if (isFunction(data[key])) {
+      data[key] = setUpdater(state, key, data[key], updater);
     }
-    if (isObject(target[key])) {
-      const value = createState(target[key]);
-      target[key] = value;
+    if (isObject(data[key])) {
+      const value = createState(data[key]);
+      data[key] = value;
       setNotifier(state, key, value, notifier);
     }
   }

@@ -6,11 +6,13 @@ import { isObject, isArray, isFunction, isString, isUndefined } from './utils';
  * Create a view.
  *
  * @param {object} config
- * @param {HTMLElement} [target]
+ * @param {object} [options]
+ * @param {HTMLElement} [options.target]
  * @returns {HTMLElement}
  */
-export function createView (config, target) {
+export function createView (config, options) {
   const el = render(config);
+  const { target } = options || {};
   const node = target || el;
   if (node) {
     const observer = createObserver(node);

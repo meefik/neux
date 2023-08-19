@@ -213,7 +213,7 @@ createView({
   }, {
     textContent: () => `Total items: ${state.list.$length}`
   }]
-}, document.body);
+}, { target: document.body });
 ```
 
 Additional events for each element:
@@ -254,7 +254,7 @@ createView({
     view: document.createElement('footer'),
     textContent: 'Powered by NEUX'
   }]
-}, document.body);
+}, { target: document.body });
 ```
 
 You can include SVG icons as a component and change their styles (size, color) via the `classList` or `attributes` field:
@@ -269,7 +269,7 @@ createView({
     width: '64px',
     height: '64px'
   }
-}, document.body);
+}, { target: document.body });
 ```
 
 ## Localization
@@ -280,18 +280,17 @@ An example with comments:
 
 ```js
 const l10n = createL10n({
-  locales: {
-    en: {
-      say: {
-        hello: "Hello %{name}!"
-      }
-    },
-    ru: {
-      say: {
-        hello: "Привет %{name}!"
-      }
+  en: {
+    say: {
+      hello: "Hello %{name}!"
     }
   },
+  ru: {
+    say: {
+      hello: "Привет %{name}!"
+    }
+  }
+}, {
   fallback: 'en',
   lang: navigator.language
 });
@@ -313,30 +312,34 @@ An example with comments:
 
 ```js
 const router = createRouter({
-  home: 'page1'
+  // #/:section/:page
+  section: /^\/(\w+)\/\w+$/,
+  page: /^\/\w+\/(\w+)$/
+}, {
+  home: '/section1/page1'
 });
 createView({
   children: [{
     children: [{
       tagName: 'a',
-      href: '#page1',
+      href: '#/section1/page1',
       textContent: 'Page 1'
     }, {
       tagName: 'a',
-      href: '#page2?param1=1',
+      href: '#/section1/page2?key1=1',
       textContent: 'Page 2'
     }, {
       tagName: 'button',
       textContent: 'Page 3',
       on: {
         click: () => {
-          router.navigate('page3', { param1: '1', param2: '2' });
+          router.navigate('/section1/page3', { key1: '1', key2: '2' });
         }
       }
     }]
   }, {
     children: () => {
-      switch (router.$path) {
+      switch (router.params.$page) {
       case 'page1':
         return [{
           tagName: 'p',
@@ -360,9 +363,14 @@ createView({
       }
     }
   }, {
-    textContent: () => `Path: ${router.$path} , Params: ${JSON.stringify(router.$params)}`
+    tagName: 'pre',
+    textContent: () => [
+      `Path: ${router.$path}`,
+      `Params: ${JSON.stringify(router.params)}`,
+      `Query: ${JSON.stringify(router.query)}`
+    ].join('\n')
   }]
-}, document.body);
+}, { target: document.body });
 ```
 
 ## Remote procedure call
@@ -646,7 +654,7 @@ import { createView } from 'neux';
 
 createView({
   textContent: 'Hello World!'
-}, document.body);
+}, { target: document.body });
 ```
 
 **4.** Run the project:
@@ -739,7 +747,7 @@ createView({
       }]
     }]
   }]
-}, document.body);
+}, { target: document.body });
 ```
 
 ## Use with Web Components
@@ -770,7 +778,7 @@ createView({
     tagName: 'my-nested-component',
     textContent: 'Hello'
   }]
-}, document.body);
+}, { target: document.body });
 ```
 
 ## Examples

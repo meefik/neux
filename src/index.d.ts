@@ -1,37 +1,51 @@
-type Proxy = {
+interface Proxy {
   [key: string | number | symbol]: any
 };
 /**
  * Create a state.
  *
- * @param target Initial state data.
+ * @param data Initial state data.
  */
-export function createState(target?: object): Proxy;
+export function createState(data?: object): Proxy;
 /**
  * Create a view.
  *
- * @param config The configuration for the view.
- * @param target The destination element to mount the view.
+ * @param config View configuration.
+ * @param options View options.
  */
-export function createView(config: object, target?: HTMLElement): HTMLElement;
+export function createView(config: object, options?: {
+  target?: HTMLElement
+}): HTMLElement;
 /**
  * Create a localization.
  * 
+ * @param locales Localized translations.
  * @param options Localization options.
  */
-export function createL10n(options: {
-  locales: object;
+export function createL10n(locales: object, options?: {
   lang?: string;
   fallback?: string;
-}): Proxy;
+}): {
+  lang: string,
+  locales: string[],
+  t: (path: string, data?: object, lang?: string) => string
+};
 /**
  * Create a router.
  *
+ * @param routes Regular expressions for parsing parameters.
  * @param options Routing parameters.
  */
-export function createRouter(options?: {
+export function createRouter(routes?: {
+  [param: string]: RegExp
+}, options?: {
   home?: string;
-}): Proxy;
+}): {
+  path: string,
+  params: { [key: string]: string },
+  query: { [key: string]: string },
+  navigate: (path: string, query?: object) => void
+};
 /**
  * Create a synchronization function.
  * 
@@ -55,4 +69,6 @@ export function createRPC(options?: {
   headers?: object;
   mode?: object;
   credentials?: object;
-}): Proxy;
+}): {
+  [method: string]: (params: any) => any
+};
