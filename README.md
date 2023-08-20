@@ -1,6 +1,6 @@
 # `{\}` NEUX
 
-[NEUX](https://github.com/meefik/neux) is a nifty ecosystem for user experience development. It is a JavaScript frontend micro-library with reactivity states and views. The library has features and tools are suitable for building small single-page applications (SPA) or isolated UI components.
+[NEUX](https://github.com/meefik/neux) is a nifty ecosystem for user experience development. It is a JavaScript frontend micro-library with reactivity states and views. The library has features and tools are suitable for building single-page applications (SPA).
 
 Here are the main concepts behind NEUX:
 
