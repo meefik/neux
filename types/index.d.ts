@@ -1,12 +1,10 @@
-interface Proxy {
-  [key: string | number | symbol]: any
-};
 /**
  * Create a state.
  *
  * @param data Initial state data.
+ * @param context Context for reactivity.
  */
-export function createState(data?: object): Proxy;
+export function createState(data?: object, context?: object): object;
 /**
  * Create a view.
  *
@@ -14,7 +12,8 @@ export function createState(data?: object): Proxy;
  * @param options View options.
  */
 export function createView(config: object, options?: {
-  target?: HTMLElement
+  target?: HTMLElement,
+  context?: object
 }): HTMLElement;
 /**
  * Create a localization.
@@ -23,12 +22,14 @@ export function createView(config: object, options?: {
  * @param options Localization options.
  */
 export function createL10n(locales: object, options?: {
-  lang?: string;
-  fallback?: string;
+  lang?: string,
+  fallback?: string,
+  context?: object
 }): {
   lang: string,
+  $lang: string,
   locales: string[],
-  t: (path: string, data?: object, lang?: string) => string
+  t: (path: string, data?: object | string, lang?: string) => string
 };
 /**
  * Create a router.
@@ -39,12 +40,28 @@ export function createL10n(locales: object, options?: {
 export function createRouter(routes?: {
   [param: string]: RegExp
 }, options?: {
-  home?: string;
+  home?: string,
+  context?: object
 }): {
   path: string,
+  $path: string,
   params: { [key: string]: string },
   query: { [key: string]: string },
   navigate: (path: string, query?: object) => void
+};
+/**
+ * Create an RPC client.
+ * 
+ * @param options RPC connection options.
+ */
+export function createRPC(options?: {
+  url?: object,
+  method?: object,
+  headers?: object,
+  mode?: object,
+  credentials?: object
+}): {
+  [method: string]: (params: any) => any
 };
 /**
  * Create a synchronization function.
@@ -53,22 +70,8 @@ export function createRouter(routes?: {
  * @param handler Synchronization function call handler.
  * @param options Synchronization options.
  */
-export function createSync(state: Proxy, handler: (
-  newv: any, oldv: any, diff?: object, ...args: any
+export function createSync(state: object, handler: (
+  newv: any, oldv: any, ...args: any
 ) => any, options?: {
   slippage?: number
 }): Function;
-/**
- * Create an RPC client.
- * 
- * @param options RPC connection options.
- */
-export function createRPC(options?: {
-  url?: object;
-  method?: object;
-  headers?: object;
-  mode?: object;
-  credentials?: object;
-}): {
-  [method: string]: (params: any) => any
-};

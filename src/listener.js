@@ -2,11 +2,11 @@
  * Event listener.
  */
 export default class EventListener {
-  #list = {};
+  _list = {};
 
   on (event, handler) {
     if (event && handler) {
-      const list = this.#list;
+      const list = this._list;
       const events = [].concat(event);
       for (const event of events) {
         if (!list[event]) {
@@ -19,7 +19,7 @@ export default class EventListener {
 
   once (event, handler) {
     if (event && handler) {
-      const list = this.#list;
+      const list = this._list;
       const events = [].concat(event);
       for (const event of events) {
         if (!list[event]) {
@@ -32,7 +32,7 @@ export default class EventListener {
 
   off (event, handler) {
     if (event) {
-      const list = this.#list;
+      const list = this._list;
       const events = [].concat(event);
       for (const event of events) {
         if (list[event]) {
@@ -51,7 +51,7 @@ export default class EventListener {
   }
 
   emit (event, ...args) {
-    const list = this.#list;
+    const list = this._list;
     if (event === '*') {
       for (const event in list) {
         for (const [fn, once] of list[event]) {

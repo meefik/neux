@@ -1,18 +1,18 @@
-import { getContext } from './context';
-import EventListener from './listener';
+import { createState } from './state';
 import { isObject, isArray, isFunction, isString, isUndefined } from './utils';
 
 /**
  * Create a view.
  *
- * @param {object} config
+ * @param {object|function} config
  * @param {object} [options]
  * @param {HTMLElement} [options.target]
+ * @param {object} [options.context]
  * @returns {HTMLElement}
  */
 export function createView (config, options) {
-  const el = render(config);
-  const { target } = options || {};
+  const { target, context } = options || {};
+  const el = render(config, context);
   const node = target || el;
   if (node) {
     const observer = createObserver(node);
@@ -24,161 +24,156 @@ export function createView (config, options) {
   return el;
 }
 
-function render (config, ns) {
-  if (isFunction(config)) {
-    return render(config());
-  }
+function render (config, context, ns) {
   if (!isObject(config)) return;
-  const attrs = { ...config };
+  config = { ...config };
   let node;
-  if (attrs.view) {
-    node = attrs.view;
-    delete attrs.view;
+  // view
+  if (config.view) {
+    node = config.view;
+    delete config.view;
     if (isFunction(node)) {
-      return render(node(attrs));
+      return render(node(config), context, ns);
     } else if (isString(node)) {
       const el = document.createElement('div');
       el.innerHTML = node;
-      attrs.view = el.firstChild;
-      return render(attrs);
+      config.view = el.firstChild;
+      return render(config, context, ns);
     }
   }
-  if (!ns && `${attrs.tagName}`.toUpperCase() === 'SVG') {
+  if (!ns && `${config.tagName}`.toUpperCase() === 'SVG') {
     ns = 'http://www.w3.org/2000/svg';
   }
   const {
     tagName = 'DIV',
     namespaceURI = ns,
     attributes,
+    classList,
     on,
     children
-  } = attrs;
-  delete attrs.tagName;
-  delete attrs.namespaceURI;
-  delete attrs.attributes;
-  delete attrs.on;
-  delete attrs.children;
+  } = config;
+  delete config.tagName;
+  delete config.namespaceURI;
+  delete config.attributes;
+  delete config.classList;
+  delete config.on;
+  delete config.children;
   if (!node) {
     node = namespaceURI
       ? document.createElementNS(namespaceURI, tagName)
       : document.createElement(tagName);
   }
-  const cleaner = new EventListener();
-  node.addEventListener('removed', () => cleaner.emit('*'), false);
-  patch(attrs, node, cleaner);
-  for (const attr in attributes) {
-    let val = attributes[attr];
-    if (!isUndefined(val)) {
-      if (isFunction(val)) {
-        const fn = val;
-        const updater = () => node.setAttribute(attr, fn());
-        val = getContext(fn, (obj, prop) => {
-          obj.$$on(prop, updater);
-          cleaner.once(attr, () => obj.$$off(prop, updater));
-        });
-      }
-      node.setAttribute(attr, val);
-    }
-  }
+  const state = createState({}, context);
+  // cleanup
+  node.addEventListener('removed', () => {
+    delete state['*'];
+  }, false);
+  // events
   for (const ev in on) {
     const handler = on[ev];
     if (isFunction(handler)) {
       node.addEventListener(ev, handler);
     }
   }
-  let _children = children;
-  if (isFunction(children)) {
-    _children = getContext(children, (obj, prop, fn) => {
-      if (isArray(obj) && prop === '$each' && isFunction(fn)) {
-        const add = (newv, prop, obj) => {
-          const index = parseInt(prop);
-          const newView = fn(newv, index, obj);
-          if (newView) {
-            const newChild = render(newView, namespaceURI);
-            if (newChild) {
-              node.appendChild(newChild);
-            }
-          }
-        };
-        obj.$$on('#add', add);
-        cleaner.once(prop, () => obj.$$off('#add', add));
-        const mod = (newv, prop, obj) => {
-          const index = parseInt(prop);
-          const oldChild = node.children[index];
-          const newView = fn(newv, index, obj);
-          if (newView) {
-            const newChild = render(newView, namespaceURI);
-            if (newChild && oldChild) {
-              node.replaceChild(newChild, oldChild);
-            }
-          }
-        };
-        obj.$$on('#mod', mod);
-        cleaner.once(prop, () => obj.$$off('#mod', mod));
-        const del = (_newv, prop) => {
-          const index = parseInt(prop);
-          const oldChild = node.children[index];
-          if (oldChild) {
-            node.removeChild(oldChild);
-          }
-        };
-        obj.$$on('#del', del);
-        cleaner.once(prop, () => obj.$$off('#del', del));
-      } else {
-        const fn = children;
-        const updater = () => {
-          const views = [].concat(fn());
+  // attributes
+  for (const attr in attributes) {
+    const val = attributes[attr];
+    const setter = (newv) => {
+      node.setAttribute(attr, newv);
+    };
+    if (isFunction(val)) {
+      const getter = val;
+      const newv = state.$$watch(`attributes.${attr}`, getter, setter);
+      setter(newv);
+    } else {
+      setter(val);
+    }
+  }
+  // classList
+  if (!isUndefined(classList)) {
+    const setter = (newv) => {
+      if (isArray(newv)) {
+        newv = newv.join(' ');
+      }
+      node.classList = newv;
+    };
+    if (isFunction(classList)) {
+      const getter = classList;
+      const newv = state.$$watch('classList', getter, setter);
+      setter(newv);
+    } else {
+      setter(classList);
+    }
+  }
+  // other parameters
+  patchNode(state, node, config);
+  // children
+  if (!isUndefined(children)) {
+    const key = 'children';
+    const setter = (newv, oldv, prop) => {
+      if (prop === key) {
+        // replace
+        if (!isUndefined(newv)) {
           node.innerHTML = '';
+          const views = [].concat(newv);
           for (const view of views) {
-            const child = render(view, namespaceURI);
+            const child = render(view, context, namespaceURI);
             if (child) {
               node.appendChild(child);
             }
           }
-        };
-        obj.$$on(prop, updater);
-        cleaner.once(prop, () => obj.$$off(prop, updater));
+        }
+      } else if (isUndefined(newv)) {
+        // del
+        const oldChild = node.children[prop];
+        if (oldChild) {
+          node.removeChild(oldChild);
+        }
+      } else if (isUndefined(oldv)) {
+        // add
+        const newChild = render(newv, context, namespaceURI);
+        if (newChild) {
+          node.appendChild(newChild);
+        }
+      } else {
+        // mod
+        const oldChild = node.children[prop];
+        const newChild = render(newv, context, namespaceURI);
+        if (newChild && oldChild) {
+          node.replaceChild(newChild, oldChild);
+        }
       }
-    });
-  }
-  if (!isUndefined(_children)) {
-    const views = [].concat(_children);
-    for (const view of views) {
-      const child = render(view, namespaceURI);
-      if (child) {
-        node.appendChild(child);
-      }
+    };
+    if (isFunction(children)) {
+      const getter = children;
+      const val = state.$$watch(key, getter, setter);
+      setter(val, undefined, key);
+    } else {
+      setter(children, undefined, key);
     }
   }
   return node;
 }
 
-function patch (source, target, cleaner, level = 0) {
-  const setValue = (obj, key, val) => {
-    if (key === 'classList' && isArray(val) && !level) {
-      const arr = [];
-      for (const cls of val) {
-        if (cls) arr.push(cls);
-      }
-      val = arr.join(' ');
-    }
+function patchNode (state, node, params, ...rest) {
+  for (const param in params) {
+    const val = params[param];
     if (isObject(val)) {
-      patch(val, obj[key], cleaner, level + 1);
-    } else {
-      if (obj[key] !== val) obj[key] = val;
+      const target = node[param];
+      if (target) patchNode(state, target, val, ...rest, param);
+    } else if (!isUndefined(val)) {
+      const setter = (newv) => {
+        node[param] = newv;
+      };
+      if (isFunction(val)) {
+        const key = [].concat(rest, param).join('.');
+        const getter = val;
+        const newv = state.$$watch(key, getter, setter);
+        setter(newv);
+      } else {
+        setter(val);
+      }
     }
-  };
-  for (const key in source) {
-    let value = source[key];
-    if (isFunction(value)) {
-      const fn = value;
-      const updater = () => setValue(target, key, fn());
-      value = getContext(fn, (obj, prop) => {
-        obj.$$on(prop, updater);
-        cleaner.once(key, () => obj.$$off(prop, updater));
-      });
-    }
-    setValue(target, key, value);
   }
 }
 

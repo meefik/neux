@@ -1,4 +1,3 @@
-import { deepPatch, deepClone, deepDiff } from './state';
 import { isObject, isNumber } from './utils';
 
 /**
@@ -15,12 +14,9 @@ export function createSync (state, handler, options) {
   let data;
   const syncer = async (...args) => {
     const oldv = data;
-    const newv = deepClone(state);
-    const diff = deepDiff(newv, oldv);
-    data = await handler(newv, oldv, diff, ...args);
-    if (isObject(data)) {
-      deepPatch(state, data);
-    }
+    const newv = state.$$clone();
+    data = await handler(newv, oldv, ...args);
+    if (isObject(data)) state.$$patch(data);
     return data;
   };
   let timer;

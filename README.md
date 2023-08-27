@@ -55,7 +55,7 @@ import {
 Also, you can use it from the browser:
 
 ```html
-<script src="https://unpkg.com/neux@latest/dist/neux.min.js"></script>
+<script src="https://unpkg.com/neux"></script>
 <script>
   const { 
     createState,
@@ -101,13 +101,12 @@ The `$` character ahead of a field name is used in calculated fields to monitor 
 **Attention!**
 
 1. When deleting or replacing the tracking object/array in the calculated field, all binding is lost.
-2. In calculated fields, binding occurs only with those fields that are called during initialization.
+2. In calculated fields, binding occurs only with those fields that are called during the first synchronous execution.
 
-Watching for state changes:
+Listening for state changes:
 
 ```js
-const handler = (newv, prop, obj) => {
-  const oldv = obj[prop];
+const handler = (newv, oldv, prop, obj) => {
   console.log(newv, oldv, prop, obj);
 };
 // add a specified listener
@@ -120,7 +119,35 @@ state.$$off('double', handler);
 state.$$off('double');
 // add a listener to watch any changes
 // on this object and all children
-state.tasks.$$on('*', handler);
+state.$$on('*', handler);
+```
+
+Watching for state changes:
+
+```js
+// add watcher
+const res = state.$$watch('field', 
+  // getter
+  (obj, prop) => {
+    return obj.tasks.$$each((value, index, array) => {
+      return value;
+    });
+  },
+  // handler
+  (newv, oldv, prop, obj) => {
+    if (newv === undefined) {
+      console.log('deleted');
+    } else (oldv === undefined) {
+      console.log('added');
+    } else {
+      console.log('updated');
+    }
+    // store new value in state
+    // return newv;
+  }
+);
+// remove watcher
+state.$$unwatch('field');
 ```
 
 ## Views
@@ -486,31 +513,6 @@ const handlers = {
   },
   async download (path) {
     return fs.createReadStream(path);
-  },
-  async syncTodoList (diff) {
-    if (diff) {
-      const { add = [], mod = [], del = [] } = diff;
-      for (const item of add) {
-        const _index = todos.findIndex(el => el.id === item.id);
-        if (_index < 0) {
-          todos.push(item);
-        }
-      }
-      for (const item of mod) {
-        const _item = todos.find(el => el.id === item.id);
-        if (!_item) continue;
-        for (const field in item) {
-          if (item[field] === null) delete _item[field];
-          else _item[field] = item[field];
-        }
-      }
-      for (const item of del) {
-        const _index = todos.findIndex(el => el.id === item.id);
-        if (_index < 0) continue;
-        delete todos[_index];
-      }
-    }
-    return todos;
   }
 };
 
@@ -578,7 +580,7 @@ State synchronization is used to save their data to persistent storage.
 Synchronizing state with `localStorage`:
 
 ```js
-const syncer = (newv, oldv, diff) => {
+const syncer = (newv, oldv) => {
   if (!oldv) {
     return JSON.parse(localStorage.getItem('todos') || '[]');
   } else {
@@ -596,8 +598,8 @@ sync();
 Synchronizing state with remote store:
 
 ```js
-const syncer = async (newv, oldv, diff) => {
-  return await rpc.syncTodoList(diff);
+const syncer = async (newv, oldv) => {
+  return await rpc.getTodoList();
 };
 // create a synchronization with state
 const sync = createSync(state.tasks, syncer);
@@ -608,7 +610,7 @@ sync();
 Undo last changes or clear:
 
 ```js
-const syncer = (newv, oldv, diff, action) => {
+const syncer = (newv, oldv, action) => {
   if (action === 'undo') return oldv;
   if (action === 'clear') return [];
   return newv;

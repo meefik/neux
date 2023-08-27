@@ -7,47 +7,47 @@ import { isObject, hasOwnProperty, isString } from './utils';
  * @param {object} [routes]
  * @param {object} [options]
  * @param {string} [options.home]
+ * @param {object} [options.context]
  * @returns {Proxy}
  */
 export function createRouter (routes, options) {
-  const { home } = options || {};
+  const { home, context } = options || {};
   function refresh () {
     if ((!location.hash || location.hash === '#') && home) {
       return (location.hash = home);
     }
     const { path, query } = decodeQueryString(location.hash);
-    if (!state.query) state.query = {};
-    for (const k in state.query) {
+    if (!router.query) router.query = {};
+    for (const k in router.query) {
       if (!hasOwnProperty(query, k)) {
-        delete state.query[k];
+        delete router.query[k];
       }
     }
     for (const k in query) {
-      if (state.query[k] !== query[k]) {
-        state.query[k] = query[k];
+      if (router.query[k] !== query[k]) {
+        router.query[k] = query[k];
       }
     }
     for (const k in routes) {
       const re = routes[k];
       const match = path.match(re);
-      state.params[k] = match && match[1];
+      router.params[k] = match && match[1];
     }
-    state.path = path;
+    router.path = path;
   }
-  const target = {
+  const router = createState({
     path: '',
     params: {},
     query: {},
     navigate: () => navigate
-  };
-  Object.seal(target);
-  const state = createState(target);
+  }, context);
+  Object.seal(router);
   refresh();
-  state.$$on('*', () => {
-    navigate(state.path, state.query);
+  router.$$on('*', () => {
+    navigate(router.path, router.query);
   });
   window.addEventListener('hashchange', () => refresh());
-  return state;
+  return router;
 }
 
 function navigate (path, query) {
@@ -66,13 +66,14 @@ function decodeQueryString (qs) {
   const query = {};
   const re = /[?&]([^=]+)=([^&]*)/g;
   let tokens = re.exec(qs);
+  const decode = decodeURIComponent;
   while (tokens) {
-    const param = decodeURIComponent(tokens[1]);
-    query[param] = decodeURIComponent(tokens[2]);
+    const param = decode(tokens[1]);
+    query[param] = decode(tokens[2]);
     tokens = re.exec(qs);
   }
   const match = /^#([^?]+)/.exec(qs) || [];
-  const path = decodeURIComponent(match[1] || '');
+  const path = decode(match[1] || '');
   return { path, query };
 }
 

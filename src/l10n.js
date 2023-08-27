@@ -8,26 +8,21 @@ import { isObject, isString } from './utils';
  * @param {object} [options]
  * @param {string} [options.lang=navigator.language]
  * @param {string} [options.fallback="en"]
+ * @param {object} [options.context]
  * @returns {Proxy}
  */
 export function createL10n (locales, options) {
   const {
     lang = navigator.language,
-    fallback = 'en'
+    fallback = 'en',
+    context
   } = options || {};
-  const target = {
-    lang: locales[lang] ? lang : fallback,
-    locales: Object.keys(locales),
-    t: () => t
-  };
-  Object.seal(target);
-  const state = createState(target);
-  function t (path, data, lang) {
+  function translate (path, data, lang) {
     if (isString(data)) {
       lang = data;
       data = null;
     }
-    if (!lang) lang = state.$lang;
+    if (!lang) lang = l10n.$lang;
     if (!lang || !locales[lang]) lang = fallback;
     if (!lang) return path;
     const arr = `${path}`.split('.');
@@ -40,5 +35,11 @@ export function createL10n (locales, options) {
     }
     return value;
   }
-  return state;
+  const l10n = createState({
+    lang: locales[lang] ? lang : fallback,
+    locales: Object.keys(locales),
+    t: () => translate
+  }, context);
+  Object.seal(l10n);
+  return l10n;
 }
