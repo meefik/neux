@@ -28,7 +28,8 @@ Here are the main concepts behind NEUX:
 9. [Use with Vite](#use-with-vite)
 10. [Use with Tailwind CSS](#use-with-tailwind-css)
 11. [Use with Web Components](#use-with-web-components)
-12. [Examples](#examples)
+12. [Create your own Web Component](#create-your-own-web-component)
+13. [Examples](#examples)
 
 ## Installation
 
@@ -79,29 +80,29 @@ An example with comments:
 const state = createState({
   counter: 1,
   multiplier: 2,
-  tasks: [
+  list: [
     { text: 'Item 1' },
     { text: 'Item 2', checked: true }
   ],
-  // the calculated field for an object
+  // the computed field for an object
   double: (obj, prop) => obj.$counter * 2,
-  // the calculated field for an array
+  // the computed field for an array
   filtered: (obj, prop) => {
-    return obj.$tasks.filter(item => item.checked);
+    return obj.$list.filter(item => item.checked);
   }
 });
-// set or change the calculated field
+// set or change the computed field
 state.double = (obj, prop) => state.$double * state.$multiplier;
 // delete specified field with all listeners
 delete state.double;
 ```
 
-The `$` character ahead of a field name is used in calculated fields to monitor its changes. When changes occur in this field, this function will automatically restart to recalculate the new value of the calculated field.
+The `$` character ahead of a field name is used in computed fields to observe its changes. When changes occur in this field, this function will automatically recalled and receives the new value of the computed field.
 
 **Attention!**
 
-1. When deleting or replacing the tracking object/array in the calculated field, all binding is lost.
-2. In calculated fields, binding occurs only with those fields that are called during the first synchronous execution.
+1. When deleting or replacing the tracking object/array in the computed field, all binding is lost.
+2. In computed fields, binding occurs only with those fields that are called during the first synchronous execution.
 
 Listening for state changes:
 
@@ -117,37 +118,34 @@ state.$$once('double', handler);
 state.$$off('double', handler);
 // remove all listeners for the specified field
 state.$$off('double');
-// add a listener to watch any changes
+// add a listener to observe any changes
 // on this object and all children
 state.$$on('*', handler);
 ```
 
+Watcher is a computed field with no store date in the state.
+
 Watching for state changes:
 
 ```js
-// add watcher
-const res = state.$$watch('field', 
-  // getter
-  (obj, prop) => {
-    return obj.tasks.$$each((value, index, array) => {
-      return value;
-    });
-  },
-  // handler
-  (newv, oldv, prop, obj) => {
-    if (newv === undefined) {
-      console.log('deleted');
-    } else (oldv === undefined) {
-      console.log('added');
-    } else {
-      console.log('updated');
-    }
-    // store new value in state
-    // return newv;
+// add a listener for the watcher
+state.$$on('$list', (newv, oldv, prop, obj) => {
+  if (newv === undefined) {
+    console.log('deleted');
+  } else (oldv === undefined) {
+    console.log('added');
+  } else {
+    console.log('updated');
   }
-);
-// remove watcher
-state.$$unwatch('field');
+});
+// add a watcher without saving its result
+state.$list = (obj, prop) => {
+  return obj.list.$$each((value, index, array) => {
+    return value;
+  });
+});
+// remove the watcher
+delete state.$list;
 ```
 
 ## Views
@@ -590,7 +588,7 @@ const syncer = (newv, oldv) => {
 };
 // create a synchronization with state
 // slippage (in ms) helps group and reduce call frequency
-const sync = createSync(state.tasks, syncer, { slippage: 100 });
+const sync = createSync(state.list, syncer, { slippage: 100 });
 // sync state with local storage
 sync();
 ```
@@ -602,7 +600,7 @@ const syncer = async (newv, oldv) => {
   return await rpc.getTodoList();
 };
 // create a synchronization with state
-const sync = createSync(state.tasks, syncer);
+const sync = createSync(state.list, syncer);
 // sync state with remote store
 sync();
 ```
@@ -616,15 +614,15 @@ const syncer = (newv, oldv, action) => {
   return newv;
 };
 // create a synchronization with state
-const sync = createSync(state.tasks, syncer);
+const sync = createSync(state.list, syncer);
 // commit current state
 sync();
 // change state
-state.tasks[0].checked = true;
+state.list[0].checked = true;
 // commit changes
 sync();
 // change state again
-state.tasks[0].checked = false;
+state.list[0].checked = false;
 // undo last change
 sync('undo');
 // delete all data
@@ -779,6 +777,75 @@ createView({
   children: [{
     tagName: 'my-nested-component',
     textContent: 'Hello'
+  }]
+}, { target: document.body });
+```
+
+## Create your own Web Component
+
+An example of a web component definition:
+
+```js
+class Counter extends HTMLElement {
+  static get observedAttributes() {
+    return ['value'];
+  }
+  constructor() {
+    super();
+    const context = {};
+    this.attrs = createState({}, context);
+    this.attrs.$$on('*', (newv, oldv, prop) => {
+      this.setAttribute(prop, newv);
+    });
+    const view = createView(this.template(), { context });
+    const shadow = this.attachShadow({ mode: 'open' });
+    shadow.appendChild(view);
+  }
+  attributeChangedCallback(name, oldv, newv) {
+    this.attrs[name] = newv;
+  }
+  template() {
+    return {
+      children: [{
+        tagName: 'input',
+        type: 'number',
+        value: () => this.attrs.$value,
+        on: {
+          change: (e) => {
+            this.attrs.value = e.target.value;
+          }
+        }
+      }, {
+        tagName: 'slot',
+        name: 'label',
+        textContent: () => this.attrs.$value
+      }]
+    };
+  }
+}
+customElements.define('ne-counter', Counter);
+```
+
+Use this web component:
+
+```js
+const state = createState({
+  counter: 1
+});
+createView({
+  tagName: 'ne-counter',
+  attributes: {
+    value: () => state.$counter,
+  },
+  on: {
+    changed(e) {
+      state.counter = parseInt(e.detail.newValue);
+    }
+  },
+  children: [{
+    tagName: 'span',
+    slot: 'label',
+    textContent: () => state.$counter
   }]
 }, { target: document.body });
 ```

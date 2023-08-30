@@ -26,13 +26,13 @@ export function createState (data, context = defaultContext) {
   const watcher = new EventListener();
   const updater = new EventListener();
   const handler = {
-    get: (obj, prop, receiver) => {
+    get: (obj, prop) => {
       if (prop === proxyKey) {
         return true;
       }
       if (prop === '$') {
         return function (key) {
-          return receiver['$' + key];
+          return state['$' + key];
         };
       } else if (prop === '$$on') {
         return function (...args) {
@@ -50,14 +50,6 @@ export function createState (data, context = defaultContext) {
         return function (...args) {
           return listener.emit(...args);
         };
-      } else if (prop === '$$watch') {
-        return function (prop, getter, setter) {
-          return setWatcher(context, receiver, prop, getter, setter, watcher);
-        };
-      } else if (prop === '$$unwatch') {
-        return function (prop = '*') {
-          watcher.emit(prop);
-        };
       } else if (prop === '$$clone') {
         return function (oldv = obj) {
           return deepClone(oldv);
@@ -67,49 +59,49 @@ export function createState (data, context = defaultContext) {
           return isEqual(newv, oldv);
         };
       } else if (prop === '$$patch') {
-        return function (newv, oldv = receiver) {
+        return function (newv, oldv = state) {
           return deepPatch(context, newv, oldv);
         };
       } else if (prop === '$$each' && isArray(obj)) {
         return function (callbackFn, thisArg) {
           if (isFunction(callbackFn)) {
-            setContext(context, receiver, '#', callbackFn);
+            setContext(context, state, '#', callbackFn.bind(thisArg));
           }
           return obj.map(callbackFn, thisArg).filter(item => item);
         };
       } else if (isString(prop) && dollarRe.test(prop)) {
         prop = prop.slice(1);
         if (!isFunction(obj[prop])) {
-          setContext(context, receiver, prop);
+          setContext(context, state, prop);
         }
       }
       return Reflect.get(obj, prop);
     },
-    set: (obj, prop, value, receiver) => {
+    set: (obj, prop, value) => {
       const oldv = deepClone(obj[prop]);
+      const setter = !(isString(prop) && dollarRe.test(prop));
       if (isFunction(value)) {
         const getter = value;
-        const setter = (newv) => newv;
-        value = setWatcher(context, receiver, prop, getter, setter, watcher);
+        value = setWatcher(context, state, prop, getter, watcher);
       }
-      if (isObject(value)) {
+      if (setter && isObject(value)) {
         value = createState(value, context);
-        setUpdater(receiver, prop, value, updater);
+        setUpdater(state, prop, value, updater);
       }
-      const changed = (isArray(obj) && prop === 'length') || obj[prop] !== value;
-      const res = Reflect.set(obj, prop, value);
+      const changed = !setter || obj[prop] !== value || (prop === 'length' && isArray(obj));
+      const res = setter ? Reflect.set(obj, prop, value) : true;
       if (!res) return false;
       if (changed) {
         const events = [prop, '*'];
         if (isArray(obj) && !isNaN(prop)) events.push('#');
         const emit = async () => {
-          listener.emit(events, value, oldv, prop, receiver);
+          listener.emit(events, value, oldv, prop, state);
         };
         emit();
       }
       return true;
     },
-    deleteProperty: (obj, prop, receiver) => {
+    deleteProperty: (obj, prop) => {
       const oldv = deepClone(obj[prop]);
       const res = Reflect.deleteProperty(obj, prop);
       if (!res) return false;
@@ -118,23 +110,28 @@ export function createState (data, context = defaultContext) {
       const events = [prop, '*'];
       if (isArray(obj) && !isNaN(prop)) events.push('#');
       const emit = async () => {
-        listener.emit(events, undefined, oldv, prop, receiver);
+        listener.emit(events, undefined, oldv, prop, state);
       };
       emit();
       return true;
     }
   };
   const state = new Proxy(data, handler);
-  for (const key in data) {
-    if (isFunction(data[key])) {
-      const getter = data[key];
-      const setter = (newv) => newv;
-      data[key] = setWatcher(context, state, key, getter, setter, watcher);
+  for (const prop in data) {
+    if (isFunction(data[prop])) {
+      const getter = data[prop];
+      const value = setWatcher(context, state, prop, getter, watcher);
+      const setter = !(isString(prop) && dollarRe.test(prop));
+      if (setter) {
+        data[prop] = value;
+      } else {
+        delete data[prop];
+      }
     }
-    if (isObject(data[key])) {
-      const value = createState(data[key], context);
-      data[key] = value;
-      setUpdater(state, key, value, updater);
+    if (isObject(data[prop])) {
+      const value = createState(data[prop], context);
+      data[prop] = value;
+      setUpdater(state, prop, value, updater);
     }
   }
   return state;
@@ -162,8 +159,9 @@ function getContext (context, getter, setter) {
   return val;
 }
 
-function setWatcher (context, state, prop, getter, setter, cleaner) {
-  let data = getContext(
+function setWatcher (context, state, prop, getter, cleaner) {
+  cleaner.emit(prop);
+  return getContext(
     context,
     () => getter(state, prop),
     (obj, key, callbackFn) => {
@@ -178,37 +176,25 @@ function setWatcher (context, state, prop, getter, setter, cleaner) {
           if (!isUndefined(newv)) {
             newv = callbackFn(newv, idx, arr);
           }
-          if (isFunction(setter)) {
-            const res = setter(newv, oldv, idx, arr);
-            if (!isUndefined(res)) state[prop] = arr;
-          } else {
-            state.$$emit(prop, newv, oldv, idx, arr);
-          }
+          state.$$emit(`#${prop}`, newv, oldv, idx, arr);
         };
       } else {
         handler = () => {
           const newv = getter(state, prop);
-          if (isFunction(setter)) {
-            const res = setter(newv, data, prop, state);
-            if (!isUndefined(res)) state[prop] = res;
-          } else {
-            state.$$emit(prop, newv, data, prop, state);
-          }
-          data = newv;
+          state[prop] = newv;
         };
       }
       obj.$$on(key, handler);
       cleaner.once(prop, () => obj.$$off(key, handler));
     }
   );
-  return data;
 }
 
 function setUpdater (state, prop, sub, cleaner) {
   cleaner.emit(prop);
   if (!sub[proxyKey]) return;
   const handler = (...args) => {
-    state.$$emit(['*'], ...args, prop);
+    state.$$emit([prop, '*'], ...args, prop);
   };
   sub.$$on('*', handler);
   cleaner.once(prop, () => sub.$$off('*', handler));

@@ -14,17 +14,17 @@ describe('state', () => {
         text: () => 'Text'
       },
       arr: [{
-        text: 'Item 1'
-      }, {
-        text: 'Item 2',
+        text: 'Item 1',
         checked: true
+      }, {
+        text: 'Item 2'
       }, {
         text: 'Item 3'
       }],
       filtered: (obj, prop) => {
-        // TODO: reactivity for any sub changes
         return obj.$arr.filter(item => item.checked);
-      }
+      },
+      $triple: (obj, prop) => obj.$counter * 3
     });
     await t.test('regular field', () => {
       assert.equal(state.counter, 3);
@@ -42,12 +42,16 @@ describe('state', () => {
     await t.test('array field', () => {
       assert.equal(state.arr.length, 3);
       assert.equal(state.arr[0].text, 'Item 1');
+      assert.equal(state.arr[0].checked, true);
       assert.equal(state.arr[1].text, 'Item 2');
-      assert.equal(state.arr[1].checked, true);
       assert.equal(state.arr[2].text, 'Item 3');
     });
     await t.test('computed array field', () => {
-      assert.equal(state.filtered.length, 1);
+      state.arr[1].checked = true;
+      assert.equal(state.filtered.length, 2);
+    });
+    await t.test('watcher field', () => {
+      assert.equal(state.$triple, undefined);
     });
   });
 
@@ -73,6 +77,29 @@ describe('state', () => {
     await t.test('computed field', () => {
       state.double = (obj, prop) => obj.$counter * 2;
       assert.equal(state.double, 4);
+    });
+    await t.test('watcher field', async (t) => {
+      try {
+        const state = createState({
+          counter: 1,
+          $triple: (obj, prop) => obj.$counter * 3
+        });
+        await new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            reject(Error('Operation timeout'));
+          }, 100);
+          state.$$on('$triple', (newv, oldv, prop, obj) => {
+            if (newv === 6 && oldv === undefined && prop === '$triple') {
+              clearTimeout(timer);
+              resolve();
+            }
+          });
+          state.counter++;
+        });
+        assert.ok(true);
+      } catch (err) {
+        assert.fail(err.message);
+      }
     });
   });
 
@@ -273,57 +300,25 @@ describe('state', () => {
   it('each', async (t) => {
     try {
       const state = createState({
-        arr: [],
+        arr: [1, 2],
         computed: (obj, prop) => {
           return obj.arr.$$each(item => {
             return item;
           });
         }
       });
+      const stages = [
+        { newv: 3, oldv: undefined, prop: 2 },
+        { newv: 4, oldv: 2, prop: 1 },
+        { newv: undefined, oldv: 3, prop: 2 }
+      ];
       await new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
           reject(Error('Operation timeout'));
         }, 100);
-        state.$$on('computed', (newv, oldv, prop, obj) => {
-          clearTimeout(timer);
-          if (prop === 'computed' && newv.length === 1 && oldv.length === 0) {
-            resolve();
-          } else {
-            reject(new Error('Incorrect value'));
-          }
-        });
-        state.arr.push(1);
-      });
-      assert.ok(true);
-    } catch (err) {
-      assert.fail(err.message);
-    }
-  });
-
-  it('watch', async (t) => {
-    try {
-      const state = createState({
-        counter: 1,
-        arr: ['a', 'b']
-      });
-      await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          reject(Error('Operation timeout'));
-        }, 100);
-        const stages = [
-          { newv: 'c-1', oldv: 'undefined', idx: 2 },
-          { newv: 'c-1', oldv: 'b-1', idx: 1 },
-          { newv: 'undefined', oldv: 'c-1', idx: 2 },
-          { newv: 'a-2,c-2', oldv: 'a-1,b-1', idx: 'computed' }
-        ];
-        const arr = state.$$watch('computed', (obj, prop) => {
-          const counter = obj.$counter;
-          return obj.arr.$$each(item => {
-            return `${item}-${counter}`;
-          });
-        }, (newv, oldv, idx, arr) => {
+        state.$$on('#computed', (newv, oldv, prop, obj) => {
           const stage = stages.shift();
-          if (`${newv}` !== stage.newv || `${oldv}` !== stage.oldv || idx !== stage.idx) {
+          if (newv !== stage.newv || oldv !== stage.oldv || prop !== stage.prop) {
             reject(new Error('Incorrect value'));
           }
           if (!stages.length) {
@@ -331,14 +326,29 @@ describe('state', () => {
             resolve();
           }
         });
-        assert.equal(arr.length, 2);
-        state.arr.push('c');
-        state.arr.splice(1, 1);
-        state.counter++;
+        state.arr.push(3);
+        state.arr.splice(1, 1, 4);
+        state.arr.pop();
       });
       assert.ok(true);
     } catch (err) {
       assert.fail(err.message);
     }
+  });
+
+  it('context', async (t) => {
+    const context = {};
+    const state1 = createState({
+      counter: 1
+    }, context);
+    const state2 = createState({
+      double: (obj, prop) => state1.$counter * 2
+    }, context);
+    const state3 = createState({
+      double: (obj, prop) => state1.$counter * 2
+    });
+    state1.counter = 2;
+    assert.equal(state2.double, 4);
+    assert.equal(state3.double, 2);
   });
 });

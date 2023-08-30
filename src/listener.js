@@ -31,7 +31,9 @@ export default class EventListener {
   }
 
   off (event, handler) {
-    if (event) {
+    if (!event) {
+      this._list = {};
+    } else {
       const list = this._list;
       const events = [].concat(event);
       for (const event of events) {

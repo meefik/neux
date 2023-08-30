@@ -13,11 +13,14 @@ import { isObject, isArray, isFunction, isString, isUndefined } from './utils';
 export function createView (config, options) {
   const { target, context } = options || {};
   const el = render(config, context);
-  const node = target || el;
-  if (node) {
-    const observer = createObserver(node);
-    node.addEventListener('removed', () => observer.disconnect(), false);
-    if (target && el) {
+  if (el) {
+    const observer = createObserver(target || el);
+    el.addEventListener('removed', (e) => {
+      if (e.target === el) {
+        observer.disconnect();
+      }
+    }, false);
+    if (target) {
       target.appendChild(el);
     }
   }
@@ -26,6 +29,7 @@ export function createView (config, options) {
 
 function render (config, context, ns) {
   if (!isObject(config)) return;
+  const { document } = window;
   config = { ...config };
   let node;
   // view
@@ -66,6 +70,7 @@ function render (config, context, ns) {
   const state = createState({}, context);
   // cleanup
   node.addEventListener('removed', () => {
+    state.$$off();
     delete state['*'];
   }, false);
   // events
@@ -82,9 +87,9 @@ function render (config, context, ns) {
       node.setAttribute(attr, newv);
     };
     if (isFunction(val)) {
-      const getter = val;
-      const newv = state.$$watch(`attributes.${attr}`, getter, setter);
-      setter(newv);
+      const key = `$attributes.${attr}`;
+      state.$$on(key, setter);
+      state[key] = val;
     } else {
       setter(val);
     }
@@ -98,9 +103,9 @@ function render (config, context, ns) {
       node.classList = newv;
     };
     if (isFunction(classList)) {
-      const getter = classList;
-      const newv = state.$$watch('classList', getter, setter);
-      setter(newv);
+      const key = '$classList';
+      state.$$on(key, setter);
+      state[key] = classList;
     } else {
       setter(classList);
     }
@@ -109,21 +114,21 @@ function render (config, context, ns) {
   patchNode(state, node, config);
   // children
   if (!isUndefined(children)) {
-    const key = 'children';
-    const setter = (newv, oldv, prop) => {
-      if (prop === key) {
-        // replace
-        if (!isUndefined(newv)) {
-          node.innerHTML = '';
-          const views = [].concat(newv);
-          for (const view of views) {
-            const child = render(view, context, namespaceURI);
-            if (child) {
-              node.appendChild(child);
-            }
+    const key = '$children';
+    const setter = (newv) => {
+      node.innerHTML = '';
+      if (!isUndefined(newv)) {
+        const views = [].concat(newv);
+        for (const view of views) {
+          const child = render(view, context, namespaceURI);
+          if (child) {
+            node.appendChild(child);
           }
         }
-      } else if (isUndefined(newv)) {
+      }
+    };
+    const updater = (newv, oldv, prop) => {
+      if (isUndefined(newv)) {
         // del
         const oldChild = node.children[prop];
         if (oldChild) {
@@ -145,11 +150,11 @@ function render (config, context, ns) {
       }
     };
     if (isFunction(children)) {
-      const getter = children;
-      const val = state.$$watch(key, getter, setter);
-      setter(val, undefined, key);
+      state.$$on(key, setter);
+      state.$$on('#' + key, updater);
+      state[key] = children;
     } else {
-      setter(children, undefined, key);
+      setter(children);
     }
   }
   return node;
@@ -158,26 +163,27 @@ function render (config, context, ns) {
 function patchNode (state, node, params, ...rest) {
   for (const param in params) {
     const val = params[param];
-    if (isObject(val)) {
-      const target = node[param];
-      if (target) patchNode(state, target, val, ...rest, param);
-    } else if (!isUndefined(val)) {
-      const setter = (newv) => {
+    const setter = (newv) => {
+      if (isObject(newv)) {
+        const target = node[param];
+        if (target) patchNode(state, target, newv, ...rest, param);
+      } else if (!isUndefined(newv)) {
         node[param] = newv;
-      };
-      if (isFunction(val)) {
-        const key = [].concat(rest, param).join('.');
-        const getter = val;
-        const newv = state.$$watch(key, getter, setter);
-        setter(newv);
-      } else {
-        setter(val);
       }
+    };
+    if (isFunction(val)) {
+      const key = '$' + [].concat(rest, param).join('.');
+      state.$$on(key, setter);
+      state[key] = val;
+    } else {
+      setter(val);
     }
   }
 }
 
 function createObserver (el) {
+  const { MutationObserver, CustomEvent, Node } = window;
+  const ELEMENT_NODE = Node.ELEMENT_NODE;
   const observer = new MutationObserver(function (mutationList) {
     const dispatchEvent = (node, event) => {
       const children = node.children;
@@ -190,25 +196,30 @@ function createObserver (el) {
     for (const mutation of mutationList) {
       if (mutation.type === 'childList') {
         mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
+          if (node.nodeType === ELEMENT_NODE) {
             dispatchEvent(node, 'mounted');
           }
         });
         mutation.removedNodes.forEach((node) => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
+          if (node.nodeType === ELEMENT_NODE) {
             dispatchEvent(node, 'removed');
           }
         });
       } else if (mutation.type === 'attributes') {
         const node = mutation.target;
-        const ev = new CustomEvent('changed', {
-          detail: {
-            attributeName: mutation.attributeName,
-            oldValue: mutation.oldValue,
-            newValue: node.getAttribute(mutation.attributeName)
-          }
-        });
-        node.dispatchEvent(ev);
+        const attributeName = mutation.attributeName;
+        const oldValue = mutation.oldValue;
+        const newValue = node.getAttribute(attributeName);
+        if (oldValue !== newValue) {
+          const ev = new CustomEvent('changed', {
+            detail: {
+              attributeName,
+              oldValue,
+              newValue
+            }
+          });
+          node.dispatchEvent(ev);
+        }
       }
     }
   });

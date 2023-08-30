@@ -12,6 +12,7 @@ import { isObject, hasOwnProperty, isString } from './utils';
  */
 export function createRouter (routes, options) {
   const { home, context } = options || {};
+  const { location, addEventListener } = window;
   function refresh () {
     if ((!location.hash || location.hash === '#') && home) {
       return (location.hash = home);
@@ -46,11 +47,12 @@ export function createRouter (routes, options) {
   router.$$on('*', () => {
     navigate(router.path, router.query);
   });
-  window.addEventListener('hashchange', () => refresh());
+  addEventListener('hashchange', () => refresh());
   return router;
 }
 
 function navigate (path, query) {
+  const { location } = window;
   if (isObject(path)) {
     query = path;
     path = null;
@@ -66,14 +68,14 @@ function decodeQueryString (qs) {
   const query = {};
   const re = /[?&]([^=]+)=([^&]*)/g;
   let tokens = re.exec(qs);
-  const decode = decodeURIComponent;
+  const { decodeURIComponent } = window;
   while (tokens) {
-    const param = decode(tokens[1]);
-    query[param] = decode(tokens[2]);
+    const param = decodeURIComponent(tokens[1]);
+    query[param] = decodeURIComponent(tokens[2]);
     tokens = re.exec(qs);
   }
   const match = /^#([^?]+)/.exec(qs) || [];
-  const path = decode(match[1] || '');
+  const path = decodeURIComponent(match[1] || '');
   return { path, query };
 }
 
