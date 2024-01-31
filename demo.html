@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head></head>
+
+<body>
+  <script src="./dist/neux.umd.js"></script>
+  <script>
+    const { createView, createState } = NEUX;
+    const config = {
+      tagName: 'div',
+      classList: ['a', 'b'],
+      attributes: {
+        for: 'label'
+      },
+      dataset: {
+        id: '123'
+      },
+      on: {
+        mounted(e) { return () => console.log('mounted'); },
+        removed(e) { return () => console.log('removed'); },
+        changed(e) { return () => console.log('changed'); }
+      },
+      children: [{
+        textContent: 'a'
+      }, {
+        children: [{
+          textContent: 'b'
+        }, {
+          children: [{
+            textContent: 'c'
+          }]
+        }]
+      }]
+    };
+    const state = createState();
+    state.$$on('*', (newv, oldv, prop, obj, ...rest) => {
+      console.log(newv, oldv, prop, obj, rest);
+    });
+    for (const k in config) {
+      state[k] = config[k];
+    }
+    // const view = createView(config, { target: document.body });
+    // console.log(view);
+    // window.view = view;
+
+    // const context = {};
+    // const state = createState({
+    //   text: 'Hello',
+    //   counter: 1,
+    //   double: (obj, prop) => obj.$counter * 2,
+    //   arr: [{
+    //     text: 'Item 1'
+    //   }, {
+    //     text: 'Item 2'
+    //   }],
+    //   obj: {
+    //     y: 1
+    //   }
+    // }, context);
+    // state.$$watch('#triple', (obj, prop) => {
+    //   console.log('$$watch');
+    //   const triple = obj.$counter * 3;
+    //   // obj.triple = triple;
+    //   obj.arr.$$each((v, i, a) => {
+    //     console.log(v, i, a);
+    //     return v.text;
+    //   });
+    //   return triple;
+    // });
+    // state.$$on('#triple', (newv, oldv, prop, obj) => {
+    //   console.log('$$on', newv, oldv, prop, obj);
+    // });
+    // state.$$on('triple', (newv, oldv, prop, obj) => {
+    //   console.log('$$on', newv, oldv, prop, obj);
+    // });
+
+    // state.$$on('*', (...args) => {
+    //   console.log('*', ...args);
+    // });
+    // const view = createView({
+    //   on: {
+    //     mounted(e) {
+    //       console.log('mounted', e);
+    //     },
+    //     removed(e) {
+    //       console.log('removed', e);
+    //     },
+    //     changed(e) {
+    //       console.log('changed', e);
+    //     }
+    //   },
+    //   children: [{
+    //     on: {
+    //       mounted(e) {
+    //         console.log('mounted', e);
+    //       },
+    //       removed(e) {
+    //         console.log('removed', e);
+    //       },
+    //       changed(e) {
+    //         console.log('changed', e);
+    //       }
+    //     },
+    //     id: 'my-label',
+    //     tagName: 'label',
+    //     classList: ['aa', 'bb', 'cc'],
+    //     textContent: 'Label'
+    //   }, {
+    //     tagName: 'input',
+    //     attributes: {
+    //       for: 'my-label'
+    //     },
+    //     on: {
+    //       change(e) {
+    //         state.text = e.target.value;
+    //       },
+    //       input(e) {
+    //         state.text = e.target.value;
+    //       }
+    //     }
+    //   }, {
+    //     tagName: 'div',
+    //     textContent() {
+    //       return state.$text;
+    //     }
+    //   }, {
+    //     tagName: 'button',
+    //     textContent: 'OK',
+    //     style: { color: () => 'red' },
+    //     on: {
+    //       click(e) {
+    //         console.log('click');
+    //       }
+    //     }
+    //   }, {
+    //     tagName: 'ul',
+    //     children: () => {
+    //       return state.$arr.$$each(item => {
+    //         return {
+    //           tagName: 'li',
+    //           textContent: () => item.$text
+    //         }
+    //       });
+    //     }
+    //   }]
+    // }, {
+    //   // target: document.body,
+    //   context
+    // });
+    // document.body.appendChild(view);
+
+    // const l10n = createL10n({ en: {}, ru: {} }, {
+    //   lang: navigator.language,
+    //   fallback: 'en',
+    //   context
+    // });
+    // const router = createRouter({
+    //   home: '',
+    //   context
+    // });
+
+    // const app = NEUX({
+    //   tagName: 'main',
+    //   on: {
+    //     mounted(ctx, e) {
+    //       console.log('mounted');
+    //     }
+    //   },
+    //   children: [{
+    //     tagName: 'button',
+    //     on: {
+    //       async click(ctx, e) {
+    //         const text = await ctx.rpc.hello('World');
+    //         console.log(text);
+    //       }
+    //     }
+    //   }, {
+    //     children: (ctx) => {
+    //       console.log(ctx.state.$text);
+    //       console.log(ctx.router.$path);
+    //       console.log(ctx.l10n.$lang);
+    //     }
+    //   }]
+    // }, {
+    //   state: {
+    //     text: '111'
+    //   },
+    //   router: {
+    //     home: ''
+    //   },
+    //   l10n: {
+    //     locales: {},
+    //     lang: navigator.language,
+    //     fallback: 'en'
+    //   },
+    //   rpc: {
+    //     url: '/api/rpc',
+    //     method: 'POST'
+    //   }
+    // });
+    // document.body.appendChild(app);
+
+    // const ne = new NEUX();
+    // ne.createState()
+    // ne.createView()
+    // ne.createRouter()
+    // ne.createL10n()
+    // ne.createSync()
+    // ne.createRPC()
+
+    // const app = new NEUX(({ state, router, l10n }) => {
+    //     const views = {};
+    //     return {
+    //       tagName: 'div',
+    //       children: [{
+    //         tagName: 'h1',
+    //         textContent: () => state.$text
+    //       }, {
+    //         tagName: 'main',
+    //         children: () => {
+    //           const view = views[router.$path];
+    //           return view;
+    //         }
+    //       }]
+    //     };
+    //   }, {
+    //     home: 'todo',
+    //     locales: {},
+    //     lang: 'en',
+    //     fallback: 'en',
+    //     url: ''
+    //   });
+
+    // class Counter extends HTMLElement {
+    //   static get observedAttributes() {
+    //     return ['value'];
+    //   }
+    //   constructor() {
+    //     super();
+    //     const context = {};
+    //     this.attrs = createState({}, context);
+    //     this.attrs.$$on('*', (newv, oldv, prop) => {
+    //       this.setAttribute(prop, newv);
+    //     });
+    //     const view = createView(this.template(), { context });
+    //     const shadow = this.attachShadow({ mode: 'open' });
+    //     shadow.appendChild(view);
+    //   }
+    //   attributeChangedCallback(name, oldv, newv) {
+    //     this.attrs[name] = newv;
+    //   }
+    //   template() {
+    //     return {
+    //       children: [{
+    //         tagName: 'input',
+    //         type: 'number',
+    //         value: () => this.attrs.$value,
+    //         on: {
+    //           change: (e) => {
+    //             this.attrs.value = e.target.value;
+    //           }
+    //         }
+    //       }, {
+    //         tagName: 'slot',
+    //         name: 'label',
+    //         textContent: () => this.attrs.$value
+    //       }]
+    //     };
+    //   }
+    // }
+    // customElements.define('ne-counter', Counter);
+
+    // const state = createState({
+    //   counter: 1
+    // });
+    // createView({
+    //   tagName: 'ne-counter',
+    //   attributes: {
+    //     value: () => state.$counter,
+    //   },
+    //   on: {
+    //     changed(e) {
+    //       state.counter = parseInt(e.detail.newValue);
+    //     }
+    //   },
+    //   children: [{
+    //     tagName: 'span',
+    //     slot: 'label',
+    //     textContent: () => state.$counter
+    //   }]
+    // }, { target: document.body });
+  </script>
+</body>
+
+</html>
