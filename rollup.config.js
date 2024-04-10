@@ -1,5 +1,7 @@
 import terser from '@rollup/plugin-terser';
 
+const { NODE_ENV = 'production' } = process.env;
+
 export default {
   input: 'src/index.js',
   output: [{
@@ -10,5 +12,5 @@ export default {
     file: 'dist/neux.esm.js',
     format: 'esm'
   }],
-  plugins: [terser()]
+  plugins: NODE_ENV === 'production' ? [terser()] : []
 };
