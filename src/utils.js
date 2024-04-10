@@ -19,10 +19,6 @@ export function isArray (obj) {
 }
 
 export function isObject (obj) {
-  return typeof obj === 'object' && obj !== null &&
-    (obj.constructor === Object || obj.constructor === Array);
-}
-
-export function hasOwnProperty (obj, prop) {
-  return isObject(obj) && Object.prototype.hasOwnProperty.call(obj, prop);
+  return typeof obj === 'object' && obj !== null
+    && (obj.constructor === Object || obj.constructor === Array);
 }

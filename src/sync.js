@@ -1,4 +1,4 @@
-import { isObject, isNumber } from './utils';
+import { isNumber, isObject } from './utils';
 
 /**
  * Create a synchronization function.
@@ -6,31 +6,30 @@ import { isObject, isNumber } from './utils';
  * @param {Proxy} state
  * @param {function} handler
  * @param {object} [options]
- * @param {object} [options.slippage]
+ * @param {number} [options.slippage]
  * @returns {function}
  */
 export function createSync (state, handler, options) {
   const { slippage } = options || {};
-  let data;
+  let data = null;
   const syncer = async (...args) => {
     const oldv = data;
     const newv = state.$$clone();
-    data = await handler(newv, oldv, ...args);
-    if (isObject(data)) state.$$patch(data);
-    return data;
+    const res = await handler(newv, oldv, ...args);
+    if (isObject(res)) {
+      state.$$patch(res);
+    }
+    return (data = res);
   };
-  let timer;
+  let timer = null;
   if (isNumber(slippage)) {
-    return async function (...args) {
-      return new Promise(resolve => {
-        clearTimeout(timer);
-        timer = setTimeout(
-          async () => resolve(await syncer(...args)),
-          timer ? slippage : 0
-        );
-      });
-    };
-  } else {
-    return syncer;
+    return (...args) => new Promise((resolve) => {
+      clearTimeout(timer);
+      timer = setTimeout(
+        async () => resolve(await syncer(...args)),
+        timer ? slippage : 0
+      );
+    });
   }
+  return syncer;
 }

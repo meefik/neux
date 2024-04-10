@@ -2,9 +2,11 @@
  * Create a state.
  *
  * @param data Initial state data.
- * @param context Context for reactivity.
+ * @param options State options.
  */
-export function createState(data?: object, context?: object): object;
+export function createState(data?: object, options?: {
+  context?: object
+}): object;
 /**
  * Create a view.
  *
@@ -14,7 +16,7 @@ export function createState(data?: object, context?: object): object;
 export function createView(config: object, options?: {
   target?: HTMLElement,
   context?: object
-}): HTMLElement;
+}): object | HTMLElement;
 /**
  * Create a localization.
  * 
@@ -24,12 +26,14 @@ export function createView(config: object, options?: {
 export function createL10n(locales: object, options?: {
   lang?: string,
   fallback?: string,
+  prefix?: string,
   context?: object
 }): {
   lang: string,
   $lang: string,
   locales: string[],
-  t: (path: string, data?: object | string, lang?: string) => string
+  t: (path: string, data?: object | string, lang?: string) => string,
+  d: (date: Date | number, format: string, utc?: boolean) => string
 };
 /**
  * Create a router.

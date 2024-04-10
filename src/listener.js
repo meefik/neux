@@ -2,72 +2,82 @@
  * Event listener.
  */
 export default class EventListener {
-  _list = {};
+  #list = {};
 
   on (event, handler) {
     if (event && handler) {
-      const list = this._list;
+      const list = this.#list;
       const events = [].concat(event);
-      for (const event of events) {
-        if (!list[event]) {
-          list[event] = new Map();
+      for (const ev of events) {
+        if (!list[ev]) {
+          list[ev] = new Map();
         }
-        list[event].set(handler, false);
+        list[ev].set(handler, false);
       }
     }
   }
 
   once (event, handler) {
     if (event && handler) {
-      const list = this._list;
+      const list = this.#list;
       const events = [].concat(event);
-      for (const event of events) {
-        if (!list[event]) {
-          list[event] = new Map();
+      for (const ev of events) {
+        if (!list[ev]) {
+          list[ev] = new Map();
         }
-        list[event].set(handler, true);
+        list[ev].set(handler, true);
       }
     }
   }
 
   off (event, handler) {
-    if (!event) {
-      this._list = {};
-    } else {
-      const list = this._list;
+    if (event) {
+      const list = this.#list;
       const events = [].concat(event);
-      for (const event of events) {
-        if (list[event]) {
+      for (const ev of events) {
+        if (list[ev]) {
           if (handler) {
-            list[event].delete(handler);
-            if (!list[event].size) {
-              delete list[event];
+            list[ev].delete(handler);
+            if (!list[ev].size) {
+              delete list[ev];
             }
           } else {
-            list[event].clear();
-            delete list[event];
+            list[ev].clear();
+            delete list[ev];
           }
         }
       }
+    } else {
+      this.#list = {};
     }
   }
 
   emit (event, ...args) {
-    const list = this._list;
+    const list = this.#list;
     if (event === '*') {
-      for (const event in list) {
-        for (const [fn, once] of list[event]) {
-          fn(...args);
-          if (once) this.off(event, fn);
+      for (const ev in list) {
+        for (const [fn, once] of list[ev]) {
+          const res = fn(...args);
+          if (once) {
+            this.off(ev, fn);
+          }
+          if (res === false) {
+            break;
+          }
         }
       }
     } else {
       const events = new Set([].concat(event));
-      for (const event of events) {
-        if (list[event]) {
-          for (const [fn, once] of list[event]) {
-            fn(...args);
-            if (once) this.off(event, fn);
+      for (const ev of events) {
+        if (list[ev]) {
+          for (const [fn, once] of list[ev]) {
+            const res = fn(...args);
+            if (once) {
+              this.off(ev, fn);
+            }
+            if (res === false) {
+              break;
+            }
           }
         }
       }
