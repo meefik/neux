@@ -1,192 +1,16 @@
+import { isArray, isFunction, isObject, isString, isUndefined } from './utils';
 import { createState } from './state';
-import { isObject, isArray, isFunction, isString, isUndefined } from './utils';
 
-/**
- * Create a view.
- *
- * @param {object|function} config
- * @param {object} [options]
- * @param {HTMLElement} [options.target]
- * @param {object} [options.context]
- * @returns {HTMLElement}
- */
-export function createView (config, options) {
-  const { target, context } = options || {};
-  const el = render(config, context);
-  if (el) {
-    const observer = createObserver(target || el);
-    el.addEventListener('removed', (e) => {
-      if (e.target === el) {
-        observer.disconnect();
-      }
-    }, false);
-    if (target) {
-      target.appendChild(el);
-    }
-  }
-  return el;
-}
-
-function render (config, context, ns) {
-  if (!isObject(config)) return;
-  const { document } = window;
-  config = { ...config };
-  let node;
-  // view
-  if (config.view) {
-    node = config.view;
-    delete config.view;
-    if (isFunction(node)) {
-      return render(node(config), context, ns);
-    } else if (isString(node)) {
-      const el = document.createElement('div');
-      el.innerHTML = node;
-      config.view = el.firstChild;
-      return render(config, context, ns);
-    }
-  }
-  if (!ns && `${config.tagName}`.toUpperCase() === 'SVG') {
-    ns = 'http://www.w3.org/2000/svg';
-  }
-  const {
-    tagName = 'DIV',
-    namespaceURI = ns,
-    attributes,
-    classList,
-    on,
-    children
-  } = config;
-  delete config.tagName;
-  delete config.namespaceURI;
-  delete config.attributes;
-  delete config.classList;
-  delete config.on;
-  delete config.children;
-  if (!node) {
-    node = namespaceURI
-      ? document.createElementNS(namespaceURI, tagName)
-      : document.createElement(tagName);
-  }
-  const state = createState({}, context);
-  // cleanup
-  node.addEventListener('removed', () => {
-    state.$$off();
-    delete state['*'];
-  }, false);
-  // events
-  for (const ev in on) {
-    const handler = on[ev];
-    if (isFunction(handler)) {
-      node.addEventListener(ev, handler);
-    }
-  }
-  // attributes
-  for (const attr in attributes) {
-    const val = attributes[attr];
-    const setter = (newv) => {
-      node.setAttribute(attr, newv);
-    };
-    if (isFunction(val)) {
-      const key = `$attributes.${attr}`;
-      state.$$on(key, setter);
-      state[key] = val;
-    } else {
-      setter(val);
-    }
-  }
-  // classList
-  if (!isUndefined(classList)) {
-    const setter = (newv) => {
-      if (isArray(newv)) {
-        newv = newv.join(' ');
-      }
-      node.classList = newv;
-    };
-    if (isFunction(classList)) {
-      const key = '$classList';
-      state.$$on(key, setter);
-      state[key] = classList;
-    } else {
-      setter(classList);
-    }
-  }
-  // other parameters
-  patchNode(state, node, config);
-  // children
-  if (!isUndefined(children)) {
-    const key = '$children';
-    const setter = (newv) => {
-      node.innerHTML = '';
-      if (!isUndefined(newv)) {
-        const views = [].concat(newv);
-        for (const view of views) {
-          const child = render(view, context, namespaceURI);
-          if (child) {
-            node.appendChild(child);
-          }
-        }
-      }
-    };
-    const updater = (newv, oldv, prop) => {
-      if (isUndefined(newv)) {
-        // del
-        const oldChild = node.children[prop];
-        if (oldChild) {
-          node.removeChild(oldChild);
-        }
-      } else if (isUndefined(oldv)) {
-        // add
-        const newChild = render(newv, context, namespaceURI);
-        if (newChild) {
-          node.appendChild(newChild);
-        }
-      } else {
-        // mod
-        const oldChild = node.children[prop];
-        const newChild = render(newv, context, namespaceURI);
-        if (newChild && oldChild) {
-          node.replaceChild(newChild, oldChild);
-        }
-      }
-    };
-    if (isFunction(children)) {
-      state.$$on(key, setter);
-      state.$$on('#' + key, updater);
-      state[key] = children;
-    } else {
-      setter(children);
-    }
-  }
-  return node;
-}
-
-function patchNode (state, node, params, ...rest) {
-  for (const param in params) {
-    const val = params[param];
-    const setter = (newv) => {
-      if (isObject(newv)) {
-        const target = node[param];
-        if (target) patchNode(state, target, newv, ...rest, param);
-      } else if (!isUndefined(newv)) {
-        node[param] = newv;
-      }
-    };
-    if (isFunction(val)) {
-      const key = '$' + [].concat(rest, param).join('.');
-      state.$$on(key, setter);
-      state[key] = val;
-    } else {
-      setter(val);
-    }
-  }
+function isReadOnly (prop) {
+  return ['tagName', 'namespaceURI', 'view'].includes(prop);
 }
 
 function createObserver (el) {
-  const { MutationObserver, CustomEvent, Node } = window;
-  const ELEMENT_NODE = Node.ELEMENT_NODE;
-  const observer = new MutationObserver(function (mutationList) {
+  const { MutationObserver, CustomEvent, Element } = window;
+  const { ELEMENT_NODE } = Element;
+  const observer = new MutationObserver((mutationList) => {
     const dispatchEvent = (node, event) => {
-      const children = node.children;
+      const { children } = node;
       for (let i = 0; i < children.length; i++) {
         dispatchEvent(children[i], event);
       }
@@ -207,8 +31,8 @@ function createObserver (el) {
         });
       } else if (mutation.type === 'attributes') {
         const node = mutation.target;
-        const attributeName = mutation.attributeName;
-        const oldValue = mutation.oldValue;
+        const { attributeName } = mutation;
+        const { oldValue } = mutation;
         const newValue = node.getAttribute(attributeName);
         if (oldValue !== newValue) {
           const ev = new CustomEvent('changed', {
@@ -229,4 +53,211 @@ function createObserver (el) {
     attributeOldValue: true
   });
   return observer;
+}
+
+function createElement (cfg, ns) {
+  if (!isObject(cfg)) {
+    cfg = {};
+  }
+  if (!ns && `${cfg.tagName}`.toUpperCase() === 'SVG') {
+    ns = 'http://www.w3.org/2000/svg';
+  }
+  const { tagName = 'div', namespaceURI = ns, view } = cfg;
+  const { document, Element } = window;
+  let el = view instanceof Element
+    ? view
+    : (namespaceURI
+      ? document.createElementNS(namespaceURI, tagName)
+      : document.createElement(tagName));
+  if (isString(view)) {
+    el.innerHTML = view;
+    if (el.firstChild instanceof Element) {
+      el = el.firstChild;
+    }
+  }
+  for (const prop in cfg) {
+    const newv = cfg[prop];
+    updateElement(el, newv, undefined, prop);
+  }
+  return el;
+}
+
+function updateElement (el, newv, oldv, prop, obj, rest = []) {
+  const { Element } = window;
+  const [parent] = rest;
+
+  let level = 0;
+  let node = el;
+  for (let i = rest.length - 1; i >= 0; i--) {
+    const path = rest[i];
+    node = node[path];
+    if (node instanceof Element) {
+      el = node;
+      level = 0;
+    }
+    if (!node) {
+      break;
+    }
+    level++;
+  }
+
+  if (level === 0) {
+    if (prop === 'on') {
+      for (const ev in newv) {
+        const handler = newv[ev];
+        if (isFunction(handler)) {
+          el.addEventListener(ev, handler);
+        }
+      }
+      for (const ev in oldv) {
+        if (!newv || isUndefined(newv[ev])) {
+          const handler = oldv[ev];
+          if (isFunction(handler)) {
+            el.removeEventListener(ev, handler);
+          }
+        }
+      }
+    } else if (prop === 'attributes') {
+      for (const attr in newv) {
+        const val = newv[attr];
+        if (!isUndefined(val)) {
+          el.setAttribute(attr, val);
+        }
+      }
+      for (const attr in oldv) {
+        if (!newv || isUndefined(newv[attr])) {
+          el.removeAttribute(attr);
+        }
+      }
+    } else if (prop === 'style') {
+      const { style } = el;
+      for (const name in newv) {
+        style[name] = newv[name];
+      }
+      for (const name in oldv) {
+        if (!newv || isUndefined(newv[name])) {
+          style.removeProperty(name);
+        }
+      }
+    } else if (prop === 'classList') {
+      el.classList = isArray(newv) ? newv.join(' ') : newv;
+    } else if (prop === 'children') {
+      el.innerHTML = '';
+      if (!isUndefined(newv)) {
+        const children = [].concat(newv);
+        for (const cfg of children) {
+          const child = createElement(cfg, el.namespaceURI);
+          if (child) {
+            el.appendChild(child);
+          }
+        }
+      }
+    } else if (!isReadOnly(prop)) {
+      if (isObject(newv)) {
+        if (el[prop]) {
+          for (const param in newv) {
+            const val = newv[param];
+            if (!isUndefined(val)) {
+              el[prop][param] = val;
+            }
+          }
+          for (const param in oldv) {
+            if (isUndefined(newv[param])) {
+              delete el[prop][param];
+            }
+          }
+        }
+      } else if (isUndefined(newv)) {
+        delete el[prop];
+      } else {
+        el[prop] = newv;
+      }
+    }
+  } else if (level === 1) {
+    if (parent === 'on') {
+      if (isUndefined(newv)) {
+        if (isFunction(oldv)) {
+          el.removeEventListener(prop, oldv);
+        }
+      } else if (isFunction(newv)) {
+        el.addEventListener(prop, newv);
+      }
+    } else if (parent === 'attributes') {
+      if (isUndefined(newv)) {
+        el.removeAttribute(prop);
+      } else {
+        el.setAttribute(prop, newv);
+      }
+    } else if (parent === 'style') {
+      const { style } = el;
+      if (isUndefined(newv)) {
+        style.removeProperty(prop);
+      } else {
+        style[prop] = newv;
+      }
+    } else if (parent === 'classList') {
+      if (isArray(obj)) {
+        el.classList = obj.join(' ');
+      }
+    } else if (parent === 'children') {
+      if (isUndefined(newv)) {
+        // Del
+        const oldChild = el.children[prop];
+        if (oldChild) {
+          el.removeChild(oldChild);
+        }
+      } else if (isUndefined(oldv)) {
+        // Add
+        const newChild = createElement(newv, el.namespaceURI);
+        if (newChild) {
+          el.appendChild(newChild);
+        }
+      } else {
+        // Mod
+        const oldChild = el.children[prop];
+        const newChild = createElement(newv, el.namespaceURI);
+        if (newChild && oldChild) {
+          el.replaceChild(newChild, oldChild);
+        }
+      }
+    } else if (el[parent] && !isReadOnly(parent)) {
+      if (isUndefined(newv)) {
+        delete el[parent][prop];
+      } else {
+        el[parent][prop] = newv;
+      }
+    }
+  }
+}
+
+/**
+ * Create a view.
+ *
+ * @param {object|function} config
+ * @param {object} [options]
+ * @param {HTMLElement} [options.target]
+ * @param {object} [options.context]
+ * @returns {Proxy}
+ */
+export function createView (config, options) {
+  const { target, context } = options || {};
+  const state = createState(config, { context });
+  const el = createElement(state);
+  state.$$on('*', (newv, oldv, prop, obj, rest) => {
+    if (isArray(obj) && prop === 'length') {
+      return;
+    }
+    updateElement(el, newv, oldv, prop, obj, rest);
+  });
+  const observer = createObserver(target || el);
+  el.addEventListener('removed', (e) => {
+    if (e.target === el) {
+      observer.disconnect();
+    }
+  }, false);
+  if (target) {
+    target.appendChild(el);
+    return state;
+  }
+  return el;
 }
