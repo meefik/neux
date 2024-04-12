@@ -45,15 +45,19 @@ function setWatcher (context, state, prop, getter, cleaner) {
     (obj, key, callbackFn) => {
       const handler = callbackFn
         ? (newv, oldv, idx, arr) => {
-          if (!isNaN(idx)) {
-            idx = parseInt(idx, 10);
-            if (!isUndefined(oldv)) {
-              oldv = callbackFn(oldv, idx, arr);
-            }
-            if (!isUndefined(newv)) {
-              newv = callbackFn(newv, idx, arr);
-            }
-            state.$$emit(`#${prop}`, newv, oldv, idx, arr);
+          const target = state[prop];
+          const index = parseInt(idx, 10);
+          if (isUndefined(newv)) {
+            // Remove
+            target.splice(index, 1);
+          } else if (isUndefined(oldv)) {
+            // Add
+            const value = callbackFn(newv, index, arr);
+            target[index] = value;
+          } else {
+            // Replace
+            const value = callbackFn(newv, index, arr);
+            target.splice(index, 1, value);
           }
         }
         : () => {
@@ -172,7 +176,7 @@ export function createState (data, options) {
           return state[`$${key}`];
         };
       } else if (prop === '$$on') {
-        return function $on (...args) {
+        return function $$on (...args) {
           return listener.on(...args);
         };
       } else if (prop === '$$once') {
@@ -202,7 +206,7 @@ export function createState (data, options) {
       } else if (prop === '$$each' && isArray(obj)) {
         return function $$each (callbackFn, thisArg) {
           if (isFunction(callbackFn)) {
-            setContext(context, state, '#', callbackFn.bind(thisArg));
+            setContext(context, state, '*', callbackFn.bind(thisArg));
           }
           return obj.map(callbackFn, thisArg).filter((item) => item);
         };
@@ -230,10 +234,7 @@ export function createState (data, options) {
         return false;
       }
       if (changed) {
-        const events = [prop, '*'];
-        if (isArray(obj) && !isNaN(prop)) {
-          events.push('#');
-        }
+        const events = (!isArray(obj) || !isNaN(prop)) ? ['*', prop] : [prop];
         const emit = async () => {
           await listener.emit(events, value, oldv, prop, state);
         };
@@ -249,10 +250,7 @@ export function createState (data, options) {
       }
       watcher.emit(prop);
       updater.emit(prop);
-      const events = [prop, '*'];
-      if (isArray(obj) && !isNaN(prop)) {
-        events.push('#');
-      }
+      const events = (!isArray(obj) || !isNaN(prop)) ? ['*', prop] : [prop];
       const emit = async () => {
         await listener.emit(events, undefined, oldv, prop, state);
       };
