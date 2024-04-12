@@ -12,7 +12,7 @@ Here are the main concepts behind NEUX:
   - localization,
   - synchronization of states with persistent storage,
   - calling remote procedures on the backend.
-- Small library size ~ 8kb (4kb gzipped).
+- Small library size ~ 11kb (5kb gzipped).
 - It is open source software under MIT license.
 
 ## Content
@@ -20,16 +20,15 @@ Here are the main concepts behind NEUX:
 1. [Installation](#installation)
 2. [States](#states)
 3. [Views](#views)
-4. [Components](#components)
-5. [Localization](#localization)
-6. [Routing](#routing)
-7. [Remote procedure call](#remote-procedure-call)
-8. [State synchronization](#state-synchronization)
-9. [Use with Vite](#use-with-vite)
-10. [Use with Tailwind CSS](#use-with-tailwind-css)
-11. [Use with Web Components](#use-with-web-components)
-12. [Create your own Web Component](#create-your-own-web-component)
-13. [Examples](#examples)
+4. [Localization](#localization)
+5. [Routing](#routing)
+6. [Remote procedure call](#remote-procedure-call)
+7. [State synchronization](#state-synchronization)
+8. [Use with Vite](#use-with-vite)
+9. [Use with Tailwind CSS](#use-with-tailwind-css)
+10. [Use with Web Components](#use-with-web-components)
+11. [Create your own Web Component](#create-your-own-web-component)
+12. [Examples](#examples)
 
 ## Installation
 
@@ -80,6 +79,7 @@ An example with comments:
 const state = createState({
   counter: 1,
   multiplier: 2,
+  // the field as array
   list: [
     { text: 'Item 1' },
     { text: 'Item 2', checked: true }
@@ -109,6 +109,13 @@ Listening for state changes:
 ```js
 const handler = (newv, oldv, prop, obj) => {
   console.log(newv, oldv, prop, obj);
+  if (newv === undefined) {
+    console.log('deleted');
+  } else if (oldv === undefined) {
+    console.log('added');
+  } else {
+    console.log('updated');
+  }
 };
 // add a specified listener
 state.$$on('double', handler);
@@ -121,31 +128,6 @@ state.$$off('double');
 // add a listener to observe any changes
 // on this object and all children
 state.$$on('*', handler);
-```
-
-Watcher is a computed field with no store date in the state.
-
-Watching for state changes:
-
-```js
-// add a listener for the watcher
-state.$$on('$list', (newv, oldv, prop, obj) => {
-  if (newv === undefined) {
-    console.log('deleted');
-  } else (oldv === undefined) {
-    console.log('added');
-  } else {
-    console.log('updated');
-  }
-});
-// add a watcher without saving its result
-state.$list = (obj, prop) => {
-  return obj.list.$$each((value, index, array) => {
-    return value;
-  });
-});
-// remove the watcher
-delete state.$list;
 ```
 
 ## Views
@@ -245,30 +227,13 @@ Additional events for each element:
 
 - `mounted` - the element was mounted in the DOM;
 - `removed` - the element was removed from the DOM;
-- `changed` - the element attribute has been changed.
+- `changed` - the element attribute was changed.
 
-## Components
-
-You can wrap part of the view into a separate component. It is a simple function that returns the markup of the view. To use such a component, you need to pass this function in the "view" parameter.
-
-An example with comments:
+You can pass HTML markup or the entire HTML element in the "view" parameter:
 
 ```js
-const Header = (params) => {
-  return {
-    tagName: 'header',
-    children: [{
-      tagName: 'strong',
-      textContent: params.text
-    }]
-  };
-};
 createView({
   children: [{
-    // create view from function
-    view: Header,
-    text: 'Welcome!'
-  }, {
     // create view from HTML markup
     view: '<main><p>My content</p></main>',
     style: {
@@ -282,7 +247,7 @@ createView({
 }, { target: document.body });
 ```
 
-You can include SVG icons as a component and change their styles (size, color) via the `classList` or `attributes` field:
+You can include any SVG icon as HTML markup and change its styles (size, color) via the `classList` or `attributes` field:
 
 ```js
 import githubIcon from '@svg-icons/fa-brands/github.svg?raw';
@@ -301,7 +266,7 @@ createView({
 
 Localization is used to display the application interface in different languages.
 
-An example with comments:
+Translation example:
 
 ```js
 const l10n = createL10n({
@@ -328,6 +293,56 @@ l10n.lang = 'ru';
 const msgRu = l10n.t('say.hello', { name: 'Мир' });
 console.log(msgRu); // Привет Мир!
 ```
+
+Convert date and time to localized string:
+
+```js
+const l10n = createL10n({
+  en: {
+    month: {
+      full: ['January','February','March','April','May','June','July','August','September','October','November','December'],
+      short: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    },
+    day:{
+      full: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+      short: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
+    },
+    time: {
+      am: ['am','AM'],
+      pm: ['pm','PM']
+    }
+  }
+}, {
+  fallback: 'en',
+  lang: navigator.language
+});
+// date format
+const date = new Date('2024-03-15T14:30:00.000Z');
+const text = l10n.d(date, '{dddd}, {DD} {MMM} {YYYY} {h}:{mm} {A} {Z}');
+console.log(text); // Friday, 15 Mar 2024 2:30 PM +0:00
+```
+
+Description of date format similar to [Moment.js](https://momentjs.com/docs/#/parsing/string-format/)
+
+| Input    | Example        | Description                         |
+|----------|----------------|-------------------------------------|
+| YYYY     | 2024           | 4 digit year                        |
+| YY       | 24             | 2 digit year                        |
+| Q        | 1..4           | Quarter of year                     |
+| M MM     | 1..12          | Month number                        |
+| MMM MMMM | Jan..December  | Month name                          |
+| D DD     | 1..31          | Day of month                        |
+| DDD DDDD | 1..365         | Day of year                         |
+| ddd dddd | Mon...Sunday   | Day name                            |
+| X        | 1712751431.381 | Unix timestamp                      |
+| x        | 1712751431381  | Unix ms timestamp                   |
+| H HH     | 0..23          | Hours (24 hour time)                |
+| h hh     | 1..12          | Hours (12 hour time used with a A.) |
+| k kk     | 1..24          | Hours (24 hour time from 1 to 24)   |
+| a A      | am PM          | Post or ante meridiem               |
+| m mm     | 0..59          | Minutes                             |
+| s ss     | 0..59          | Seconds                             |
+| Z ZZ     | +12:00         | Offset from UTC                     |
 
 ## Routing
 
