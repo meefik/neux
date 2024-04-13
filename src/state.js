@@ -235,10 +235,7 @@ export function createState (data, options) {
       }
       if (changed) {
         const events = (!isArray(obj) || !isNaN(prop)) ? ['*', prop] : [prop];
-        const emit = async () => {
-          await listener.emit(events, value, oldv, prop, state);
-        };
-        emit();
+        listener.emit(events, value, oldv, prop, state);
       }
       return true;
     },
@@ -251,10 +248,7 @@ export function createState (data, options) {
       watcher.emit(prop);
       updater.emit(prop);
       const events = (!isArray(obj) || !isNaN(prop)) ? ['*', prop] : [prop];
-      const emit = async () => {
-        await listener.emit(events, undefined, oldv, prop, state);
-      };
-      emit();
+      listener.emit(events, undefined, oldv, prop, state);
       return true;
     }
   };
