@@ -13,7 +13,7 @@ export default [{
     '@stylistic/js': stylisticJs
   },
   rules: {
-    ...js.configs.all.rules,
+    ...js.configs.recommended.rules,
     // Stylistic
     '@stylistic/js/array-bracket-newline': ['error', 'consistent'],
     '@stylistic/js/array-bracket-spacing': ['error', 'never'],
@@ -81,28 +81,6 @@ export default [{
     '@stylistic/js/template-tag-spacing': ['error', 'never'],
     '@stylistic/js/wrap-iife': ['error', 'outside'],
     // '@stylistic/js/wrap-regex': ['error'],
-    '@stylistic/js/yield-star-spacing': ['error', { before: false, after: true }],
-    // Turn off rules
-    'complexity': 'off',
-    'func-style': 'off',
-    'guard-for-in': 'off',
-    'id-length': 'off',
-    'max-depth': 'off',
-    'max-lines': 'off',
-    'max-lines-per-function': 'off',
-    'max-params': 'off',
-    'max-statements': 'off',
-    'no-bitwise': 'off',
-    'no-magic-numbers': 'off',
-    'no-nested-ternary': 'off',
-    'no-param-reassign': 'off',
-    'no-plusplus': 'off',
-    'no-ternary': 'off',
-    'no-undefined': 'off',
-    'no-use-before-define': 'off',
-    'one-var': 'off',
-    'require-atomic-updates': 'off',
-    'sort-keys': 'off',
-    'sort-vars': 'off'
+    '@stylistic/js/yield-star-spacing': ['error', { before: false, after: true }]
   }
 }];
