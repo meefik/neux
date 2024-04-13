@@ -16,7 +16,7 @@ export function createState(data?: object, options?: {
 export function createView(config: object, options?: {
   target?: HTMLElement,
   context?: object
-}): object | HTMLElement;
+}): object;
 /**
  * Create a localization.
  * 

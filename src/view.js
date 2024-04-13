@@ -2,7 +2,7 @@ import { isArray, isFunction, isObject, isString, isUndefined } from './utils';
 import { createState } from './state';
 
 function isReadOnly (prop) {
-  return ['tagName', 'namespaceURI', 'view'].includes(prop);
+  return ['tagName', 'namespaceURI', 'node'].includes(prop);
 }
 
 function createObserver (el) {
@@ -62,19 +62,25 @@ function createElement (cfg, ns) {
   if (!ns && `${cfg.tagName}`.toUpperCase() === 'SVG') {
     ns = 'http://www.w3.org/2000/svg';
   }
-  const { tagName = 'div', namespaceURI = ns, view } = cfg;
+  const { tagName = 'div', namespaceURI = ns, node } = cfg;
   const { document, Element } = window;
-  let el = view instanceof Element
-    ? view
+  let el = node instanceof Element
+    ? node
     : (namespaceURI
       ? document.createElementNS(namespaceURI, tagName)
       : document.createElement(tagName));
-  if (isString(view)) {
-    el.innerHTML = view;
+  if (isString(node)) {
+    el.innerHTML = node;
     if (el.firstChild instanceof Element) {
       el = el.firstChild;
     }
   }
+  const options = { configurable: false, enumerable: true, writable: false };
+  Object.defineProperties(cfg, {
+    tagName: { value: el.tagName, ...options },
+    namespaceURI: { value: el.namespaceURI, ...options },
+    node: { value: el, ...options }
+  });
   for (const prop in cfg) {
     const newv = cfg[prop];
     updateElement(el, newv, undefined, prop);
@@ -87,18 +93,18 @@ function updateElement (el, newv, oldv, prop, obj, rest = []) {
   const [parent] = rest;
 
   let level = 0;
-  let node = el;
-  for (let i = rest.length - 1; i >= 0; i--) {
+  for (let i = rest.length - 1, curr = el; i >= 0; i--) {
     const path = rest[i];
-    node = node[path];
-    if (node instanceof Element) {
-      el = node;
-      level = 0;
-    }
-    if (!node) {
+    curr = curr[path];
+    if (!curr) {
       break;
     }
-    level++;
+    if (curr instanceof Element) {
+      el = curr;
+      level = 0;
+    } else {
+      level++;
+    }
   }
 
   if (level === 0) {
@@ -152,26 +158,24 @@ function updateElement (el, newv, oldv, prop, obj, rest = []) {
           }
         }
       }
-    } else if (!isReadOnly(prop)) {
-      if (isObject(newv)) {
-        if (el[prop]) {
-          for (const param in newv) {
-            const val = newv[param];
-            if (!isUndefined(val)) {
-              el[prop][param] = val;
-            }
-          }
-          for (const param in oldv) {
-            if (isUndefined(newv[param])) {
-              delete el[prop][param];
-            }
+    } else if (isObject(newv)) {
+      if (el[prop]) {
+        for (const param in newv) {
+          const val = newv[param];
+          if (!isUndefined(val)) {
+            el[prop][param] = val;
           }
         }
-      } else if (isUndefined(newv)) {
-        delete el[prop];
-      } else {
-        el[prop] = newv;
+        for (const param in oldv) {
+          if (isUndefined(newv[param])) {
+            delete el[prop][param];
+          }
+        }
       }
+    } else if (isUndefined(newv)) {
+      delete el[prop];
+    } else if (!isReadOnly(prop)) {
+      el[prop] = newv;
     }
   } else if (level === 1) {
     if (parent === 'on') {
@@ -220,7 +224,7 @@ function updateElement (el, newv, oldv, prop, obj, rest = []) {
           el.replaceChild(newChild, oldChild);
         }
       }
-    } else if (el[parent] && !isReadOnly(parent)) {
+    } else if (el[parent]) {
       if (isUndefined(newv)) {
         delete el[parent][prop];
       } else {
@@ -243,11 +247,8 @@ export function createView (config, options) {
   const { target, context } = options || {};
   const state = createState(config, { context });
   const el = createElement(state);
-  state.$$on('*', (newv, oldv, prop, obj, rest) => {
-    if (isArray(obj) && prop === 'length') {
-      return;
-    }
-    updateElement(el, newv, oldv, prop, obj, rest);
+  state.$$on('*', (...args) => {
+    updateElement(el, ...args);
   });
   const observer = createObserver(target || el);
   el.addEventListener('removed', (e) => {
@@ -257,7 +258,6 @@ export function createView (config, options) {
   }, false);
   if (target) {
     target.appendChild(el);
-    return state;
   }
-  return el;
+  return state;
 }
