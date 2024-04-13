@@ -77,6 +77,7 @@ An example with comments:
 
 ```js
 const state = createState({
+  // regular fields
   counter: 1,
   multiplier: 2,
   // the field as array
@@ -92,8 +93,11 @@ const state = createState({
   }
 });
 // set or change the computed field
-state.double = (obj, prop) => state.$double * state.$multiplier;
-// delete specified field with all listeners
+state.double = (obj, prop) => state.$counter * state.$multiplier;
+// change the regular field
+state.counter++;
+state.list.push({ text: 'Item 3' });
+// remove the field with all listeners
 delete state.double;
 ```
 
@@ -144,7 +148,7 @@ const state = createState({
     { text: 'Item 3' }
   ]
 });
-createView({
+const view = createView({
   children: [{
     tagName: 'h1',
     textContent: 'To Do'
@@ -153,13 +157,15 @@ createView({
     placeholder: 'Enter your task...',
     autofocus: true,
     on: {
-      keyup: (e) => {
-        if (e.keyCode === 13) {
-          e.preventDefault();
-          state.list.push({ text: e.target.value });
-          e.target.value = '';
-        }
-      },
+      keyup() {
+        return (e) => {
+          if (e.keyCode === 13) {
+            e.preventDefault();
+            state.list.push({ text: e.target.value });
+            e.target.value = '';
+          }
+        };
+      }
     }
   }, {
     tagName: 'div',
@@ -167,11 +173,13 @@ createView({
       tagName: 'input',
       type: 'checkbox',
       on: {
-        change: (e) => {
-          const checked = e.target.checked;
-          state.list.forEach((item) => {
-            item.checked = checked;
-          });
+        change() {
+          return (e) => {
+            const checked = e.target.checked;
+            state.list.forEach((item) => {
+              item.checked = checked;
+            });
+          };
         }
       }
     }, {
@@ -187,16 +195,22 @@ createView({
         return {
           tagName: 'li',
           on: {
-            mounted: () => console.log('mounted', item),
-            removed: () => console.log('removed', item)
+            mounted() {
+              return () => console.log('mounted', item);
+            },
+            removed() {
+              return () => console.log('removed', item);
+            }
           },
           children: [{
             tagName: 'input',
             type: 'checkbox',
             checked: () => item.$checked,
             on: {
-              change: (e) => {
-                item.checked = e.target.checked;
+              change() {
+                return (e) => {
+                  item.checked = e.target.checked;
+                };
               }
             }
           }, {
@@ -207,10 +221,12 @@ createView({
             href: '#',
             textContent: '[x]',
             on: {
-              click: (e) => {
-                e.preventDefault();
-                const index = state.list.indexOf(item);
-                state.list.splice(index, 1);
+              click() {
+                return (e) => {
+                  e.preventDefault();
+                  const index = state.list.indexOf(item);
+                  state.list.splice(index, 1);
+                };
               }
             }
           }]
@@ -229,19 +245,38 @@ Additional events for each element:
 - `removed` - the element was removed from the DOM;
 - `changed` - the element attribute was changed.
 
-You can pass HTML markup or the entire HTML element in the "view" parameter:
+You can change the DOM using simple operations on objects and arrays:
+
+```js
+const view = createView({
+  tagName: 'ul',
+  children: [{
+    tagName: 'li'
+    textContent: 'Item 1'
+  }]
+}, { target: document.body });
+
+view.children.push({
+  tagName: 'li',
+  textContent: 'Item 2'
+});
+view.children[1].textContent = 'Item 3';
+view.children.unshift();
+```
+
+You can pass HTML markup or the entire HTML element in the "node" parameter:
 
 ```js
 createView({
   children: [{
-    // create view from HTML markup
-    view: '<main><p>My content</p></main>',
+    // create element from HTML markup
+    node: '<main><p>My content</p></main>',
     style: {
       color: 'red'
     }
   }, {
-    // create view from HTMLElement
-    view: document.createElement('footer'),
+    // create element from HTMLElement
+    node: document.createElement('footer'),
     textContent: 'Powered by NEUX'
   }]
 }, { target: document.body });
@@ -253,7 +288,7 @@ You can include any SVG icon as HTML markup and change its styles (size, color) 
 import githubIcon from '@svg-icons/fa-brands/github.svg?raw';
 
 createView({
-  view: githubIcon,
+  node: githubIcon,
   classList: ['icon'],
   attributes: {
     width: '64px',
@@ -372,8 +407,10 @@ createView({
       tagName: 'button',
       textContent: 'Page 3',
       on: {
-        click: () => {
-          router.navigate('/section1/page3', { key1: '1', key2: '2' });
+        click() {
+          return () => {
+            router.navigate('/section1/page3', { key1: '1', key2: '2' });
+          };
         }
       }
     }]
@@ -754,8 +791,10 @@ createView({
             'focus-visible:outline-indigo-500'],
           textContent: 'See on GitHub',
           on: {
-            click: () => {
-              window.open('https://meefik.github.io/neux');
+            click() {
+              return () => {
+                window.open('https://meefik.github.io/neux');
+              };
             }
           }
         }]
@@ -786,7 +825,7 @@ createView({
   attrTwo: 'two',
   on: {
     MyEvent() {
-      alert('Action');
+      return () => alert('Action');
     }
   },
   children: [{
@@ -812,9 +851,8 @@ class Counter extends HTMLElement {
     this.attrs.$$on('*', (newv, oldv, prop) => {
       this.setAttribute(prop, newv);
     });
-    const view = createView(this.template(), { context });
-    const shadow = this.attachShadow({ mode: 'open' });
-    shadow.appendChild(view);
+    const target = this.attachShadow({ mode: 'open' });
+    this.view = createView(this.template(), { context, target });
   }
   attributeChangedCallback(name, oldv, newv) {
     this.attrs[name] = newv;
@@ -826,8 +864,10 @@ class Counter extends HTMLElement {
         type: 'number',
         value: () => this.attrs.$value,
         on: {
-          change: (e) => {
-            this.attrs.value = e.target.value;
+          change() {
+            return (e) => {
+              this.attrs.value = e.target.value;
+            };
           }
         }
       }, {
@@ -853,8 +893,10 @@ createView({
     value: () => state.$counter,
   },
   on: {
-    changed(e) {
-      state.counter = parseInt(e.detail.newValue);
+    changed() {
+      return (e) => {
+        state.counter = parseInt(e.detail.newValue);
+      };
     }
   },
   children: [{
