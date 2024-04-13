@@ -1,25 +1,26 @@
-import { describe, it } from 'node:test';
-import assert from 'node:assert/strict';
-import { JSDOM } from 'jsdom';
 import { createState, createView } from '../dist/neux.esm.js';
+import { describe, it } from 'node:test';
+import { JSDOM } from 'jsdom';
+import assert from 'node:assert/strict';
 
 describe('view', () => {
   const { window } = new JSDOM('', {
     url: 'http://localhost',
     contentType: 'text/html'
   });
+  /* eslint-disable-next-line */
   global.window = window;
 
   it('initial', async (t) => {
-    await t.test('tagName', async (t) => {
-      const view = createView({
+    await t.test('tagName', () => {
+      const { node } = createView({
         tagName: 'p'
       });
-      assert.equal(view.tagName, 'P');
+      assert.equal(node.tagName, 'P');
     });
 
-    await t.test('children', async (t) => {
-      const view = createView({
+    await t.test('children', () => {
+      const { node } = createView({
         tagName: 'ul',
         children: [{
           tagName: 'li',
@@ -29,29 +30,29 @@ describe('view', () => {
           textContent: 'Item 2'
         }]
       });
-      assert.equal(view.tagName, 'UL');
-      assert.equal(view.children[0].tagName, 'LI');
-      assert.equal(view.children[0].textContent, 'Item 1');
-      assert.equal(view.children[1].tagName, 'LI');
-      assert.equal(view.children[1].textContent, 'Item 2');
+      assert.equal(node.tagName.toUpperCase(), 'UL');
+      assert.equal(node.children[0].tagName.toUpperCase(), 'LI');
+      assert.equal(node.children[0].textContent, 'Item 1');
+      assert.equal(node.children[1].tagName.toUpperCase(), 'LI');
+      assert.equal(node.children[1].textContent, 'Item 2');
     });
 
-    await t.test('namespaceURI', async (t) => {
-      const view = createView({
+    await t.test('namespaceURI', () => {
+      const { node } = createView({
         tagName: 'svg',
         children: [{
           tagName: 'path'
         }]
       });
       const svgNamespaceURI = 'http://www.w3.org/2000/svg';
-      assert.equal(view.tagName, 'svg');
-      assert.equal(view.namespaceURI, svgNamespaceURI);
-      assert.equal(view.children[0].tagName, 'path');
-      assert.equal(view.children[0].namespaceURI, svgNamespaceURI);
+      assert.equal(node.tagName.toUpperCase(), 'SVG');
+      assert.equal(node.namespaceURI, svgNamespaceURI);
+      assert.equal(node.children[0].tagName.toUpperCase(), 'PATH');
+      assert.equal(node.children[0].namespaceURI, svgNamespaceURI);
     });
 
-    await t.test('attributes', async (t) => {
-      const view = createView({
+    await t.test('attributes', () => {
+      const { node } = createView({
         tagName: 'label',
         attributes: {
           for: 'my-input'
@@ -60,62 +61,64 @@ describe('view', () => {
           id: '123'
         }
       });
-      assert.equal(view.getAttribute('for'), 'my-input');
-      assert.equal(view.getAttribute('data-id'), '123');
+      assert.equal(node.getAttribute('for'), 'my-input');
+      assert.equal(node.dataset.id, '123');
     });
 
-    await t.test('classList', async (t) => {
-      const view = createView({
+    await t.test('classList', () => {
+      const { node } = createView({
         children: [{
           classList: ['a', 'b', 'c']
         }, {
-          classList: 'a b c'
+          classList: 'd e f'
         }]
       });
-      assert.equal(view.children[0].className, 'a b c');
-      assert.equal(view.children[1].className, 'a b c');
+      assert.equal(node.children[0].className, 'a b c');
+      assert.equal(node.children[1].className, 'd e f');
     });
 
-    await t.test('style', async (t) => {
-      const view = createView({
+    await t.test('style', () => {
+      const { node } = createView({
         style: {
           color: 'red'
         }
       });
-      assert.equal(view.style.color, 'red');
+      assert.equal(node.style.color, 'red');
     });
 
-    await t.test('textContent', async (t) => {
-      const view = createView({
+    await t.test('textContent', () => {
+      const { node } = createView({
         textContent: 'Hello World'
       });
-      assert.equal(view.textContent, 'Hello World');
+      assert.equal(node.textContent, 'Hello World');
     });
 
-    await t.test('on:change', async (t) => {
+    await t.test('on:change', () => {
       let value = 1;
-      const view = createView({
+      const { node } = createView({
         tagName: 'input',
         type: 'number',
         value,
         on: {
-          change (e) {
-            value = parseInt(e.target.value);
+          change () {
+            return (e) => {
+              value = parseInt(e.target.value, 10);
+            };
           }
         }
       });
-      view.value = 2;
+      node.value = 2;
       const event = new window.Event('change', {
         bubbles: true,
         cancelable: true
       });
-      view.dispatchEvent(event);
+      node.dispatchEvent(event);
       assert.equal(value, 2);
     });
 
-    await t.test('on:mounted', async (t) => {
+    await t.test('on:mounted', async () => {
       try {
-        let view;
+        let view = null;
         await new Promise((resolve, reject) => {
           const timer = setTimeout(() => {
             reject(Error('Operation timeout'));
@@ -123,9 +126,11 @@ describe('view', () => {
           view = createView({
             children: [{
               on: {
-                mounted (e) {
-                  clearTimeout(timer);
-                  resolve();
+                mounted () {
+                  return () => {
+                    clearTimeout(timer);
+                    resolve();
+                  };
                 }
               }
             }]
@@ -133,7 +138,7 @@ describe('view', () => {
             target: window.document.body
           });
         }).finally(() => {
-          view?.remove();
+          view?.node.remove();
         });
         assert.ok(true);
       } catch (err) {
@@ -141,9 +146,9 @@ describe('view', () => {
       }
     });
 
-    await t.test('on:removed', async (t) => {
+    await t.test('on:removed', async () => {
       try {
-        let view;
+        let view = null;
         await new Promise((resolve, reject) => {
           const timer = setTimeout(() => {
             reject(Error('Operation timeout'));
@@ -151,12 +156,16 @@ describe('view', () => {
           view = createView({
             children: [{
               on: {
-                mounted (e) {
-                  this.remove();
+                mounted () {
+                  return (e) => {
+                    e.target.remove();
+                  };
                 },
                 removed () {
-                  clearTimeout(timer);
-                  resolve();
+                  return () => {
+                    clearTimeout(timer);
+                    resolve();
+                  };
                 }
               }
             }]
@@ -164,7 +173,7 @@ describe('view', () => {
             target: window.document.body
           });
         }).finally(() => {
-          view?.remove();
+          view?.node.remove();
         });
         assert.ok(true);
       } catch (err) {
@@ -172,9 +181,9 @@ describe('view', () => {
       }
     });
 
-    await t.test('on:changed', async (t) => {
+    await t.test('on:changed', async () => {
       try {
-        let view;
+        let view = null;
         await new Promise((resolve, reject) => {
           const timer = setTimeout(() => {
             reject(Error('Operation timeout'));
@@ -185,17 +194,21 @@ describe('view', () => {
                 'my-attr': '1'
               },
               on: {
-                mounted (e) {
-                  this.setAttribute('my-attr', '2');
+                mounted () {
+                  return (e) => {
+                    e.target.setAttribute('my-attr', '2');
+                  };
                 },
-                changed (e) {
-                  clearTimeout(timer);
-                  if (e.detail.attributeName === 'my-attr' &&
-                    e.detail.newValue === '2' && e.detail.oldValue === '1') {
-                    resolve();
-                  } else {
-                    reject(new Error('Incorrect event'));
-                  }
+                changed () {
+                  return (e) => {
+                    clearTimeout(timer);
+                    if (e.detail.attributeName === 'my-attr'
+                      && e.detail.newValue === '2' && e.detail.oldValue === '1') {
+                      resolve();
+                    } else {
+                      reject(new Error('Incorrect event'));
+                    }
+                  };
                 }
               }
             }]
@@ -203,7 +216,7 @@ describe('view', () => {
             target: window.document.body
           });
         }).finally(() => {
-          view?.remove();
+          view?.node.remove();
         });
         assert.ok(true);
       } catch (err) {
@@ -213,14 +226,14 @@ describe('view', () => {
   });
 
   it('reactivity', async (t) => {
-    await t.test('parameters', async (t) => {
+    await t.test('parameters', () => {
       const state = createState({
         counter: 1,
         text: 'Text',
         color: 'red',
         dataId: '1'
       });
-      const view = createView({
+      const { node } = createView({
         children: [{
           tagName: 'input',
           type: 'number',
@@ -236,56 +249,56 @@ describe('view', () => {
             id: () => state.$dataId
           }
         }, {
-          style: () => {
+          style () {
             return {
-              color: () => state.$color
+              color: state.$color
             };
           }
         }, {
-          dataset: () => {
+          dataset () {
             return {
-              id: () => state.$dataId
+              id: state.$dataId
             };
           }
         }]
       });
       state.counter++;
-      assert.equal(view.children[0].value, `${state.counter}`);
+      assert.equal(node.children[0].value, `${state.counter}`);
       state.text = 'Hello';
-      assert.equal(view.children[1].textContent, state.text);
+      assert.equal(node.children[1].textContent, state.text);
       state.color = 'blue';
-      assert.equal(view.children[2].style.color, state.color);
-      assert.equal(view.children[4].style.color, state.color);
+      assert.equal(node.children[2].style.color, state.color);
+      assert.equal(node.children[4].style.color, state.color);
       state.dataId = '2';
-      assert.equal(view.children[3].dataset.id, state.dataId);
-      assert.equal(view.children[5].dataset.id, state.dataId);
+      assert.equal(node.children[3].dataset.id, state.dataId);
+      assert.equal(node.children[5].dataset.id, state.dataId);
     });
 
-    await t.test('attributes', async (t) => {
+    await t.test('attributes', () => {
       const state = createState({
         attr: ''
       });
-      const view = createView({
+      const { node } = createView({
         attributes: {
           for: () => state.$attr
         }
       });
       state.attr = 'my-input';
-      assert.equal(view.getAttribute('for'), state.attr);
+      assert.equal(node.getAttribute('for'), state.attr);
     });
 
-    await t.test('classList', async (t) => {
+    await t.test('classList', () => {
       const state = createState({
         cls: ['a', 'b']
       });
-      const view = createView({
+      const { node } = createView({
         classList: () => state.$cls
       });
       state.cls.push('c');
-      assert.equal(view.className, state.cls.join(' '));
+      assert.equal(node.className, state.cls.join(' '));
     });
 
-    await t.test('children', async (t) => {
+    await t.test('children', () => {
       const state = createState({
         list: [{
           text: 'Item 1',
@@ -294,32 +307,28 @@ describe('view', () => {
           text: 'Item 2'
         }]
       });
-      const view = createView({
+      const { node } = createView({
         tagName: 'ul',
-        children: () => {
-          return state.list.$$each(item => {
-            return {
-              tagName: 'li',
-              children: [{
-                tagName: 'input',
-                type: 'checkbox',
-                checked: () => item.$checked
-              }, {
-                tagName: 'label',
-                textContent: () => item.$text
-              }]
-            };
-          });
-        }
+        children: () => state.list.$$each((item) => ({
+          tagName: 'li',
+          children: [{
+            tagName: 'input',
+            type: 'checkbox',
+            checked: () => item.$checked
+          }, {
+            tagName: 'label',
+            textContent: () => item.$text
+          }]
+        }))
       });
       state.list.push({ text: 'Item 3' });
-      assert.equal(view.children[2].children[1].textContent, 'Item 3');
+      assert.equal(node.children[2].children[1].textContent, 'Item 3');
       state.list.splice(1, 1, { text: 'Item 4' });
-      assert.equal(view.children[1].children[1].textContent, 'Item 4');
+      assert.equal(node.children[1].children[1].textContent, 'Item 4');
       state.list.pop();
-      assert.equal(view.children[2], undefined);
+      assert.equal(node.children[2], undefined);
       state.list[0].checked = false;
-      assert.equal(view.children[0].children[0].checked, false);
+      assert.equal(node.children[0].children[0].checked, false);
     });
   });
 });
