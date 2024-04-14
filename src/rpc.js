@@ -1,4 +1,4 @@
-import { isObject } from './utils';
+import { isArray, isObject } from './utils';
 
 /**
  * Create an RPC client.
@@ -24,11 +24,13 @@ export function createRPC (options) {
   const handler = {
     get: (_obj, prop) => async function get (params) {
       const reqHeaders = {};
-      if (params instanceof File || params instanceof Blob) {
+      if (params instanceof FormData) {
+        // ignore
+      } else if (params instanceof File || params instanceof Blob) {
         const fd = new FormData();
         fd.append('file', params);
         params = fd;
-      } else if (isObject(params)) {
+      } else if (isObject(params) || isArray(params)) {
         reqHeaders['Content-Type'] = 'application/json';
         params = JSON.stringify(params);
       } else {
