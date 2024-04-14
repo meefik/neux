@@ -206,7 +206,7 @@ export function createState (data, options) {
       } else if (prop === '$$each' && isArray(obj)) {
         return function $$each (callbackFn, thisArg) {
           if (isFunction(callbackFn)) {
-            setContext(context, state, '*', callbackFn.bind(thisArg));
+            setContext(context, state, '#', callbackFn.bind(thisArg));
           }
           return obj.map(callbackFn, thisArg).filter((item) => item);
         };
@@ -234,7 +234,13 @@ export function createState (data, options) {
         return false;
       }
       if (changed) {
-        const events = (!isArray(obj) || !isNaN(prop)) ? ['*', prop] : [prop];
+        const events = [prop];
+        if (!isArray(obj) || !isNaN(prop)) {
+          events.push('*');
+        }
+        if (isArray(obj) && !isNaN(prop)) {
+          events.push('#');
+        }
         listener.emit(events, value, oldv, prop, state);
       }
       return true;
@@ -247,7 +253,13 @@ export function createState (data, options) {
       }
       watcher.emit(prop);
       updater.emit(prop);
-      const events = (!isArray(obj) || !isNaN(prop)) ? ['*', prop] : [prop];
+      const events = [prop];
+      if (!isArray(obj) || !isNaN(prop)) {
+        events.push('*');
+      }
+      if (isArray(obj) && !isNaN(prop)) {
+        events.push('#');
+      }
       listener.emit(events, undefined, oldv, prop, state);
       return true;
     }
