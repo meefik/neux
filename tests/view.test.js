@@ -21,16 +21,22 @@ describe('view', () => {
 
     await t.test('namespaceURI', () => {
       const { node } = createView({
-        tagName: 'svg',
+        tagName: 'div',
         children: [{
-          tagName: 'path'
+          tagName: 'svg',
+          children: [{
+            tagName: 'path'
+          }]
         }]
       });
+      const xhtmlNamespaceURI = 'http://www.w3.org/1999/xhtml';
       const svgNamespaceURI = 'http://www.w3.org/2000/svg';
-      assert.equal(node.tagName.toUpperCase(), 'SVG');
-      assert.equal(node.namespaceURI, svgNamespaceURI);
-      assert.equal(node.children[0].tagName.toUpperCase(), 'PATH');
+      assert.equal(node.tagName.toUpperCase(), 'DIV');
+      assert.equal(node.namespaceURI, xhtmlNamespaceURI);
+      assert.equal(node.children[0].tagName.toUpperCase(), 'SVG');
       assert.equal(node.children[0].namespaceURI, svgNamespaceURI);
+      assert.equal(node.children[0].children[0].tagName.toUpperCase(), 'PATH');
+      assert.equal(node.children[0].children[0].namespaceURI, svgNamespaceURI);
     });
 
     await t.test('node', () => {
