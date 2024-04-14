@@ -19,24 +19,6 @@ describe('view', () => {
       assert.equal(node.tagName, 'P');
     });
 
-    await t.test('children', () => {
-      const { node } = createView({
-        tagName: 'ul',
-        children: [{
-          tagName: 'li',
-          textContent: 'Item 1'
-        }, {
-          tagName: 'li',
-          textContent: 'Item 2'
-        }]
-      });
-      assert.equal(node.tagName.toUpperCase(), 'UL');
-      assert.equal(node.children[0].tagName.toUpperCase(), 'LI');
-      assert.equal(node.children[0].textContent, 'Item 1');
-      assert.equal(node.children[1].tagName.toUpperCase(), 'LI');
-      assert.equal(node.children[1].textContent, 'Item 2');
-    });
-
     await t.test('namespaceURI', () => {
       const { node } = createView({
         tagName: 'svg',
@@ -51,17 +33,42 @@ describe('view', () => {
       assert.equal(node.children[0].namespaceURI, svgNamespaceURI);
     });
 
+    await t.test('node', () => {
+      const { node } = createView({
+        children: [{
+          node: '<span>Text</span>',
+          className: 'abc'
+        }, {
+          node: window.document.createElement('span'),
+          className: 'abc',
+          textContent: 'Text'
+        }]
+      });
+      assert.equal(node.children[0].tagName.toUpperCase(), 'SPAN');
+      assert.equal(node.children[0].textContent, 'Text');
+      assert.equal(node.children[0].className, 'abc');
+      assert.equal(node.children[1].tagName.toUpperCase(), 'SPAN');
+      assert.equal(node.children[1].textContent, 'Text');
+      assert.equal(node.children[1].className, 'abc');
+    });
+
     await t.test('attributes', () => {
       const { node } = createView({
         tagName: 'label',
         attributes: {
           for: 'my-input'
-        },
+        }
+      });
+      assert.equal(node.getAttribute('for'), 'my-input');
+    });
+
+    await t.test('dataset', () => {
+      const { node } = createView({
+        tagName: 'label',
         dataset: {
           id: '123'
         }
       });
-      assert.equal(node.getAttribute('for'), 'my-input');
       assert.equal(node.dataset.id, '123');
     });
 
@@ -91,6 +98,24 @@ describe('view', () => {
         textContent: 'Hello World'
       });
       assert.equal(node.textContent, 'Hello World');
+    });
+
+    await t.test('children', () => {
+      const { node } = createView({
+        tagName: 'ul',
+        children: [{
+          tagName: 'li',
+          textContent: 'Item 1'
+        }, {
+          tagName: 'li',
+          textContent: 'Item 2'
+        }]
+      });
+      assert.equal(node.tagName.toUpperCase(), 'UL');
+      assert.equal(node.children[0].tagName.toUpperCase(), 'LI');
+      assert.equal(node.children[0].textContent, 'Item 1');
+      assert.equal(node.children[1].tagName.toUpperCase(), 'LI');
+      assert.equal(node.children[1].textContent, 'Item 2');
     });
 
     await t.test('on:change', () => {
