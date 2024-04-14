@@ -251,7 +251,7 @@ You can change the DOM using simple operations on objects and arrays:
 const view = createView({
   tagName: 'ul',
   children: [{
-    tagName: 'li'
+    tagName: 'li',
     textContent: 'Item 1'
   }]
 }, { target: document.body });
@@ -319,14 +319,14 @@ const l10n = createL10n({
   fallback: 'en',
   lang: navigator.language
 });
-const msg = l10n.t('say.hello', { name: 'World' }, 'en');
-console.log(msg); // Hello World!
 l10n.lang = 'en';
 const msgEn = l10n.t('say.hello', { name: 'World' });
 console.log(msgEn); // Hello World!
 l10n.lang = 'ru';
 const msgRu = l10n.t('say.hello', { name: 'Мир' });
 console.log(msgRu); // Привет Мир!
+const msg = l10n.t('say.hello', { name: 'World' }, 'en');
+console.log(msg); // Hello World!
 ```
 
 Convert date and time to localized string:
@@ -630,6 +630,10 @@ State synchronization is used to save their data to persistent storage.
 Synchronizing state with `localStorage`:
 
 ```js
+const state = createState({
+  list: []
+});
+// describe the synchronization function
 const syncer = (newv, oldv) => {
   if (!oldv) {
     return JSON.parse(localStorage.getItem('todos') || '[]');
@@ -648,6 +652,10 @@ sync();
 Synchronizing state with remote store:
 
 ```js
+const state = createState({
+  list: []
+});
+// describe the synchronization function
 const syncer = async (newv, oldv) => {
   return await rpc.getTodoList();
 };
@@ -660,6 +668,12 @@ sync();
 Undo last changes or clear:
 
 ```js
+const state = createState({
+  list: [
+    { text: 'Item 1', checked: false }
+  ]
+});
+// describe the synchronization function
 const syncer = (newv, oldv, action) => {
   if (action === 'undo') return oldv;
   if (action === 'clear') return [];
