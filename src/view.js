@@ -146,7 +146,7 @@ function updateElement (el, newv, oldv, prop, obj, rest = []) {
         }
       }
     } else if (prop === 'classList') {
-      el.classList = isArray(newv) ? newv.join(' ') : newv;
+      el.classList = isArray(newv) ? newv.join(' ') : (newv || '');
     } else if (prop === 'children') {
       el.innerHTML = '';
       if (!isUndefined(newv)) {
@@ -200,9 +200,7 @@ function updateElement (el, newv, oldv, prop, obj, rest = []) {
         style[prop] = newv;
       }
     } else if (parent === 'classList') {
-      if (isArray(obj)) {
-        el.classList = obj.join(' ');
-      }
+      el.classList = isArray(obj) ? obj.join(' ') : (obj || '');
     } else if (parent === 'children') {
       if (isUndefined(newv)) {
         // Del
