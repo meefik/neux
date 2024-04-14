@@ -59,15 +59,19 @@ function createElement (cfg, ns) {
   if (!isObject(cfg)) {
     cfg = {};
   }
-  if (!ns && `${cfg.tagName}`.toUpperCase() === 'SVG') {
-    ns = 'http://www.w3.org/2000/svg';
-  }
-  const { tagName = 'div', namespaceURI = ns, node } = cfg;
   const { document, Element } = window;
+  const { tagName = 'div', namespaceURI, node } = cfg;
+  if (namespaceURI) {
+    ns = namespaceURI;
+  } else if (tagName === 'svg') {
+    ns = 'http://www.w3.org/2000/svg';
+  } else if (ns === 'http://www.w3.org/1999/xhtml') {
+    ns = null;
+  }
   let el = node instanceof Element
     ? node
-    : (namespaceURI
-      ? document.createElementNS(namespaceURI, tagName)
+    : (ns
+      ? document.createElementNS(ns, tagName)
       : document.createElement(tagName));
   if (isString(node)) {
     el.innerHTML = node;
