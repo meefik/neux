@@ -57,12 +57,9 @@ export default class EventListener {
     if (event === '*') {
       for (const ev in list) {
         for (const [fn, once] of list[ev]) {
-          const res = fn(...args);
+          fn(...args);
           if (once) {
             this.off(ev, fn);
-          }
-          if (res === false) {
-            break;
           }
         }
       }
@@ -71,12 +68,9 @@ export default class EventListener {
       for (const ev of events) {
         if (list[ev]) {
           for (const [fn, once] of list[ev]) {
-            const res = fn(...args);
+            fn(...args);
             if (once) {
               this.off(ev, fn);
-            }
-            if (res === false) {
-              break;
             }
           }
         }

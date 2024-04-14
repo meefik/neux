@@ -149,9 +149,8 @@ function updateElement (el, newv, oldv, prop, obj, rest = []) {
       el.classList = isArray(newv) ? newv.join(' ') : (newv || '');
     } else if (prop === 'children') {
       el.innerHTML = '';
-      if (!isUndefined(newv)) {
-        const children = [].concat(newv);
-        for (const cfg of children) {
+      if (isArray(newv)) {
+        for (const cfg of newv) {
           const child = createElement(cfg, el.namespaceURI);
           if (child) {
             el.appendChild(child);
