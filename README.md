@@ -261,7 +261,7 @@ view.children.push({
   textContent: 'Item 2'
 });
 view.children[1].textContent = 'Item 3';
-view.children.unshift();
+view.children.shift();
 ```
 
 You can pass HTML markup or the entire HTML element in the "node" parameter:
