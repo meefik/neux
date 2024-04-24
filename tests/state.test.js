@@ -247,6 +247,13 @@ describe('state', () => {
     }
   });
 
+  it('create', () => {
+    const state = createState({});
+    const sub = state.$$create();
+    assert.equal(Object.keys(state).length, 0);
+    assert.ok(typeof sub === 'object');
+  });
+
   it('clone & equal', () => {
     const state = createState({
       a: 1,
@@ -340,6 +347,48 @@ describe('state', () => {
     } catch (err) {
       assert.fail(err.message);
     }
+  });
+
+  it('query', async () => {
+    const state = createState({
+      t: 'a',
+      n: 1,
+      b: true,
+      obj: {
+        t: 'b',
+        n: 2,
+        b: false,
+        arr: [{
+          t: 'c',
+          n: 3,
+          b: true
+        }]
+      }
+    });
+    const res = state.$$query({ t: 'c' });
+    assert.equal(res.n, 3);
+  });
+
+  it('queryAll', async () => {
+    const state = createState({
+      t: 'a',
+      n: 1,
+      b: true,
+      obj: {
+        t: 'b',
+        n: 2,
+        b: false,
+        arr: [{
+          t: 'a',
+          n: 3,
+          b: true
+        }]
+      }
+    });
+    const res = state.$$queryAll({ t: 'a' });
+    assert.equal(res.length, 2);
+    assert.equal(res[0].n, 1);
+    assert.equal(res[1].n, 3);
   });
 
   it('context', () => {

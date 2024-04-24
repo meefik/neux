@@ -79,11 +79,11 @@ function createElement (cfg, ns) {
       el = el.firstChild;
     }
   }
-  const options = { configurable: false, enumerable: true, writable: false };
+  const opts = { configurable: false, enumerable: true, writable: false };
   Object.defineProperties(cfg, {
-    tagName: { value: el.tagName, ...options },
-    namespaceURI: { value: el.namespaceURI, ...options },
-    node: { value: el, ...options }
+    tagName: { ...opts, value: el.tagName },
+    namespaceURI: { ...opts, value: el.namespaceURI },
+    node: { ...opts, value: el }
   });
   for (const prop in cfg) {
     const newv = cfg[prop];
@@ -177,7 +177,7 @@ function updateElement (el, newv, oldv, prop, obj, rest = []) {
       }
     } else if (isUndefined(newv)) {
       delete el[prop];
-    } else if (!isReadOnly(prop)) {
+    } else if (!isReadOnly(prop) && !isUndefined(el[prop])) {
       el[prop] = newv;
     }
   } else if (level === 1) {
@@ -199,8 +199,12 @@ function updateElement (el, newv, oldv, prop, obj, rest = []) {
       const { style } = el;
       if (isUndefined(newv)) {
         style.removeProperty(prop);
-      } else {
+      } else if (/[A-Z]/u.test(prop)) {
+        // camelCase
         style[prop] = newv;
+      } else {
+        // kebab-case
+        style.setProperty(prop, newv);
       }
     } else if (parent === 'classList') {
       el.classList = isArray(obj) ? obj.join(' ') : (obj || '');

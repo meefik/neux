@@ -7,12 +7,13 @@ import {
 } from './utils';
 import EventListener from './listener';
 
-const proxyKey = Symbol('isProxy');
-const dollarRe = /^\$/u;
+const stateKey = Symbol('state');
+const contextKey = Symbol('context');
+const dollarRe = /^\$[^$]/u;
 const defaultContext = {};
 
 function setContext (context, obj, prop, fn) {
-  const ctx = context.value;
+  const ctx = context[contextKey];
   if (ctx) {
     const props = ctx.get(obj) || {};
     props[prop] = fn || null;
@@ -21,13 +22,13 @@ function setContext (context, obj, prop, fn) {
 }
 
 function getContext (context, getter, setter) {
-  if (context.value) {
+  if (context[contextKey]) {
     throw Error('Collision in state binding');
   }
   const ctx = new Map();
-  context.value = ctx;
+  context[contextKey] = ctx;
   const val = getter();
-  delete context.value;
+  delete context[contextKey];
   for (const kv of ctx) {
     const [obj, props] = kv;
     for (const prop in props) {
@@ -41,7 +42,7 @@ function setWatcher (context, state, prop, getter, cleaner) {
   cleaner.emit(prop);
   return getContext(
     context,
-    () => getter(state, prop),
+    () => getter.call(context, state, prop),
     (obj, key, callbackFn) => {
       const handler = callbackFn
         ? (newv, oldv, idx, arr) => {
@@ -52,16 +53,16 @@ function setWatcher (context, state, prop, getter, cleaner) {
             target.splice(index, 1);
           } else if (isUndefined(oldv)) {
             // Add
-            const value = callbackFn(newv, index, arr);
+            const value = callbackFn.call(context, newv, index, arr);
             target[index] = value;
           } else {
             // Replace
-            const value = callbackFn(newv, index, arr);
+            const value = callbackFn.call(context, newv, index, arr);
             target.splice(index, 1, value);
           }
         }
         : () => {
-          const newv = getter(state, prop);
+          const newv = getter.call(context, state, prop);
           state[prop] = newv;
         };
       obj.$$on(key, handler);
@@ -72,7 +73,7 @@ function setWatcher (context, state, prop, getter, cleaner) {
 
 function setUpdater (state, prop, sub, cleaner) {
   cleaner.emit(prop);
-  if (sub[proxyKey]) {
+  if (sub[stateKey]) {
     const handler = (newv, oldv, key, obj, rest = []) => {
       state.$$emit([prop, '*'], newv, oldv, key, obj, [...rest, prop]);
     };
@@ -148,6 +149,45 @@ function isEqual (newv, oldv) {
   return true;
 }
 
+function isEqualFilter (obj, filter) {
+  let found = true;
+  for (const key in filter) {
+    if (obj[key] !== filter[key]) {
+      found = false;
+      break;
+    }
+  }
+  return found;
+}
+
+function query (obj, filter) {
+  if (isEqualFilter(obj, filter)) {
+    return obj;
+  }
+  for (const key in obj) {
+    const val = obj[key];
+    if (isObject(val) || isArray(val)) {
+      const res = query(val, filter);
+      if (!isUndefined(res)) {
+        return res;
+      }
+    }
+  }
+}
+
+function queryAll (obj, filter, res = []) {
+  if (isEqualFilter(obj, filter)) {
+    res.push(obj);
+  }
+  for (const key in obj) {
+    const val = obj[key];
+    if (isObject(val) || isArray(val)) {
+      queryAll(val, filter, res);
+    }
+  }
+  return res;
+}
+
 /**
  * Create a state.
  *
@@ -159,58 +199,19 @@ function isEqual (newv, oldv) {
 export function createState (data, options) {
   if (isUndefined(data)) {
     data = {};
-  } else if (!isObject(data) || data[proxyKey]) {
+  } else if (!isObject(data) || data[stateKey]) {
     return data;
   }
   const { context = defaultContext } = options || {};
-  const listener = new EventListener();
+  const listener = new EventListener(context);
   const watcher = new EventListener();
   const updater = new EventListener();
   const handler = {
     get: (obj, prop) => {
-      if (prop === proxyKey) {
+      if (prop === stateKey) {
         return true;
       }
-      if (prop === '$') {
-        return function $ (key) {
-          return state[`$${key}`];
-        };
-      } else if (prop === '$$on') {
-        return function $$on (...args) {
-          return listener.on(...args);
-        };
-      } else if (prop === '$$once') {
-        return function $$once (...args) {
-          return listener.once(...args);
-        };
-      } else if (prop === '$$off') {
-        return function $$off (...args) {
-          return listener.off(...args);
-        };
-      } else if (prop === '$$emit') {
-        return function $$emit (...args) {
-          return listener.emit(...args);
-        };
-      } else if (prop === '$$clone') {
-        return function $$clone (oldv = obj) {
-          return deepClone(oldv);
-        };
-      } else if (prop === '$$equal') {
-        return function $$equal (newv, oldv = obj) {
-          return isEqual(newv, oldv);
-        };
-      } else if (prop === '$$patch') {
-        return function $$patch (newv, oldv = state) {
-          return deepPatch(newv, oldv, options);
-        };
-      } else if (prop === '$$each' && isArray(obj)) {
-        return function $$each (callbackFn, thisArg) {
-          if (isFunction(callbackFn)) {
-            setContext(context, state, '#', callbackFn.bind(thisArg));
-          }
-          return obj.map(callbackFn, thisArg).filter((item) => item);
-        };
-      } else if (isString(prop) && dollarRe.test(prop)) {
+      if (isString(prop) && dollarRe.test(prop)) {
         prop = prop.slice(1);
         if (!isFunction(obj[prop])) {
           setContext(context, state, prop);
@@ -265,6 +266,86 @@ export function createState (data, options) {
     }
   };
   const state = new Proxy(data, handler);
+  const opts = { configurable: false, enumerable: false, writable: false };
+  Object.defineProperties(state, {
+    $: {
+      ...opts,
+      value (key) {
+        return state[`$${key}`];
+      }
+    },
+    $$on: {
+      ...opts,
+      value (...args) {
+        return listener.on(...args);
+      }
+    },
+    $$once: {
+      ...opts,
+      value (...args) {
+        return listener.once(...args);
+      }
+    },
+    $$off: {
+      ...opts,
+      value (...args) {
+        return listener.off(...args);
+      }
+    },
+    $$emit: {
+      ...opts,
+      value (...args) {
+        return listener.emit(...args);
+      }
+    },
+    $$query: {
+      ...opts,
+      value (filter) {
+        return query(state, filter);
+      }
+    },
+    $$queryAll: {
+      ...opts,
+      value (filter) {
+        return queryAll(state, filter);
+      }
+    },
+    $$create: {
+      ...opts,
+      value (data) {
+        return createState(data, options);
+      }
+    },
+    $$clone: {
+      ...opts,
+      value (oldv = state) {
+        return deepClone(oldv);
+      }
+    },
+    $$equal: {
+      ...opts,
+      value (newv, oldv = state) {
+        return isEqual(newv, oldv);
+      }
+    },
+    $$patch: {
+      ...opts,
+      value (newv, oldv = state) {
+        return deepPatch(newv, oldv, options);
+      }
+    },
+    $$each: {
+      ...opts,
+      value (callbackFn, thisArg) {
+        if (isArray(state)) {
+          if (isFunction(callbackFn)) {
+            setContext(context, state, '#', callbackFn.bind(thisArg));
+          }
+          return state.map(callbackFn, thisArg).filter((item) => item);
+        }
+      }
+    }
+  });
   for (const prop in data) {
     if (isFunction(data[prop])) {
       const getter = data[prop];

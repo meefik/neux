@@ -4,6 +4,12 @@
 export default class EventListener {
   #list = {};
 
+  #context;
+
+  constructor (context) {
+    this.#context = context;
+  }
+
   on (event, handler) {
     if (event && handler) {
       const list = this.#list;
@@ -57,7 +63,7 @@ export default class EventListener {
     if (event === '*') {
       for (const ev in list) {
         for (const [fn, once] of list[ev]) {
-          fn(...args);
+          fn.apply(this.#context, args);
           if (once) {
             this.off(ev, fn);
           }
@@ -68,7 +74,7 @@ export default class EventListener {
       for (const ev of events) {
         if (list[ev]) {
           for (const [fn, once] of list[ev]) {
-            fn(...args);
+            fn.apply(this.#context, args);
             if (once) {
               this.off(ev, fn);
             }
