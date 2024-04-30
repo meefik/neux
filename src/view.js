@@ -81,8 +81,8 @@ function createElement (cfg, ns) {
   }
   const opts = { configurable: false, enumerable: true, writable: false };
   Object.defineProperties(cfg, {
-    tagName: { ...opts, value: el.tagName },
-    namespaceURI: { ...opts, value: el.namespaceURI },
+    tagName: { ...opts, value: tagName },
+    namespaceURI: { ...opts, value: ns },
     node: { ...opts, value: el }
   });
   for (const prop in cfg) {
