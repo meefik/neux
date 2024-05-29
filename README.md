@@ -297,6 +297,54 @@ createView({
 }, { target: document.body });
 ```
 
+For convenience, you can divide the code into separate components, which can have input properties of the parent element:
+
+```js
+const state = createState({
+  counter: 0
+});
+
+function Button() {
+  return [{
+    tagName: 'button',
+    textContent: '+1',
+    on: {
+      click() {
+        return (e) => {
+          e.preventDefault();
+          const ev = new CustomEvent('increase', { bubbles: true });
+          e.target.dispatchEvent(ev);
+        }
+      }
+    }
+  }];
+}
+
+function Counter(obj) {
+  return [{
+    tagName: 'label',
+    textContent: () => obj.$text
+  }];
+}
+
+createView({
+  children: [{
+    on: {
+      increase() {
+        return (e) => {
+          e.preventDefault();
+          state.counter++;
+        };
+      }
+    },
+    children: Button
+  }, {
+    text: () => state.$counter,
+    children: Counter
+  }]
+}, { target: document.body });
+```
+
 ## Localization
 
 Localization is used to display the application interface in different languages.
