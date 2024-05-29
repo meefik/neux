@@ -166,7 +166,7 @@ function query (obj, filter) {
   }
   for (const key in obj) {
     const val = obj[key];
-    if (isObject(val) || isArray(val)) {
+    if (isObject(val)) {
       const res = query(val, filter);
       if (!isUndefined(res)) {
         return res;
@@ -181,7 +181,7 @@ function queryAll (obj, filter, res = []) {
   }
   for (const key in obj) {
     const val = obj[key];
-    if (isObject(val) || isArray(val)) {
+    if (isObject(val)) {
       queryAll(val, filter, res);
     }
   }

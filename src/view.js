@@ -56,9 +56,7 @@ function createObserver (el) {
 }
 
 function createElement (cfg, ns) {
-  if (!isObject(cfg)) {
-    cfg = {};
-  }
+  if (!isObject(cfg)) return;
   const { document, Element } = window;
   const { tagName = 'div', namespaceURI, node } = cfg;
   if (namespaceURI) {
@@ -79,7 +77,7 @@ function createElement (cfg, ns) {
       el = el.firstChild;
     }
   }
-  const opts = { configurable: false, enumerable: true, writable: false };
+  const opts = { configurable: true, enumerable: true, writable: false };
   Object.defineProperties(cfg, {
     tagName: { ...opts, value: tagName },
     namespaceURI: { ...opts, value: ns },
@@ -87,101 +85,31 @@ function createElement (cfg, ns) {
   });
   for (const prop in cfg) {
     const newv = cfg[prop];
-    updateElement(el, newv, undefined, prop);
+    updateElement(newv, undefined, prop, cfg);
   }
   return el;
 }
 
-function updateElement (el, newv, oldv, prop, obj, rest = []) {
-  const { Element } = window;
-  const [parent] = rest;
+function updateElement (newv, oldv, prop, obj) {
+  const el = obj.node;
+  if (!el) return;
 
-  let level = 0;
-  for (let i = rest.length - 1, curr = el; i >= 0; i--) {
-    const path = rest[i];
-    curr = curr[path];
-    if (!curr) {
-      break;
+  if (prop === 'on') {
+    for (const ev in newv) {
+      const handler = newv[ev];
+      if (isFunction(handler)) {
+        el.addEventListener(ev, handler);
+      }
     }
-    if (curr instanceof Element) {
-      el = curr;
-      level = 0;
-    } else {
-      level++;
-    }
-  }
-
-  if (level === 0) {
-    if (prop === 'on') {
-      for (const ev in newv) {
-        const handler = newv[ev];
+    for (const ev in oldv) {
+      if (!newv || isUndefined(newv[ev])) {
+        const handler = oldv[ev];
         if (isFunction(handler)) {
-          el.addEventListener(ev, handler);
+          el.removeEventListener(ev, handler);
         }
       }
-      for (const ev in oldv) {
-        if (!newv || isUndefined(newv[ev])) {
-          const handler = oldv[ev];
-          if (isFunction(handler)) {
-            el.removeEventListener(ev, handler);
-          }
-        }
-      }
-    } else if (prop === 'attributes') {
-      for (const attr in newv) {
-        const val = newv[attr];
-        if (!isUndefined(val)) {
-          el.setAttribute(attr, val);
-        }
-      }
-      for (const attr in oldv) {
-        if (!newv || isUndefined(newv[attr])) {
-          el.removeAttribute(attr);
-        }
-      }
-    } else if (prop === 'style') {
-      const { style } = el;
-      for (const name in newv) {
-        style[name] = newv[name];
-      }
-      for (const name in oldv) {
-        if (!newv || isUndefined(newv[name])) {
-          style.removeProperty(name);
-        }
-      }
-    } else if (prop === 'classList') {
-      el.classList = isArray(newv) ? newv.join(' ') : (newv || '');
-    } else if (prop === 'children') {
-      el.innerHTML = '';
-      if (isArray(newv)) {
-        for (const cfg of newv) {
-          const child = createElement(cfg, el.namespaceURI);
-          if (child) {
-            el.appendChild(child);
-          }
-        }
-      }
-    } else if (isObject(newv)) {
-      if (el[prop]) {
-        for (const param in newv) {
-          const val = newv[param];
-          if (!isUndefined(val)) {
-            el[prop][param] = val;
-          }
-        }
-        for (const param in oldv) {
-          if (isUndefined(newv[param])) {
-            delete el[prop][param];
-          }
-        }
-      }
-    } else if (isUndefined(newv)) {
-      delete el[prop];
-    } else if (!isReadOnly(prop) && !isUndefined(el[prop])) {
-      el[prop] = newv;
     }
-  } else if (level === 1) {
-    if (parent === 'on') {
+    obj.$$on('on', (newv, oldv, prop) => {
       if (isUndefined(newv)) {
         if (isFunction(oldv)) {
           el.removeEventListener(prop, oldv);
@@ -189,14 +117,42 @@ function updateElement (el, newv, oldv, prop, obj, rest = []) {
       } else if (isFunction(newv)) {
         el.addEventListener(prop, newv);
       }
-    } else if (parent === 'attributes') {
+    });
+  } else if (prop === 'classList') {
+    el.classList = isArray(newv) ? newv.join(' ') : (newv || '');
+    obj.$$on('classList', (newv, oldv, prop, obj) => {
+      el.classList = isArray(obj) ? obj.join(' ') : (obj || '');
+    });
+  } else if (prop === 'attributes') {
+    for (const attr in newv) {
+      const val = newv[attr];
+      if (!isUndefined(val)) {
+        el.setAttribute(attr, val);
+      }
+    }
+    for (const attr in oldv) {
+      if (!newv || isUndefined(newv[attr])) {
+        el.removeAttribute(attr);
+      }
+    }
+    obj.$$on('attributes', (newv, oldv, prop) => {
       if (isUndefined(newv)) {
         el.removeAttribute(prop);
       } else {
         el.setAttribute(prop, newv);
       }
-    } else if (parent === 'style') {
-      const { style } = el;
+    });
+  } else if (prop === 'style') {
+    const { style } = el;
+    for (const name in newv) {
+      style[name] = newv[name];
+    }
+    for (const name in oldv) {
+      if (!newv || isUndefined(newv[name])) {
+        style.removeProperty(name);
+      }
+    }
+    obj.$$on('style', (newv, oldv, prop) => {
       if (isUndefined(newv)) {
         style.removeProperty(prop);
       } else if (/[A-Z]/u.test(prop)) {
@@ -206,36 +162,65 @@ function updateElement (el, newv, oldv, prop, obj, rest = []) {
         // kebab-case
         style.setProperty(prop, newv);
       }
-    } else if (parent === 'classList') {
-      el.classList = isArray(obj) ? obj.join(' ') : (obj || '');
-    } else if (parent === 'children') {
-      if (isUndefined(newv)) {
-        // Del
-        const oldChild = el.children[prop];
-        if (oldChild) {
-          el.removeChild(oldChild);
-        }
-      } else if (isUndefined(oldv)) {
-        // Add
-        const newChild = createElement(newv, el.namespaceURI);
-        if (newChild) {
-          el.appendChild(newChild);
-        }
-      } else {
-        // Mod
-        const oldChild = el.children[prop];
-        const newChild = createElement(newv, el.namespaceURI);
-        if (newChild && oldChild) {
-          el.replaceChild(newChild, oldChild);
-        }
-      }
-    } else if (el[parent]) {
-      if (isUndefined(newv)) {
-        delete el[parent][prop];
-      } else {
-        el[parent][prop] = newv;
+    });
+  } else if (prop === 'dataset') {
+    const { dataset } = el;
+    for (const param in newv) {
+      const val = newv[param];
+      if (!isUndefined(val)) {
+        dataset[param] = val;
       }
     }
+    for (const param in oldv) {
+      if (isUndefined(newv[param])) {
+        delete dataset[param];
+      }
+    }
+    obj.$$on('dataset', (newv, oldv, prop) => {
+      if (isUndefined(newv)) {
+        delete dataset[prop];
+      } else {
+        dataset[prop] = newv;
+      }
+    });
+  } else if (prop === 'children') {
+    el.innerHTML = '';
+    if (isArray(newv)) {
+      for (const cfg of newv) {
+        const child = createElement(cfg, el.namespaceURI);
+        if (child) {
+          el.appendChild(child);
+        }
+      }
+      obj.children.$$on('#', (newv, oldv) => {
+        if (isUndefined(newv)) {
+          // Del
+          const oldChild = oldv?.node;
+          if (oldChild) {
+            el.removeChild(oldChild);
+          }
+        } else if (isUndefined(oldv)) {
+          // Add
+          const newChild = createElement(newv, el.namespaceURI);
+          if (newChild) {
+            el.appendChild(newChild);
+          }
+        } else {
+          // Mod
+          const oldChild = oldv?.node;
+          if (oldChild) {
+            const newChild = createElement(newv, el.namespaceURI);
+            if (newChild) {
+              el.replaceChild(newChild, oldChild);
+            }
+          }
+        }
+      });
+    }
+  } else if (isUndefined(newv)) {
+    delete el[prop];
+  } else if (!isReadOnly(prop) && !isUndefined(el[prop])) {
+    el[prop] = newv;
   }
 }
 
@@ -252,9 +237,7 @@ export function createView (config, options) {
   const { target, context } = options || {};
   const state = createState(config, { context });
   const el = createElement(state);
-  state.$$on('*', (...args) => {
-    updateElement(el, ...args);
-  });
+  state.$$on('*', updateElement);
   const observer = createObserver(target || el);
   el.addEventListener('removed', (e) => {
     if (e.target === el) {

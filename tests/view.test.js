@@ -340,24 +340,27 @@ describe('view', () => {
       });
       const { node } = createView({
         tagName: 'ul',
-        children: () => state.list.$$each((item) => ({
-          tagName: 'li',
-          children: [{
-            tagName: 'input',
-            type: 'checkbox',
-            checked: () => item.$checked
-          }, {
-            tagName: 'label',
-            textContent: () => item.$text
-          }]
-        }))
+        children: () => state.list.$$each((item) => {
+          if (item.checked) return;
+          return {
+            tagName: 'li',
+            children: [{
+              tagName: 'input',
+              type: 'checkbox',
+              checked: () => item.$checked
+            }, {
+              tagName: 'label',
+              textContent: () => item.$text
+            }]
+          };
+        })
       });
       state.list.push({ text: 'Item 3' });
-      assert.equal(node.children[2].children[1].textContent, 'Item 3');
+      assert.equal(node.children[1].children[1].textContent, 'Item 3');
       state.list.splice(1, 1, { text: 'Item 4' });
-      assert.equal(node.children[1].children[1].textContent, 'Item 4');
+      assert.equal(node.children[2].children[1].textContent, 'Item 4');
       state.list.pop();
-      assert.equal(node.children[2], undefined);
+      assert.equal(node.children.length, 2);
       state.list[0].checked = false;
       assert.equal(node.children[0].children[0].checked, false);
     });
