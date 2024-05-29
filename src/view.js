@@ -1,10 +1,6 @@
 import { isArray, isFunction, isObject, isString, isUndefined } from './utils';
 import { createState } from './state';
 
-function isReadOnly (prop) {
-  return ['tagName', 'namespaceURI', 'node'].includes(prop);
-}
-
 function createObserver (el) {
   const { MutationObserver, CustomEvent, Element } = window;
   const { ELEMENT_NODE } = Element;
@@ -77,15 +73,18 @@ function createElement (cfg, ns) {
       el = el.firstChild;
     }
   }
-  const opts = { configurable: true, enumerable: true, writable: false };
-  Object.defineProperties(cfg, {
+  const opts = { configurable: false, enumerable: true, writable: false };
+  const props = {
     tagName: { ...opts, value: tagName },
     namespaceURI: { ...opts, value: ns },
     node: { ...opts, value: el }
-  });
+  };
+  Object.defineProperties(cfg, props);
   for (const prop in cfg) {
-    const newv = cfg[prop];
-    updateElement(newv, undefined, prop, cfg);
+    if (!props[prop]) {
+      const newv = cfg[prop];
+      updateElement(newv, undefined, prop, cfg);
+    }
   }
   return el;
 }
@@ -219,7 +218,7 @@ function updateElement (newv, oldv, prop, obj) {
     }
   } else if (isUndefined(newv)) {
     delete el[prop];
-  } else if (!isReadOnly(prop) && !isUndefined(el[prop])) {
+  } else if (!isUndefined(el[prop])) {
     el[prop] = newv;
   }
 }
