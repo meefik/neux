@@ -54,21 +54,21 @@ function createObserver (el) {
 function createElement (cfg, ns) {
   if (!isObject(cfg)) return;
   const { document, Element } = window;
-  const { tagName = 'div', namespaceURI, node } = cfg;
-  if (namespaceURI) {
-    ns = namespaceURI;
-  } else if (tagName === 'svg') {
-    ns = 'http://www.w3.org/2000/svg';
+  let { tagName = 'div', namespaceURI = ns, outerHTML, el } = cfg;
+  if (tagName === 'svg') {
+    namespaceURI = 'http://www.w3.org/2000/svg';
+  } else if (tagName === 'math') {
+    namespaceURI = 'http://www.w3.org/1998/Math/MathML';
   } else if (ns === 'http://www.w3.org/1999/xhtml') {
-    ns = null;
+    namespaceURI = null;
   }
-  let el = node instanceof Element
-    ? node
-    : (ns
-      ? document.createElementNS(ns, tagName)
-      : document.createElement(tagName));
-  if (isString(node)) {
-    el.innerHTML = node;
+  if (el instanceof Element !== true) {
+    el = namespaceURI
+      ? document.createElementNS(namespaceURI, tagName)
+      : document.createElement(tagName);
+  }
+  if (isString(outerHTML)) {
+    el.innerHTML = outerHTML;
     if (el.firstChild instanceof Element) {
       el = el.firstChild;
     }
@@ -76,8 +76,9 @@ function createElement (cfg, ns) {
   const opts = { configurable: false, enumerable: true, writable: false };
   const props = {
     tagName: { ...opts, value: tagName },
-    namespaceURI: { ...opts, value: ns },
-    node: { ...opts, value: el }
+    namespaceURI: { ...opts, value: namespaceURI },
+    outerHTML: { ...opts, value: outerHTML },
+    el: { ...opts, value: el }
   };
   Object.defineProperties(cfg, props);
   for (const prop in cfg) {
@@ -90,7 +91,7 @@ function createElement (cfg, ns) {
 }
 
 function updateElement (newv, oldv, prop, obj) {
-  const el = obj.node;
+  const el = obj.el;
   if (!el) return;
 
   if (prop === 'on') {
@@ -194,7 +195,7 @@ function updateElement (newv, oldv, prop, obj) {
       obj.children.$$on('#', (newv, oldv) => {
         if (isUndefined(newv)) {
           // Del
-          const oldChild = oldv?.node;
+          const oldChild = oldv?.el;
           if (oldChild) {
             el.removeChild(oldChild);
           }
@@ -206,7 +207,7 @@ function updateElement (newv, oldv, prop, obj) {
           }
         } else {
           // Mod
-          const oldChild = oldv?.node;
+          const oldChild = oldv?.el;
           if (oldChild) {
             const newChild = createElement(newv, el.namespaceURI);
             if (newChild) {

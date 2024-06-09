@@ -237,6 +237,8 @@ const view = createView({
     textContent: () => `Total items: ${state.list.$length}`
   }]
 }, { target: document.body });
+// get the HTML element
+console.log(view.el);
 ```
 
 Additional events for each element:
@@ -264,19 +266,12 @@ view.children[1].textContent = 'Item 3';
 view.children.shift();
 ```
 
-You can pass HTML markup or the entire HTML element in the "node" parameter:
+You can pass the entire HTML element in the "el" parameter:
 
 ```js
 createView({
   children: [{
-    // create element from HTML markup
-    node: '<main><p>My content</p></main>',
-    style: {
-      color: 'red'
-    }
-  }, {
-    // create element from HTMLElement
-    node: document.createElement('footer'),
+    el: document.createElement('footer'),
     textContent: 'Powered by NEUX'
   }]
 }, { target: document.body });
@@ -288,7 +283,7 @@ You can include any SVG icon as HTML markup and change its styles (size, color) 
 import githubIcon from '@svg-icons/fa-brands/github.svg?raw';
 
 createView({
-  node: githubIcon,
+  outerHTML: githubIcon,
   classList: ['icon'],
   attributes: {
     width: '64px',
