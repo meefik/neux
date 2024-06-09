@@ -38,7 +38,7 @@ function getContext (context, getter, setter) {
   return val;
 }
 
-function setWatcher (context, state, prop, getter, cleaner) {
+function setUpdater (context, state, prop, getter, cleaner) {
   cleaner.emit(prop);
   return getContext(
     context,
@@ -71,7 +71,7 @@ function setWatcher (context, state, prop, getter, cleaner) {
   );
 }
 
-function setUpdater (state, prop, sub, cleaner) {
+function setWatcher (state, prop, sub, cleaner) {
   cleaner.emit(prop);
   if (sub[stateKey]) {
     const handler = (newv, oldv, key, obj, rest = []) => {
@@ -230,11 +230,11 @@ export function createState (data, options) {
       const oldv = deepClone(obj[prop]);
       if (isFunction(value)) {
         const getter = value;
-        value = setWatcher(context, state, prop, getter, watcher);
+        value = setUpdater(context, state, prop, getter, updater);
       }
       if (isObject(value)) {
         value = createState(value, options);
-        setUpdater(state, prop, value, updater);
+        setWatcher(state, prop, value, watcher);
       }
       const changed = obj[prop] !== value || (prop === 'length' && isArray(obj));
       const res = Reflect.set(obj, prop, value);
@@ -366,14 +366,14 @@ export function createState (data, options) {
         listener.on(propName, getter);
         delete data[prop];
       } else {
-        const value = setWatcher(context, state, prop, getter, watcher);
+        const value = setUpdater(context, state, prop, getter, updater);
         data[prop] = value;
       }
     }
     if (isObject(data[prop])) {
       const value = createState(data[prop], options);
       data[prop] = value;
-      setUpdater(state, prop, value, updater);
+      setWatcher(state, prop, value, watcher);
     }
   }
   return state;
