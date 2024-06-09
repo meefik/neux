@@ -843,7 +843,7 @@ To simplify styles you can use [daisyUI](https://daisyui.com). This is a popular
 
 How to set up your Tailwind CSS project:
 
-**1.** Install the required module:
+**1.** Install the required modules:
 
 ```sh
 npm install --save-dev daisyui @tailwindcss/typography
@@ -905,36 +905,75 @@ createView({
 
 ## Use with Web Components
 
-You can use NEUX along with any [Web Components](https://developer.mozilla.org/docs/Web/API/Web_Components). Many component libraries can be [found here](https://open-wc.org/guides/community/component-libraries/). You can create your own components using [one of the libraries](https://open-wc.org/guides/community/base-libraries/), for example [Lit](https://lit.dev).
+You can use NEUX along with any [Web Components](https://developer.mozilla.org/docs/Web/API/Web_Components). Many component libraries can be [found here](https://open-wc.org/guides/community/component-libraries/).
 
-Let's say you have a Web Component that looks like this:
+Let's take an example of working with the [BlueprintUI](https://blueprintui.dev) library:
 
-```html
-<my-component attr1="one" attr-two="two" onMyEvent="alert('Action')">
-  <my-nested-component>Hello</my-nested-component>
-</my-component>
+**1.** Install the required modules:
+
+```sh
+npm install --save-dev @blueprintui/components @blueprintui/themes @blueprintui/layout @blueprintui/typography
 ```
 
-In NEUX, it would be the following definition:
+**2.** Import styles in the `style.css` file:
+
+```css
+@import '@blueprintui/layout/index.min.css';
+@import '@blueprintui/typography/index.min.css';
+@import '@blueprintui/themes/index.min.css';
+```
+
+**3.** Replace the contents of the `main.js` file with the example:
 
 ```js
+import { createView } from 'neux';
+import './style.css';
+import '@blueprintui/components/include/button.js';
+import '@blueprintui/components/include/card.js';
+import '@blueprintui/components/include/input.js';
+
 createView({
-  tagName: 'my-component',
-  attr1: 'one',
-  attrTwo: 'two',
-  on: {
-    MyEvent() {
-      return () => alert('Action');
-    }
-  },
+  tagName: 'bp-card',
   children: [{
-    tagName: 'my-nested-component',
-    textContent: 'Hello'
+    tagName: 'h2',
+    slot: 'header',
+    attributes: {
+      'bg-text': 'section'
+    },
+    textContent: 'Heading'
+  }, {
+    tagName: 'bp-field',
+    children: [{
+      tagName: 'label',
+      textContent: 'label'
+    }, {
+      tagName: 'bp-input'
+    }]
+  }, {
+    slot: 'footer',
+    attributes: {
+      'bp-layout': 'inline gap:xs inline:end'
+    },
+    children: [{
+      tagName: 'bp-button',
+      attributes: {
+        action: 'secondary'
+      },
+      textContent: 'Cancel'
+    }, {
+      tagName: 'bp-button',
+      attributes: {
+        status: 'accent'
+      },
+      textContent: 'Confirm'
+    }]
   }]
 }, { target: document.body });
 ```
 
 ## Create your own Web Component
+
+You can create your own components using [one of the libraries](https://open-wc.org/guides/community/base-libraries/), for example [Lit](https://lit.dev). But you can also create your own Web Components using NEUX.
 
 An example of a web component definition:
 
@@ -945,36 +984,36 @@ class Counter extends HTMLElement {
   }
   constructor() {
     super();
-    const context = {};
-    this.attrs = createState({}, context);
-    this.attrs.$$on('*', (newv, oldv, prop) => {
-      this.setAttribute(prop, newv);
-    });
     const target = this.attachShadow({ mode: 'open' });
+    const context = {};
     this.view = createView(this.template(), { context, target });
-  }
-  attributeChangedCallback(name, oldv, newv) {
-    this.attrs[name] = newv;
   }
   template() {
     return {
-      children: [{
+      attributes: {
+        value: '',
+        $: (newv, oldv, prop) => this.setAttribute(prop, newv)
+      },
+      children: (obj) => [{
         tagName: 'input',
         type: 'number',
-        value: () => this.attrs.$value,
+        value: () => obj.attributes.$value,
         on: {
           change() {
             return (e) => {
-              this.attrs.value = e.target.value;
+              obj.attributes.value = e.target.value;
             };
           }
         }
       }, {
         tagName: 'slot',
         name: 'label',
-        textContent: () => this.attrs.$value
+        textContent: () => obj.attributes.$value
       }]
     };
+  }
+  attributeChangedCallback(name, oldv, newv) {
+    this.view.attributes[name] = newv;
   }
 }
 customElements.define('ne-counter', Counter);
