@@ -27,16 +27,33 @@ describe('view', () => {
           children: [{
             tagName: 'path'
           }]
+        }, {
+          tagName: 'math',
+          children: [{
+            tagName: 'msup',
+            children: [{
+              tagName: 'mi',
+              textContent: 'π'
+            }, {
+              tagName: 'mn',
+              textContent: 2
+            }]
+          }]
         }]
       });
       const xhtmlNamespaceURI = 'http://www.w3.org/1999/xhtml';
       const svgNamespaceURI = 'http://www.w3.org/2000/svg';
+      const mathNamespaceURI = 'http://www.w3.org/1998/Math/MathML';
       assert.equal(el.tagName.toUpperCase(), 'DIV');
       assert.equal(el.namespaceURI, xhtmlNamespaceURI);
       assert.equal(el.children[0].tagName.toUpperCase(), 'SVG');
       assert.equal(el.children[0].namespaceURI, svgNamespaceURI);
       assert.equal(el.children[0].children[0].tagName.toUpperCase(), 'PATH');
       assert.equal(el.children[0].children[0].namespaceURI, svgNamespaceURI);
+      assert.equal(el.children[1].tagName.toUpperCase(), 'MATH');
+      assert.equal(el.children[1].namespaceURI, mathNamespaceURI);
+      assert.equal(el.children[1].children[0].tagName.toUpperCase(), 'MSUP');
+      assert.equal(el.children[1].children[0].namespaceURI, mathNamespaceURI);
     });
 
     await t.test('el', () => {
