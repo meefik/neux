@@ -26,9 +26,10 @@ Here are the main concepts behind NEUX:
 7. [State synchronization](#state-synchronization)
 8. [Use with Vite](#use-with-vite)
 9. [Use with Tailwind CSS](#use-with-tailwind-css)
-10. [Use with Web Components](#use-with-web-components)
-11. [Create your own Web Component](#create-your-own-web-component)
-12. [Examples](#examples)
+10. [Use with daisyUI](#use-with-daisyui)
+11. [Use with Web Components](#use-with-web-components)
+12. [Create your own Web Component](#create-your-own-web-component)
+13. [Examples](#examples)
 
 ## Installation
 
@@ -755,7 +756,7 @@ How to set up:
 **1.** Create a new Vite project (select a variant JavaScript):
 
 ```sh
-npm create vite@latest
+npm init vite@latest
 ```
 
 **2.** Install the `neux` module:
@@ -823,48 +824,81 @@ export default {
 @tailwind utilities;
 ```
 
-**5.** Replace the contents of the `main.js` file with:
+**5.** Replace the contents of the `main.js` file with the example:
 
 ```js
 import './style.css';
 import { createView } from 'neux';
 
 createView({
-  classList: ['container', 'mx-auto', 'py-5'],
+  tagName: 'h1',
+  classList: ['text-3xl', 'font-bold', 'underline'],
+  textContent: 'Hello world!'
+}, { target: document.body });
+```
+
+## Use with daisyUI
+
+To simplify styles you can use [daisyUI](https://daisyui.com). This is a popular component library for [Tailwind CSS](https://tailwindcss.com).
+
+How to set up your Tailwind CSS project:
+
+**1.** Install the required module:
+
+```sh
+npm install --save-dev daisyui @tailwindcss/typography
+```
+
+**2.** Change the file `tailwind.config.js`:
+
+```js
+import daisyui from 'daisyui';
+import typography from '@tailwindcss/typography';
+
+export default {
+  // ...
+  plugins: [typography, daisyui]
+};
+```
+
+**3.** Replace the contents of the `main.js` file with the example:
+
+```js
+import './style.css';
+import { createState, createView } from 'neux';
+
+const state = createState({ counter: 0 });
+
+createView({
+  classList: ['container', 'm-auto', 'p-8', 'flex', 'gap-4'],
   children: [{
-    classList: ['bg-white', 'shadow', 'sm:rounded-lg'],
-    children: [{
-      classList: ['px-4', 'py-5', 'sm:p-6'],
-      children: [{
-        tagName: 'h3',
-        classList: ['text-base', 'font-semibold', 'leading-6', 'text-gray-900'],
-        textContent: 'Welcome to NEUX'
-      }, {
-        classList: ['mt-2', 'max-w-xl', 'text-sm', 'text-gray-500'],
-        children: [{
-          tagName: 'p',
-          textContent: 'It is a JavaScript frontend micro-library with reactivity states and views.'
-        }]
-      }, {
-        classList: ['mt-5'],
-        children: [{
-          tagName: 'button',
-          type: 'button',
-          classList: ['inline-flex', 'items-center', 'rounded-md', 'bg-indigo-600', 'px-3', 'py-2', 
-            'text-sm', 'font-semibold', 'text-white', 'shadow-sm', 'hover:bg-indigo-500', 
-            'focus-visible:outline', 'focus-visible:outline-2', 'focus-visible:outline-offset-2',
-            'focus-visible:outline-indigo-500'],
-          textContent: 'See on GitHub',
-          on: {
-            click() {
-              return () => {
-                window.open('https://meefik.github.io/neux');
-              };
-            }
-          }
-        }]
-      }]
-    }]
+    tagName: 'button',
+    classList: ['btn', 'btn-primary'],
+    textContent: '-1',
+    on: {
+      click() {
+        return () => state.counter--;
+      }
+    }
+  }, {
+    tagName: 'input',
+    type: 'number',
+    classList: ['input', 'input-bordered', 'w-full'],
+    value: () => state.$counter,
+    on: {
+      change() {
+        return ({ target }) => state.counter = parseInt(target.value);
+      }
+    }
+  }, {
+    tagName: 'button',
+    classList: ['btn', 'btn-primary'],
+    textContent: '+1',
+    on: {
+      click() {
+        return () => state.counter++;
+      }
+    }
   }]
 }, { target: document.body });
 ```
