@@ -1050,5 +1050,4 @@ createView({
 You can find development examples with NEUX in the following repositories:
 
 - [neux-todo-app](https://github.com/meefik/neux-todo-app) - example To-Do application on NEUX + Tailwind CSS + Vite;
-- [neux-ionic-app](https://github.com/meefik/neux-ionic-app) - example To-Do application on NEUX + Ionic Web Components + Vite;
 - [neux-demo](https://github.com/meefik/neux-demo) - various examples on NEUX.
