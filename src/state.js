@@ -9,7 +9,7 @@ import EventListener from './listener';
 
 const stateKey = Symbol('state');
 const contextKey = Symbol('context');
-const dollarRe = /^\$[^$]/u;
+const dollarRe = /^\$([^$]|$)/u;
 const defaultContext = {};
 
 function setContext (context, obj, prop, fn) {
@@ -220,6 +220,13 @@ export function createState (data, options) {
       return Reflect.get(obj, prop);
     },
     set: (obj, prop, value) => {
+      if (isString(prop) && dollarRe.test(prop)) {
+        const propName = prop.slice(1) || '*';
+        if (isFunction(value)) {
+          listener.on(propName, value);
+        }
+        return true;
+      }
       const oldv = deepClone(obj[prop]);
       if (isFunction(value)) {
         const getter = value;
@@ -247,6 +254,11 @@ export function createState (data, options) {
       return true;
     },
     deleteProperty: (obj, prop) => {
+      if (isString(prop) && dollarRe.test(prop)) {
+        const propName = prop.slice(1) || '*';
+        listener.off(propName);
+        return true;
+      }
       const oldv = deepClone(obj[prop]);
       const res = Reflect.deleteProperty(obj, prop);
       if (!res) {
@@ -268,10 +280,10 @@ export function createState (data, options) {
   const state = new Proxy(data, handler);
   const opts = { configurable: false, enumerable: false, writable: false };
   Object.defineProperties(state, {
-    $: {
+    $$: {
       ...opts,
       value (key) {
-        return state[`$${key}`];
+        return state['$' + key];
       }
     },
     $$on: {
@@ -349,8 +361,14 @@ export function createState (data, options) {
   for (const prop in data) {
     if (isFunction(data[prop])) {
       const getter = data[prop];
-      const value = setWatcher(context, state, prop, getter, watcher);
-      data[prop] = value;
+      if (isString(prop) && dollarRe.test(prop)) {
+        const propName = prop.slice(1) || '*';
+        listener.on(propName, getter);
+        delete data[prop];
+      } else {
+        const value = setWatcher(context, state, prop, getter, watcher);
+        data[prop] = value;
+      }
     }
     if (isObject(data[prop])) {
       const value = createState(data[prop], options);

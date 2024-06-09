@@ -90,6 +90,14 @@ const state = createState({
   // the computed field for an array
   filtered: (obj, prop) => {
     return obj.$list.filter(item => item.checked);
+  },
+  // subscribe to track changes to the "double" field
+  $double: (newv, oldv, prop, obj) => {
+    console.log(newv, oldv, prop, obj);
+  },
+  // subscribe to track any object changes
+  $: (newv, oldv, prop, obj) => {
+    console.log(newv, oldv, prop, obj);
   }
 });
 // set or change the computed field
