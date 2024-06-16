@@ -9,7 +9,7 @@ import { isNumber, isObject } from './utils';
  * @param {number} [options.slippage]
  * @returns {function}
  */
-export function createSync (state, handler, options) {
+export function createSync(state, handler, options) {
   const { slippage } = options || {};
   let data = null;
   const syncer = async (...args) => {
@@ -27,7 +27,7 @@ export function createSync (state, handler, options) {
       clearTimeout(timer);
       timer = setTimeout(
         async () => resolve(await syncer(...args)),
-        timer ? slippage : 0
+        timer ? slippage : 0,
       );
     });
   }

@@ -11,29 +11,32 @@ import { isObject } from './utils';
  * @param {object} [options.credentials]
  * @returns {Proxy}
  */
-export function createRPC (options) {
+export function createRPC(options) {
   const {
     url = '/api/rpc',
     method = 'POST',
     headers = {},
     mode,
-    credentials
+    credentials,
   } = options;
   const target = {};
   Object.seal(target);
   const handler = {
-    get: (_obj, prop) => async function get (params) {
+    get: (_obj, prop) => async function get(params) {
       const reqHeaders = {};
       if (params instanceof FormData) {
         // ignore
-      } else if (params instanceof File || params instanceof Blob) {
+      }
+      else if (params instanceof File || params instanceof Blob) {
         const fd = new FormData();
         fd.append('file', params);
         params = fd;
-      } else if (isObject(params)) {
+      }
+      else if (isObject(params)) {
         reqHeaders['Content-Type'] = 'application/json';
         params = JSON.stringify(params);
-      } else {
+      }
+      else {
         params = `${params}`;
       }
       const res = await fetch(`${url}/${prop}`, {
@@ -41,9 +44,9 @@ export function createRPC (options) {
         mode,
         credentials,
         headers: Object.defineProperties(reqHeaders, {
-          ...Object.getOwnPropertyDescriptors(headers)
+          ...Object.getOwnPropertyDescriptors(headers),
         }),
-        body: params
+        body: params,
       });
       if (!res.ok) {
         throw Error(res.statusText);
@@ -56,7 +59,7 @@ export function createRPC (options) {
         return await res.blob();
       }
       return await res.text();
-    }
+    },
   };
   return new Proxy(target, handler);
 }

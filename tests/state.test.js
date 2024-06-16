@@ -7,21 +7,21 @@ describe('state', () => {
     const now = new Date();
     const state = createState({
       counter: 3,
-      double: (obj) => obj.$counter * 2,
+      double: obj => obj.$counter * 2,
       name: (obj, prop) => prop,
       timestamp: now,
       obj: {
-        text: () => 'Text'
+        text: () => 'Text',
       },
       arr: [{
         text: 'Item 1',
-        checked: true
+        checked: true,
       }, {
-        text: 'Item 2'
+        text: 'Item 2',
       }, {
-        text: 'Item 3'
+        text: 'Item 3',
       }],
-      filtered: (obj) => obj.$arr.filter((item) => item.checked)
+      filtered: obj => obj.$arr.filter(item => item.checked),
     });
     await t.test('regular field', () => {
       assert.equal(state.counter, 3);
@@ -69,13 +69,13 @@ describe('state', () => {
       assert.ok(!state.arr[0]);
     });
     await t.test('computed field', () => {
-      state.double = (obj) => obj.$counter * 2;
+      state.double = obj => obj.$counter * 2;
       assert.equal(state.double, 4);
     });
   });
 
   it('on', async (t) => {
-    function asyncTask (handler, timeout = 1000) {
+    function asyncTask(handler, timeout = 1000) {
       let timer = null;
       return new Promise((resolve, reject) => {
         timer = setTimeout(() => {
@@ -92,7 +92,7 @@ describe('state', () => {
           const events = ['counter', 'double'];
           const state = createState({
             counter: 1,
-            double: (obj) => obj.$counter * 2
+            double: obj => obj.$counter * 2,
           });
           state.$$on('*', (newv, oldv, prop) => {
             const index = events.indexOf(prop);
@@ -106,7 +106,8 @@ describe('state', () => {
           state.counter = 2;
         });
         assert.ok(true);
-      } catch (err) {
+      }
+      catch (err) {
         assert.fail(err.message);
       }
     });
@@ -114,7 +115,7 @@ describe('state', () => {
       try {
         await asyncTask((resolve) => {
           const state = createState({
-            counter: 1
+            counter: 1,
           });
           state.$$on('counter', (newv, oldv, prop) => {
             if (prop === 'counter' && newv === 2 && oldv === 1) {
@@ -124,7 +125,8 @@ describe('state', () => {
           state.counter = 2;
         });
         assert.ok(true);
-      } catch (err) {
+      }
+      catch (err) {
         assert.fail(err.message);
       }
     });
@@ -133,7 +135,7 @@ describe('state', () => {
         await asyncTask((resolve) => {
           const state = createState({
             counter: 1,
-            double: (obj) => obj.$counter * 2
+            double: obj => obj.$counter * 2,
           });
           state.$$on('double', (newv, oldv, prop) => {
             if (prop === 'double' && newv === 4 && oldv === 2) {
@@ -143,7 +145,8 @@ describe('state', () => {
           state.counter = 2;
         });
         assert.ok(true);
-      } catch (err) {
+      }
+      catch (err) {
         assert.fail(err.message);
       }
     });
@@ -151,12 +154,12 @@ describe('state', () => {
       try {
         await asyncTask((resolve, reject) => {
           const state = createState({
-            arr: [1, 2]
+            arr: [1, 2],
           });
           const stages = [
             { prop: '2', newv: 3 },
             { prop: '1', newv: 4, oldv: 2 },
-            { prop: '2', oldv: 3 }
+            { prop: '2', oldv: 3 },
           ];
           state.$$on('*', (newv, oldv, prop) => {
             const stage = stages.shift();
@@ -167,7 +170,8 @@ describe('state', () => {
           state.arr.$$on('length', (newv) => {
             if (newv !== state.arr.length) {
               reject(new Error('Incorrect array length'));
-            } else if (!stages.length) {
+            }
+            else if (!stages.length) {
               resolve();
             }
           });
@@ -176,7 +180,8 @@ describe('state', () => {
           state.arr.pop();
         });
         assert.ok(true);
-      } catch (err) {
+      }
+      catch (err) {
         assert.fail(err.message);
       }
     });
@@ -186,7 +191,7 @@ describe('state', () => {
     try {
       await new Promise((resolve, reject) => {
         const state = createState({
-          counter: 1
+          counter: 1,
         });
         let c = 0;
         state.$$once('counter', () => {
@@ -200,7 +205,8 @@ describe('state', () => {
         state.counter = 3;
       });
       assert.ok(true);
-    } catch (err) {
+    }
+    catch (err) {
       assert.fail(err.message);
     }
   });
@@ -209,7 +215,7 @@ describe('state', () => {
     try {
       await new Promise((resolve, reject) => {
         const state = createState({
-          counter: 1
+          counter: 1,
         });
         const handler = () => {
           clearTimeout(timer);
@@ -221,7 +227,8 @@ describe('state', () => {
         state.counter = 2;
       });
       assert.ok(true);
-    } catch (err) {
+    }
+    catch (err) {
       assert.fail(err.message);
     }
   });
@@ -242,7 +249,8 @@ describe('state', () => {
         state.$$emit('myevent', '1', '2');
       });
       assert.ok(true);
-    } catch (err) {
+    }
+    catch (err) {
       assert.fail(err.message);
     }
   });
@@ -260,8 +268,8 @@ describe('state', () => {
       b: 'b',
       c: {
         d: 10,
-        e: [1, 2, { f: 'f' }]
-      }
+        e: [1, 2, { f: 'f' }],
+      },
     });
     const obj = state.$$clone();
     assert.ok(!obj.$$clone);
@@ -274,8 +282,8 @@ describe('state', () => {
       nested: {
         key1: 'nested.key1',
         key2: 'nested.key2',
-        key3: 'nested.key3'
-      }
+        key3: 'nested.key3',
+      },
     });
     try {
       await new Promise((resolve, reject) => {
@@ -300,11 +308,12 @@ describe('state', () => {
           nested: {
             key2: 'nested.key2',
             key3: 'changed1',
-            key4: 'changed2'
-          }
+            key4: 'changed2',
+          },
         });
       });
-    } catch (err) {
+    }
+    catch (err) {
       assert.fail(err.message);
     }
     assert.equal(state.key1, 'key1');
@@ -318,12 +327,12 @@ describe('state', () => {
     try {
       const state = createState({
         arr: [{ v: 1 }, { v: 2 }],
-        computed: (obj) => obj.arr.$$each((item) => item.v)
+        computed: obj => obj.arr.$$each(item => item.v),
       });
       const stages = [
         { prop: '2', newv: 3 },
         { prop: '1', newv: 4, oldv: 2 },
-        { prop: '2', oldv: 3 }
+        { prop: '2', oldv: 3 },
       ];
       await new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -344,7 +353,8 @@ describe('state', () => {
         state.arr.pop();
       });
       assert.ok(true);
-    } catch (err) {
+    }
+    catch (err) {
       assert.fail(err.message);
     }
   });
@@ -361,9 +371,9 @@ describe('state', () => {
         arr: [{
           t: 'c',
           n: 3,
-          b: true
-        }]
-      }
+          b: true,
+        }],
+      },
     });
     const res = state.$$query({ t: 'c' });
     assert.equal(res.n, 3);
@@ -381,9 +391,9 @@ describe('state', () => {
         arr: [{
           t: 'a',
           n: 3,
-          b: true
-        }]
-      }
+          b: true,
+        }],
+      },
     });
     const res = state.$$queryAll({ t: 'a' });
     assert.equal(res.length, 2);
@@ -394,13 +404,13 @@ describe('state', () => {
   it('context', () => {
     const context = {};
     const state1 = createState({
-      counter: 1
+      counter: 1,
     }, { context });
     const state2 = createState({
-      double: () => state1.$counter * 2
+      double: () => state1.$counter * 2,
     }, { context });
     const state3 = createState({
-      double: () => state1.$counter * 2
+      double: () => state1.$counter * 2,
     });
     state1.counter = 2;
     assert.equal(state2.double, 4);

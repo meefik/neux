@@ -1,7 +1,7 @@
 import { isObject, isString } from './utils';
 import { createState } from './state';
 
-function getTimeZone (date, trim) {
+function getTimeZone(date, trim) {
   const tz = -1 * new Date(date).getTimezoneOffset();
   const htz = trim ? `${~~(tz / 60)}` : `0${~~(tz / 60)}`.slice(-2);
   const mtz = `0${~~(tz % 60)}`.slice(-2);
@@ -19,12 +19,12 @@ function getTimeZone (date, trim) {
  * @param {object} [options.context]
  * @returns {Proxy}
  */
-export function createL10n (locales, options) {
+export function createL10n(locales, options) {
   const {
     lang = navigator.language,
     fallback = 'en',
     prefix,
-    context
+    context,
   } = options || {};
   // Translate into specified language
   const translate = (path, data, language) => {
@@ -94,7 +94,7 @@ export function createL10n (locales, options) {
         a: () => translate(hours() < 12 ? `${pfx}time.am.0` : `${pfx}time.pm.0`),
         A: () => (hours() < 12 ? translate(`${pfx}time.am.1`) : translate(`${pfx}time.pm.1`)),
         ZZ: () => (utc ? '+00:00' : getTimeZone(date)),
-        Z: () => (utc ? '+0:00' : getTimeZone(date, true))
+        Z: () => (utc ? '+0:00' : getTimeZone(date, true)),
       };
     for (const k in tokens) {
       const re = new RegExp(`\\{${k}\\}`, 'gu');
@@ -109,7 +109,7 @@ export function createL10n (locales, options) {
     t: () => translate,
     d: () => dateToLocaleString,
     translate: () => translate,
-    dateToLocaleString: () => dateToLocaleString
+    dateToLocaleString: () => dateToLocaleString,
   }, { context });
   Object.seal(l10n);
 

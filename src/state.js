@@ -3,7 +3,7 @@ import {
   isFunction,
   isObject,
   isString,
-  isUndefined
+  isUndefined,
 } from './utils';
 import EventListener from './listener';
 
@@ -12,7 +12,7 @@ const contextKey = Symbol('context');
 const dollarRe = /^\$([^$]|$)/u;
 const defaultContext = {};
 
-function setContext (context, obj, prop, fn) {
+function setContext(context, obj, prop, fn) {
   const ctx = context[contextKey];
   if (ctx) {
     const props = ctx.get(obj) || {};
@@ -21,7 +21,7 @@ function setContext (context, obj, prop, fn) {
   }
 }
 
-function getContext (context, getter, setter) {
+function getContext(context, getter, setter) {
   if (context[contextKey]) {
     throw Error('Collision in state binding');
   }
@@ -38,7 +38,7 @@ function getContext (context, getter, setter) {
   return val;
 }
 
-function setUpdater (context, state, prop, getter, cleaner) {
+function setUpdater(context, state, prop, getter, cleaner) {
   cleaner.emit(prop);
   return getContext(
     context,
@@ -46,32 +46,34 @@ function setUpdater (context, state, prop, getter, cleaner) {
     (obj, key, callbackFn) => {
       const handler = callbackFn
         ? (newv, oldv, idx, arr) => {
-          const target = state[prop];
-          const index = parseInt(idx, 10);
-          if (isUndefined(newv)) {
+            const target = state[prop];
+            const index = parseInt(idx, 10);
+            if (isUndefined(newv)) {
             // Remove
-            target.splice(index, 1);
-          } else if (isUndefined(oldv)) {
+              target.splice(index, 1);
+            }
+            else if (isUndefined(oldv)) {
             // Add
-            const value = callbackFn.call(context, newv, index, arr);
-            target[index] = value;
-          } else {
+              const value = callbackFn.call(context, newv, index, arr);
+              target[index] = value;
+            }
+            else {
             // Replace
-            const value = callbackFn.call(context, newv, index, arr);
-            target.splice(index, 1, value);
+              const value = callbackFn.call(context, newv, index, arr);
+              target.splice(index, 1, value);
+            }
           }
-        }
         : () => {
-          const newv = getter.call(context, state, prop);
-          state[prop] = newv;
-        };
+            const newv = getter.call(context, state, prop);
+            state[prop] = newv;
+          };
       obj.$$on(key, handler);
       cleaner.once(prop, () => obj.$$off(key, handler));
-    }
+    },
   );
 }
 
-function setWatcher (state, prop, sub, cleaner) {
+function setWatcher(state, prop, sub, cleaner) {
   cleaner.emit(prop);
   if (sub[stateKey]) {
     const handler = (newv, oldv, key, obj, rest = []) => {
@@ -82,7 +84,7 @@ function setWatcher (state, prop, sub, cleaner) {
   }
 }
 
-function deepClone (obj) {
+function deepClone(obj) {
   if (!isObject(obj)) {
     return obj;
   }
@@ -93,25 +95,29 @@ function deepClone (obj) {
   return clone;
 }
 
-function deepPatch (newv, oldv, options) {
+function deepPatch(newv, oldv, options) {
   const isOldArray = isArray(oldv);
   for (const k in newv) {
     if (isObject(newv[k])) {
       if (isObject(oldv[k])) {
         deepPatch(newv[k], oldv[k], options);
-      } else {
+      }
+      else {
         const obj = createState(isArray(newv[k]) ? [] : {}, options);
         deepPatch(newv[k], obj, options);
         if (isOldArray) {
           oldv.splice(parseInt(k, 10), 1, obj);
-        } else {
+        }
+        else {
           oldv[k] = obj;
         }
       }
-    } else if (!isUndefined(newv[k])) {
+    }
+    else if (!isUndefined(newv[k])) {
       if (isOldArray) {
         oldv.splice(parseInt(k, 10), 1, newv[k]);
-      } else {
+      }
+      else {
         oldv[k] = newv[k];
       }
     }
@@ -122,7 +128,8 @@ function deepPatch (newv, oldv, options) {
     if (count > 0) {
       oldv.splice(newvLength, count);
     }
-  } else {
+  }
+  else {
     for (const k in oldv) {
       if (!newv || isUndefined(newv[k])) {
         delete oldv[k];
@@ -131,7 +138,7 @@ function deepPatch (newv, oldv, options) {
   }
 }
 
-function isEqual (newv, oldv) {
+function isEqual(newv, oldv) {
   if (isObject(newv) && isObject(oldv)) {
     for (const k in oldv) {
       if (isUndefined(newv[k])) {
@@ -143,13 +150,14 @@ function isEqual (newv, oldv) {
         return false;
       }
     }
-  } else if (newv !== oldv) {
+  }
+  else if (newv !== oldv) {
     return false;
   }
   return true;
 }
 
-function isEqualFilter (obj, filter) {
+function isEqualFilter(obj, filter) {
   let found = true;
   for (const key in filter) {
     if (obj[key] !== filter[key]) {
@@ -160,7 +168,7 @@ function isEqualFilter (obj, filter) {
   return found;
 }
 
-function query (obj, filter) {
+function query(obj, filter) {
   if (isEqualFilter(obj, filter)) {
     return obj;
   }
@@ -175,7 +183,7 @@ function query (obj, filter) {
   }
 }
 
-function queryAll (obj, filter, res = []) {
+function queryAll(obj, filter, res = []) {
   if (isEqualFilter(obj, filter)) {
     res.push(obj);
   }
@@ -196,10 +204,11 @@ function queryAll (obj, filter, res = []) {
  * @param {object} [options.context]
  * @returns {Proxy}
  */
-export function createState (data, options) {
+export function createState(data, options) {
   if (isUndefined(data)) {
     data = {};
-  } else if (!isObject(data) || data[stateKey]) {
+  }
+  else if (!isObject(data) || data[stateKey]) {
     return data;
   }
   const { context = defaultContext } = options || {};
@@ -275,88 +284,88 @@ export function createState (data, options) {
       }
       listener.emit(events, undefined, oldv, prop, state);
       return true;
-    }
+    },
   };
   const state = new Proxy(data, handler);
   const opts = { configurable: false, enumerable: false, writable: false };
   Object.defineProperties(state, {
     $$: {
       ...opts,
-      value (key) {
+      value(key) {
         return state['$' + key];
-      }
+      },
     },
     $$on: {
       ...opts,
-      value (...args) {
+      value(...args) {
         return listener.on(...args);
-      }
+      },
     },
     $$once: {
       ...opts,
-      value (...args) {
+      value(...args) {
         return listener.once(...args);
-      }
+      },
     },
     $$off: {
       ...opts,
-      value (...args) {
+      value(...args) {
         return listener.off(...args);
-      }
+      },
     },
     $$emit: {
       ...opts,
-      value (...args) {
+      value(...args) {
         return listener.emit(...args);
-      }
+      },
     },
     $$query: {
       ...opts,
-      value (filter) {
+      value(filter) {
         return query(state, filter);
-      }
+      },
     },
     $$queryAll: {
       ...opts,
-      value (filter) {
+      value(filter) {
         return queryAll(state, filter);
-      }
+      },
     },
     $$create: {
       ...opts,
-      value (data) {
+      value(data) {
         return createState(data, options);
-      }
+      },
     },
     $$clone: {
       ...opts,
-      value (oldv = state) {
+      value(oldv = state) {
         return deepClone(oldv);
-      }
+      },
     },
     $$equal: {
       ...opts,
-      value (newv, oldv = state) {
+      value(newv, oldv = state) {
         return isEqual(newv, oldv);
-      }
+      },
     },
     $$patch: {
       ...opts,
-      value (newv, oldv = state) {
+      value(newv, oldv = state) {
         return deepPatch(newv, oldv, options);
-      }
+      },
     },
     $$each: {
       ...opts,
-      value (callbackFn, thisArg) {
+      value(callbackFn, thisArg) {
         if (isArray(state)) {
           if (isFunction(callbackFn)) {
             setContext(context, state, '#', callbackFn.bind(thisArg));
           }
-          return state.map(callbackFn, thisArg).filter((item) => item);
+          return state.map(callbackFn, thisArg).filter(item => item);
         }
-      }
-    }
+      },
+    },
   });
   for (const prop in data) {
     if (isFunction(data[prop])) {
@@ -365,7 +374,8 @@ export function createState (data, options) {
         const propName = prop.slice(1) || '*';
         listener.on(propName, getter);
         delete data[prop];
-      } else {
+      }
+      else {
         const value = setUpdater(context, state, prop, getter, updater);
         data[prop] = value;
       }

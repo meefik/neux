@@ -1,7 +1,7 @@
 import { isArray, isFunction, isObject, isString, isUndefined } from './utils';
 import { createState } from './state';
 
-function createObserver (el) {
+function createObserver(el) {
   const { MutationObserver, CustomEvent, Element } = window;
   const { ELEMENT_NODE } = Element;
   const observer = new MutationObserver((mutationList) => {
@@ -25,7 +25,8 @@ function createObserver (el) {
             dispatchEvent(node, 'removed');
           }
         });
-      } else if (mutation.type === 'attributes') {
+      }
+      else if (mutation.type === 'attributes') {
         const node = mutation.target;
         const { attributeName } = mutation;
         const { oldValue } = mutation;
@@ -35,8 +36,8 @@ function createObserver (el) {
             detail: {
               attributeName,
               oldValue,
-              newValue
-            }
+              newValue,
+            },
           });
           node.dispatchEvent(ev);
         }
@@ -46,20 +47,22 @@ function createObserver (el) {
   observer.observe(el, {
     childList: true,
     subtree: true,
-    attributeOldValue: true
+    attributeOldValue: true,
   });
   return observer;
 }
 
-function createElement (cfg, ns) {
+function createElement(cfg, ns) {
   if (!isObject(cfg)) return;
   const { document, Element } = window;
   let { tagName = 'div', namespaceURI = ns, outerHTML, el } = cfg;
   if (tagName === 'svg') {
     namespaceURI = 'http://www.w3.org/2000/svg';
-  } else if (tagName === 'math') {
+  }
+  else if (tagName === 'math') {
     namespaceURI = 'http://www.w3.org/1998/Math/MathML';
-  } else if (ns === 'http://www.w3.org/1999/xhtml') {
+  }
+  else if (ns === 'http://www.w3.org/1999/xhtml') {
     namespaceURI = null;
   }
   if (el instanceof Element !== true) {
@@ -78,7 +81,7 @@ function createElement (cfg, ns) {
     tagName: { ...opts, value: tagName },
     namespaceURI: { ...opts, value: namespaceURI },
     outerHTML: { ...opts, value: outerHTML },
-    el: { ...opts, value: el }
+    el: { ...opts, value: el },
   };
   Object.defineProperties(cfg, props);
   for (const prop in cfg) {
@@ -90,7 +93,7 @@ function createElement (cfg, ns) {
   return el;
 }
 
-function updateElement (newv, oldv, prop, obj) {
+function updateElement(newv, oldv, prop, obj) {
   const el = obj.el;
   if (!el) return;
 
@@ -114,16 +117,19 @@ function updateElement (newv, oldv, prop, obj) {
         if (isFunction(oldv)) {
           el.removeEventListener(prop, oldv);
         }
-      } else if (isFunction(newv)) {
+      }
+      else if (isFunction(newv)) {
         el.addEventListener(prop, newv);
       }
     });
-  } else if (prop === 'classList') {
+  }
+  else if (prop === 'classList') {
     el.classList = isArray(newv) ? newv.join(' ') : (newv || '');
     obj.$$on('classList', (newv, oldv, prop, obj) => {
       el.classList = isArray(obj) ? obj.join(' ') : (obj || '');
     });
-  } else if (prop === 'attributes') {
+  }
+  else if (prop === 'attributes') {
     for (const attr in newv) {
       const val = newv[attr];
       if (!isUndefined(val)) {
@@ -138,11 +144,13 @@ function updateElement (newv, oldv, prop, obj) {
     obj.$$on('attributes', (newv, oldv, prop) => {
       if (isUndefined(newv)) {
         el.removeAttribute(prop);
-      } else {
+      }
+      else {
         el.setAttribute(prop, newv);
       }
     });
-  } else if (prop === 'style') {
+  }
+  else if (prop === 'style') {
     const { style } = el;
     for (const name in newv) {
       style[name] = newv[name];
@@ -155,15 +163,18 @@ function updateElement (newv, oldv, prop, obj) {
     obj.$$on('style', (newv, oldv, prop) => {
       if (isUndefined(newv)) {
         style.removeProperty(prop);
-      } else if (/[A-Z]/u.test(prop)) {
+      }
+      else if (/[A-Z]/u.test(prop)) {
         // camelCase
         style[prop] = newv;
-      } else {
+      }
+      else {
         // kebab-case
         style.setProperty(prop, newv);
       }
     });
-  } else if (prop === 'dataset') {
+  }
+  else if (prop === 'dataset') {
     const { dataset } = el;
     for (const param in newv) {
       const val = newv[param];
@@ -179,11 +190,13 @@ function updateElement (newv, oldv, prop, obj) {
     obj.$$on('dataset', (newv, oldv, prop) => {
       if (isUndefined(newv)) {
         delete dataset[prop];
-      } else {
+      }
+      else {
         dataset[prop] = newv;
       }
     });
-  } else if (prop === 'children') {
+  }
+  else if (prop === 'children') {
     el.innerHTML = '';
     if (isArray(newv)) {
       for (const cfg of newv) {
@@ -199,13 +212,15 @@ function updateElement (newv, oldv, prop, obj) {
           if (oldChild) {
             el.removeChild(oldChild);
           }
-        } else if (isUndefined(oldv)) {
+        }
+        else if (isUndefined(oldv)) {
           // Add
           const newChild = createElement(newv, el.namespaceURI);
           if (newChild) {
             el.appendChild(newChild);
           }
-        } else {
+        }
+        else {
           // Mod
           const oldChild = oldv?.el;
           if (oldChild) {
@@ -217,9 +232,11 @@ function updateElement (newv, oldv, prop, obj) {
         }
       });
     }
-  } else if (isUndefined(newv)) {
+  }
+  else if (isUndefined(newv)) {
     delete el[prop];
-  } else if (!isUndefined(el[prop])) {
+  }
+  else if (!isUndefined(el[prop])) {
     el[prop] = newv;
   }
 }
@@ -233,7 +250,7 @@ function updateElement (newv, oldv, prop, obj) {
  * @param {object} [options.context]
  * @returns {Proxy}
  */
-export function createView (config, options) {
+export function createView(config, options) {
   const { target, context } = options || {};
   const state = createState(config, { context });
   const el = createElement(state);

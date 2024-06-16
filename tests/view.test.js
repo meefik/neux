@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 describe('view', () => {
   const { window } = new JSDOM('', {
     url: 'http://localhost',
-    contentType: 'text/html'
+    contentType: 'text/html',
   });
   /* eslint-disable-next-line */
   global.window = window;
@@ -14,7 +14,7 @@ describe('view', () => {
   it('initial', async (t) => {
     await t.test('tagName', () => {
       const { el } = createView({
-        tagName: 'p'
+        tagName: 'p',
       });
       assert.equal(el.tagName, 'P');
     });
@@ -25,21 +25,21 @@ describe('view', () => {
         children: [{
           tagName: 'svg',
           children: [{
-            tagName: 'path'
-          }]
+            tagName: 'path',
+          }],
         }, {
           tagName: 'math',
           children: [{
             tagName: 'msup',
             children: [{
               tagName: 'mi',
-              textContent: 'π'
+              textContent: 'π',
             }, {
               tagName: 'mn',
-              textContent: 2
-            }]
-          }]
-        }]
+              textContent: 2,
+            }],
+          }],
+        }],
       });
       const xhtmlNamespaceURI = 'http://www.w3.org/1999/xhtml';
       const svgNamespaceURI = 'http://www.w3.org/2000/svg';
@@ -61,8 +61,8 @@ describe('view', () => {
         children: [{
           el: window.document.createElement('span'),
           className: 'abc',
-          textContent: 'Text'
-        }]
+          textContent: 'Text',
+        }],
       });
       assert.equal(el.children[0].tagName.toUpperCase(), 'SPAN');
       assert.equal(el.children[0].textContent, 'Text');
@@ -74,8 +74,8 @@ describe('view', () => {
         children: [{
           outerHTML: '<span></span>',
           className: 'abc',
-          textContent: 'Text'
-        }]
+          textContent: 'Text',
+        }],
       });
       assert.equal(el.children[0].tagName.toUpperCase(), 'SPAN');
       assert.equal(el.children[0].textContent, 'Text');
@@ -86,8 +86,8 @@ describe('view', () => {
       const { el } = createView({
         tagName: 'label',
         attributes: {
-          for: 'my-input'
-        }
+          for: 'my-input',
+        },
       });
       assert.equal(el.getAttribute('for'), 'my-input');
     });
@@ -96,8 +96,8 @@ describe('view', () => {
       const { el } = createView({
         tagName: 'label',
         dataset: {
-          id: '123'
-        }
+          id: '123',
+        },
       });
       assert.equal(el.dataset.id, '123');
     });
@@ -105,10 +105,10 @@ describe('view', () => {
     await t.test('classList', () => {
       const { el } = createView({
         children: [{
-          classList: ['a', 'b', 'c']
+          classList: ['a', 'b', 'c'],
         }, {
-          classList: 'd e f'
-        }]
+          classList: 'd e f',
+        }],
       });
       assert.equal(el.children[0].className, 'a b c');
       assert.equal(el.children[1].className, 'd e f');
@@ -117,15 +117,15 @@ describe('view', () => {
     await t.test('style', () => {
       const { el } = createView({
         style: {
-          color: 'red'
-        }
+          color: 'red',
+        },
       });
       assert.equal(el.style.color, 'red');
     });
 
     await t.test('textContent', () => {
       const { el } = createView({
-        textContent: 'Hello World'
+        textContent: 'Hello World',
       });
       assert.equal(el.textContent, 'Hello World');
     });
@@ -135,11 +135,11 @@ describe('view', () => {
         tagName: 'ul',
         children: [{
           tagName: 'li',
-          textContent: 'Item 1'
+          textContent: 'Item 1',
         }, {
           tagName: 'li',
-          textContent: 'Item 2'
-        }]
+          textContent: 'Item 2',
+        }],
       });
       assert.equal(el.tagName.toUpperCase(), 'UL');
       assert.equal(el.children[0].tagName.toUpperCase(), 'LI');
@@ -155,17 +155,17 @@ describe('view', () => {
         type: 'number',
         value,
         on: {
-          change () {
+          change() {
             return (e) => {
               value = parseInt(e.target.value, 10);
             };
-          }
-        }
+          },
+        },
       });
       el.value = 2;
       const event = new window.Event('change', {
         bubbles: true,
-        cancelable: true
+        cancelable: true,
       });
       el.dispatchEvent(event);
       assert.equal(value, 2);
@@ -181,22 +181,23 @@ describe('view', () => {
           view = createView({
             children: [{
               on: {
-                mounted () {
+                mounted() {
                   return () => {
                     clearTimeout(timer);
                     resolve();
                   };
-                }
-              }
-            }]
+                },
+              },
+            }],
           }, {
-            target: window.document.body
+            target: window.document.body,
           });
         }).finally(() => {
           view?.el.remove();
         });
         assert.ok(true);
-      } catch (err) {
+      }
+      catch (err) {
         assert.fail(err.message);
       }
     });
@@ -211,27 +212,28 @@ describe('view', () => {
           view = createView({
             children: [{
               on: {
-                mounted () {
+                mounted() {
                   return (e) => {
                     e.target.remove();
                   };
                 },
-                removed () {
+                removed() {
                   return () => {
                     clearTimeout(timer);
                     resolve();
                   };
-                }
-              }
-            }]
+                },
+              },
+            }],
           }, {
-            target: window.document.body
+            target: window.document.body,
           });
         }).finally(() => {
           view?.el.remove();
         });
         assert.ok(true);
-      } catch (err) {
+      }
+      catch (err) {
         assert.fail(err.message);
       }
     });
@@ -246,35 +248,37 @@ describe('view', () => {
           view = createView({
             children: [{
               attributes: {
-                'my-attr': '1'
+                'my-attr': '1',
               },
               on: {
-                mounted () {
+                mounted() {
                   return (e) => {
                     e.target.setAttribute('my-attr', '2');
                   };
                 },
-                changed () {
+                changed() {
                   return (e) => {
                     clearTimeout(timer);
                     if (e.detail.attributeName === 'my-attr'
                       && e.detail.newValue === '2' && e.detail.oldValue === '1') {
                       resolve();
-                    } else {
+                    }
+                    else {
                       reject(new Error('Incorrect event'));
                     }
                   };
-                }
-              }
-            }]
+                },
+              },
+            }],
           }, {
-            target: window.document.body
+            target: window.document.body,
           });
         }).finally(() => {
           view?.el.remove();
         });
         assert.ok(true);
-      } catch (err) {
+      }
+      catch (err) {
         assert.fail(err.message);
       }
     });
@@ -286,36 +290,36 @@ describe('view', () => {
         counter: 1,
         text: 'Text',
         color: 'red',
-        dataId: '1'
+        dataId: '1',
       });
       const { el } = createView({
         children: [{
           tagName: 'input',
           type: 'number',
-          value: () => state.$counter
+          value: () => state.$counter,
         }, {
-          textContent: () => state.$text
+          textContent: () => state.$text,
         }, {
           style: {
-            color: () => state.$color
-          }
+            color: () => state.$color,
+          },
         }, {
           dataset: {
-            id: () => state.$dataId
-          }
+            id: () => state.$dataId,
+          },
         }, {
-          style () {
+          style() {
             return {
-              color: state.$color
+              color: state.$color,
             };
-          }
+          },
         }, {
-          dataset () {
+          dataset() {
             return {
-              id: state.$dataId
+              id: state.$dataId,
             };
-          }
-        }]
+          },
+        }],
       });
       state.counter++;
       assert.equal(el.children[0].value, `${state.counter}`);
@@ -331,12 +335,12 @@ describe('view', () => {
 
     await t.test('attributes', () => {
       const state = createState({
-        attr: ''
+        attr: '',
       });
       const { el } = createView({
         attributes: {
-          for: () => state.$attr
-        }
+          for: () => state.$attr,
+        },
       });
       state.attr = 'my-input';
       assert.equal(el.getAttribute('for'), state.attr);
@@ -344,10 +348,10 @@ describe('view', () => {
 
     await t.test('classList', () => {
       const state = createState({
-        cls: ['a', 'b']
+        cls: ['a', 'b'],
       });
       const { el } = createView({
-        classList: () => state.$cls
+        classList: () => state.$cls,
       });
       state.cls.push('c');
       assert.equal(el.className, state.cls.join(' '));
@@ -357,10 +361,10 @@ describe('view', () => {
       const state = createState({
         list: [{
           text: 'Item 1',
-          checked: true
+          checked: true,
         }, {
-          text: 'Item 2'
-        }]
+          text: 'Item 2',
+        }],
       });
       const { el } = createView({
         tagName: 'ul',
@@ -371,13 +375,13 @@ describe('view', () => {
             children: [{
               tagName: 'input',
               type: 'checkbox',
-              checked: () => item.$checked
+              checked: () => item.$checked,
             }, {
               tagName: 'label',
-              textContent: () => item.$text
-            }]
+              textContent: () => item.$text,
+            }],
           };
-        })
+        }),
       });
       state.list.push({ text: 'Item 3' });
       assert.equal(el.children[1].children[1].textContent, 'Item 3');

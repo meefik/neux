@@ -7,10 +7,10 @@ export default {
   output: [{
     file: 'dist/neux.umd.js',
     format: 'umd',
-    name: 'NEUX'
+    name: 'NEUX',
   }, {
     file: 'dist/neux.esm.js',
-    format: 'esm'
+    format: 'esm',
   }],
-  plugins: NODE_ENV === 'production' ? [terser()] : []
+  plugins: NODE_ENV === 'production' ? [terser()] : [],
 };

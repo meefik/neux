@@ -1,7 +1,7 @@
 import { isObject, isString, isUndefined } from './utils';
 import { createState } from './state';
 
-function decodeQueryString (qs) {
+function decodeQueryString(qs) {
   const query = {};
   const re = /[?&](?<key>[^=]+)=(?<val>[^&]*)/gu;
   let tokens = re.exec(qs);
@@ -16,7 +16,7 @@ function decodeQueryString (qs) {
   return { path, query };
 }
 
-function encodeQueryString (path, query) {
+function encodeQueryString(path, query) {
   const tokens = [];
   for (const k in query) {
     tokens.push(`${k}=${query[k]}`);
@@ -28,7 +28,7 @@ function encodeQueryString (path, query) {
   return qs;
 }
 
-function navigate (path, query) {
+function navigate(path, query) {
   const { location } = window;
   if (isObject(path)) {
     query = path;
@@ -50,20 +50,21 @@ function navigate (path, query) {
  * @param {object} [options.context]
  * @returns {Proxy}
  */
-export function createRouter (routes, options) {
+export function createRouter(routes, options) {
   const { home, context } = options || {};
   const { location, addEventListener } = window;
   const router = createState({
     path: '',
     params: {},
     query: {},
-    navigate: () => navigate
+    navigate: () => navigate,
   }, { context });
   Object.seal(router);
   const refresh = () => {
     if ((!location.hash || location.hash === '#') && home) {
       location.hash = home;
-    } else {
+    }
+    else {
       const { path, query } = decodeQueryString(location.hash);
       if (!router.query) {
         router.query = {};
