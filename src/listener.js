@@ -1,3 +1,5 @@
+import { isFunction } from './utils';
+
 /**
  * Event listener.
  */
@@ -7,7 +9,7 @@ export default class EventListener {
     this._context = context;
   }
 
-  on(event, handler) {
+  on(event, handler, cleanup) {
     if (event && handler) {
       const list = this._list;
       const events = [].concat(event);
@@ -15,20 +17,7 @@ export default class EventListener {
         if (!list[ev]) {
           list[ev] = new Map();
         }
-        list[ev].set(handler, false);
-      }
-    }
-  }
-
-  once(event, handler) {
-    if (event && handler) {
-      const list = this._list;
-      const events = [].concat(event);
-      for (const ev of events) {
-        if (!list[ev]) {
-          list[ev] = new Map();
-        }
-        list[ev].set(handler, true);
+        list[ev].set(handler, cleanup);
       }
     }
   }
@@ -59,25 +48,18 @@ export default class EventListener {
 
   emit(event, ...args) {
     const list = this._list;
-    if (event === '*') {
-      for (const ev in list) {
-        for (const [fn, once] of list[ev]) {
-          fn.apply(this._context, args);
-          if (once) {
-            this.off(ev, fn);
-          }
-        }
-      }
-    }
-    else {
-      const events = new Set([].concat(event));
-      for (const ev of events) {
-        if (list[ev]) {
-          for (const [fn, once] of list[ev]) {
-            fn.apply(this._context, args);
-            if (once) {
-              this.off(ev, fn);
+    const events = event === '*' ? Object.keys(list) : [].concat(event);
+    for (const ev of events) {
+      if (list[ev]) {
+        for (const [handler, cleanup] of list[ev]) {
+          try {
+            handler.apply(this._context, args);
+            if (isFunction(cleanup) ? cleanup() : cleanup) {
+              this.off(ev, handler);
             }
+          }
+          catch (err) {
+            console.error(err);
           }
         }
       }

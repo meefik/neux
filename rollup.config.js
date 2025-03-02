@@ -7,7 +7,7 @@ export default {
   output: [{
     file: 'dist/neux.umd.js',
     format: 'umd',
-    name: 'NEUX',
+    name: 'neux',
   }, {
     file: 'dist/neux.esm.js',
     format: 'esm',

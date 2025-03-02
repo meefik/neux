@@ -22,3 +22,18 @@ export function isObject(obj) {
   return typeof obj === 'object' && obj !== null
     && (obj.constructor === Object || obj.constructor === Array);
 }
+
+export function isDate(obj) {
+  return obj instanceof Date;
+}
+
+export function clone(obj) {
+  if (!isObject(obj)) {
+    return obj;
+  }
+  const res = isArray(obj) ? [] : {};
+  for (const k in obj) {
+    res[k] = clone(obj[k]);
+  }
+  return res;
+}

@@ -1,81 +1,72 @@
 /**
- * Create a state.
+ * Create a reactive state.
  *
  * @param data Initial state data.
- * @param options State options.
+ * @returns An object containing the reactive state.
  */
-export function createState(data?: object, options?: {
-  context?: object
-}): object;
+export function signal(data?: object): {
+  [key: string]: any
+};
+
 /**
- * Create a view.
+ * Subscribe to reactive field changes.
  *
- * @param config View configuration.
- * @param options View options.
+ * @param getter Getter function that will be called when the reactive state changes.
+ * @param setter Setter function that will be called after the getter function.
+ * @returns Dispose function.
  */
-export function createView(config: object, options?: {
-  target?: HTMLElement,
-  context?: object
-}): object;
+export function effect(
+  getter: () => any,
+  setter?: (value: any) => void
+): () => void;
+
+/**
+ * Create an HTML element or fragment.
+ *
+ * @param tag Tag name or HTML markup or Element or configuration object.
+ * @param config Configuration object or children if omitted.
+ * @param children Element content or children elements.
+ * @returns A new element.
+ */
+export function render(
+  tag: string | Element | object | Array<any>,
+  config?: object | Array<any>,
+  children?: Array<any>
+): Element | DocumentFragment;
+
+/**
+ * Mount an element to the DOM with moutation observer.
+ * 
+ * @param el Source element.
+ * @param target Target element or selector.
+ * @returns void
+ */
+export function mount(
+  el: Element | DocumentFragment,
+  target: Element | DocumentFragment | string
+): void;
+
 /**
  * Create a localization.
  * 
  * @param locales Localized translations.
  * @param options Localization options.
  */
-export function createL10n(locales: object, options?: {
-  lang?: string,
-  fallback?: string,
-  prefix?: string,
-  context?: object
-}): {
-  lang: string,
-  $lang: string,
-  locales: string[],
-  t: (path: string, data?: object | string, lang?: string) => string,
-  d: (date: Date | number, format: string, utc?: boolean) => string
-};
-/**
- * Create a router.
- *
- * @param routes Regular expressions for parsing parameters.
- * @param options Routing parameters.
- */
-export function createRouter(routes?: {
-  [param: string]: RegExp
-}, options?: {
-  home?: string,
-  context?: object
-}): {
-  path: string,
-  $path: string,
-  params: { [key: string]: string },
-  query: { [key: string]: string },
-  navigate: (path: string, query?: object) => void
-};
+export function l10n(
+  locales: { [key: string]: { [key: string]: string } },
+  options?: {
+    language?: string,
+    fallback?: string,
+  }
+): (path: string, data?: object | string, lang?: string) => string;
+
 /**
  * Create an RPC client.
  * 
- * @param options RPC connection options.
+ * @param url URL of the RPC server.
+ * @param options Fetch options.
+ * @returns An object containing RPC functions.
  */
-export function createRPC(options?: {
-  url?: object,
-  method?: object,
-  headers?: object,
-  mode?: object,
-  credentials?: object
-}): {
-  [method: string]: (params: any) => any
+export function rpc(url: string, options?: object): {
+  [fn: string]: (params: any) => any
 };
-/**
- * Create a synchronization function.
- * 
- * @param state The state to sync.
- * @param handler Synchronization function call handler.
- * @param options Synchronization options.
- */
-export function createSync(state: object, handler: (
-  newv: any, oldv: any, ...args: any
-) => any, options?: {
-  slippage?: number
-}): Function;

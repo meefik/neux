@@ -1,11 +1,11 @@
-import { describe, it } from 'node:test';
+import { suite, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createState } from '../dist/neux.esm.js';
+import { signal, effect } from '../dist/neux.esm.js';
 
-describe('state', () => {
-  it('initial', async (t) => {
+suite('signal', () => {
+  test('initial', async (t) => {
     const now = new Date();
-    const state = createState({
+    const state = signal({
       counter: 3,
       double: obj => obj.$counter * 2,
       name: (obj, prop) => prop,
@@ -49,8 +49,8 @@ describe('state', () => {
     });
   });
 
-  it('changing', async (t) => {
-    const state = createState();
+  test('changing', async (t) => {
+    const state = signal();
     await t.test('regular field', () => {
       state.counter = 2;
       assert.equal(state.counter, 2);
@@ -74,23 +74,12 @@ describe('state', () => {
     });
   });
 
-  it('on', async (t) => {
-    function asyncTask(handler, timeout = 1000) {
-      let timer = null;
-      return new Promise((resolve, reject) => {
-        timer = setTimeout(() => {
-          reject(new Error('Operation timeout'));
-        }, timeout);
-        handler(resolve, reject);
-      }).finally(() => {
-        clearTimeout(timer);
-      });
-    }
-    await t.test('any changes', async () => {
+  test('on', async (t) => {
+    await t.test('any changes', { timeout: 100 }, async () => {
       try {
-        await asyncTask((resolve) => {
+        await new Promise((resolve) => {
           const events = ['counter', 'double'];
-          const state = createState({
+          const state = signal({
             counter: 1,
             double: obj => obj.$counter * 2,
           });
@@ -111,10 +100,10 @@ describe('state', () => {
         assert.fail(err.message);
       }
     });
-    await t.test('regular field', async () => {
+    await t.test('regular field', { timeout: 100 }, async () => {
       try {
-        await asyncTask((resolve) => {
-          const state = createState({
+        await new Promise((resolve) => {
+          const state = signal({
             counter: 1,
           });
           state.$$on('counter', (newv, oldv, prop) => {
@@ -130,10 +119,10 @@ describe('state', () => {
         assert.fail(err.message);
       }
     });
-    await t.test('computed field', async () => {
+    await t.test('computed field', { timeout: 100 }, async () => {
       try {
-        await asyncTask((resolve) => {
-          const state = createState({
+        await new Promise((resolve) => {
+          const state = signal({
             counter: 1,
             double: obj => obj.$counter * 2,
           });
@@ -150,10 +139,10 @@ describe('state', () => {
         assert.fail(err.message);
       }
     });
-    await t.test('array field', async () => {
+    await t.test('array field', { timeout: 100 }, async () => {
       try {
-        await asyncTask((resolve, reject) => {
-          const state = createState({
+        await new Promise((resolve, reject) => {
+          const state = signal({
             arr: [1, 2],
           });
           const stages = [
@@ -187,10 +176,10 @@ describe('state', () => {
     });
   });
 
-  it('once', async () => {
+  test('once', async () => {
     try {
       await new Promise((resolve, reject) => {
-        const state = createState({
+        const state = signal({
           counter: 1,
         });
         let c = 0;
@@ -211,10 +200,10 @@ describe('state', () => {
     }
   });
 
-  it('off', async () => {
+  test('off', async () => {
     try {
       await new Promise((resolve, reject) => {
-        const state = createState({
+        const state = signal({
           counter: 1,
         });
         const handler = () => {
@@ -233,15 +222,11 @@ describe('state', () => {
     }
   });
 
-  it('emit', async () => {
+  test('emit', { timeout: 100 }, async () => {
     try {
-      await new Promise((resolve, reject) => {
-        const state = createState();
-        const timer = setTimeout(() => {
-          reject(Error('Operation timeout'));
-        }, 100);
+      await new Promise((resolve) => {
+        const state = signal();
         state.$$on('myevent', (a, b) => {
-          clearTimeout(timer);
           if (a === '1' && b === '2') {
             resolve();
           }
@@ -255,79 +240,11 @@ describe('state', () => {
     }
   });
 
-  it('create', () => {
-    const state = createState({});
-    const sub = state.$$create();
-    assert.equal(Object.keys(state).length, 0);
-    assert.ok(typeof sub === 'object');
-  });
-
-  it('clone & equal', () => {
-    const state = createState({
-      a: 1,
-      b: 'b',
-      c: {
-        d: 10,
-        e: [1, 2, { f: 'f' }],
-      },
-    });
-    const obj = state.$$clone();
-    assert.ok(!obj.$$clone);
-    assert.ok(state.$$equal(obj));
-  });
-
-  it('patch', async () => {
-    const state = createState({
-      key1: 'key1',
-      nested: {
-        key1: 'nested.key1',
-        key2: 'nested.key2',
-        key3: 'nested.key3',
-      },
-    });
+  test('map', { timeout: 100 }, async () => {
     try {
-      await new Promise((resolve, reject) => {
-        const changed = ['key3', 'key4'];
-        state.$$on('*', (newv, oldv, prop, obj, rest) => {
-          if (rest[0] === 'nested') {
-            const index = changed.indexOf(prop);
-            if (index > -1) {
-              changed.splice(index, 1);
-            }
-            if (!changed.length) {
-              clearTimeout(timer);
-              resolve();
-            }
-          }
-        });
-        const timer = setTimeout(() => {
-          reject(Error('Operation timeout'));
-        }, 100);
-        state.$$patch({
-          key1: 'key1',
-          nested: {
-            key2: 'nested.key2',
-            key3: 'changed1',
-            key4: 'changed2',
-          },
-        });
-      });
-    }
-    catch (err) {
-      assert.fail(err.message);
-    }
-    assert.equal(state.key1, 'key1');
-    assert.ok(!state.nested.key1);
-    assert.equal(state.nested.key2, 'nested.key2');
-    assert.equal(state.nested.key3, 'changed1');
-    assert.equal(state.nested.key4, 'changed2');
-  });
-
-  it('each', async () => {
-    try {
-      const state = createState({
+      const state = signal({
         arr: [{ v: 1 }, { v: 2 }],
-        computed: obj => obj.arr.$$each(item => item.v),
+        computed: obj => obj.arr.$$map(item => item.v),
       });
       const stages = [
         { prop: '2', newv: 3 },
@@ -335,16 +252,12 @@ describe('state', () => {
         { prop: '2', oldv: 3 },
       ];
       await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          reject(Error('Operation timeout'));
-        }, 100);
         state.computed.$$on('*', (newv, oldv, prop) => {
           const stage = stages.shift();
           if (prop !== stage.prop || newv !== stage.newv || oldv !== stage.oldv) {
             reject(new Error('Incorrect value'));
           }
           if (!stages.length) {
-            clearTimeout(timer);
             resolve();
           }
         });
@@ -359,61 +272,41 @@ describe('state', () => {
     }
   });
 
-  it('query', async () => {
-    const state = createState({
-      t: 'a',
-      n: 1,
-      b: true,
-      obj: {
-        t: 'b',
-        n: 2,
-        b: false,
-        arr: [{
-          t: 'c',
-          n: 3,
-          b: true,
-        }],
-      },
-    });
-    const res = state.$$query({ t: 'c' });
-    assert.equal(res.n, 3);
-  });
-
-  it('queryAll', async () => {
-    const state = createState({
-      t: 'a',
-      n: 1,
-      b: true,
-      obj: {
-        t: 'b',
-        n: 2,
-        b: false,
-        arr: [{
-          t: 'a',
-          n: 3,
-          b: true,
-        }],
-      },
-    });
-    const res = state.$$queryAll({ t: 'a' });
-    assert.equal(res.length, 2);
-    assert.equal(res[0].n, 1);
-    assert.equal(res[1].n, 3);
-  });
-
-  it('context', () => {
+  test('context', () => {
     const context = {};
-    const state1 = createState({
+    const state1 = signal.call(context, {
       counter: 1,
-    }, { context });
-    const state2 = createState({
+    });
+    const state2 = signal.call(context, {
       double: () => state1.$counter * 2,
-    }, { context });
-    const state3 = createState({
+    });
+    const state3 = signal({
       double: () => state1.$counter * 2,
     });
     state1.counter = 2;
     assert.equal(state2.double, 4);
     assert.equal(state3.double, 2);
+  });
+
+  test('effect', { timeout: 100 }, async () => {
+    try {
+      await new Promise((resolve) => {
+        const state = signal({
+          counter: 1,
+        });
+        effect(() => {
+          return state.$counter * 2;
+        }, (value) => {
+          if (value === 4) {
+            resolve();
+          }
+        });
+        state.counter = 2;
+      });
+      assert.ok(true);
+    }
+    catch (err) {
+      assert.fail(err.message);
+    }
   });
 });
