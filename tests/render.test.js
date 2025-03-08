@@ -1,8 +1,15 @@
-import { signal, render } from '../dist/neux.esm.js';
+import { signal, render, mount } from '../dist/neux.esm.js';
+import { JSDOM } from 'jsdom';
 import { suite, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 suite('render', () => {
+  const { window } = new JSDOM('', {
+    url: 'http://localhost',
+    contentType: 'text/html',
+  });
+  global.window = window;
+
   test('initial', async (t) => {
     test('tag', async (t) => {
       t.test('tag name', () => {
@@ -169,7 +176,17 @@ suite('render', () => {
       assert.equal(el.children[1].textContent, 'Item 2');
     });
 
-    await t.test('on:change', () => {
+    await t.test('ref', () => {
+      let ref = null;
+      const el = render({
+        ref: (e) => {
+          ref = e;
+        },
+      });
+      assert.equal(el, ref);
+    });
+
+    await t.test('on', () => {
       let value = 1;
       const el = render({
         tag: 'input',
@@ -190,14 +207,89 @@ suite('render', () => {
       assert.equal(value, 2);
     });
 
-    await t.test('ref', () => {
-      let ref = null;
+    await t.test('mount', async () => {
       const el = render({
-        ref: (e) => {
-          ref = e;
-        },
+        tag: 'p',
       });
-      assert.equal(el, ref);
+      mount(el, window.document.body);
+      assert.equal(window.document.body.firstChild, el);
+      el.remove();
+      assert.equal(window.document.body.firstChild, null);
+    });
+
+    await t.test('on:mounted', { timeout: 100 }, async () => {
+      try {
+        let el = null;
+        await new Promise((resolve) => {
+          el = render({
+            on: {
+              mounted: () => resolve(),
+            },
+          });
+          mount(el, window.document.body);
+        }).finally(() => {
+          el?.remove();
+        });
+        assert.ok(true);
+      }
+      catch (err) {
+        assert.fail(err.message);
+      }
+    });
+
+    await t.test('on:changed', { timeout: 100 }, async () => {
+      try {
+        let el = null;
+        await new Promise((resolve, reject) => {
+          el = render({
+            attributes: {
+              'my-attr': '1',
+            },
+            on: {
+              mounted(e) {
+                e.target.setAttribute('my-attr', '2');
+              },
+              changed(e) {
+                if (e.detail.attributeName === 'my-attr'
+                  && e.detail.newValue === '2' && e.detail.oldValue === '1') {
+                  resolve();
+                }
+                else {
+                  reject(new Error('Incorrect event'));
+                }
+              },
+            },
+          });
+          mount(el, window.document.body);
+        }).finally(() => {
+          el?.remove();
+        });
+        assert.ok(true);
+      }
+      catch (err) {
+        assert.fail(err.message);
+      }
+    });
+
+    await t.test('on:removed', { timeout: 100 }, async () => {
+      try {
+        let el = null;
+        await new Promise((resolve) => {
+          el = render({
+            on: {
+              mounted: e => e.target.remove(),
+              removed: () => resolve(),
+            },
+          });
+          mount(el, window.document.body);
+        }).finally(() => {
+          el?.remove();
+        });
+        assert.ok(true);
+      }
+      catch (err) {
+        assert.fail(err.message);
+      }
     });
   });
 

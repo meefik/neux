@@ -59,14 +59,3 @@ export function l10n(
     fallback?: string,
   }
 ): (path: string, data?: object | string, lang?: string) => string;
-
-/**
- * Create an RPC client.
- * 
- * @param url URL of the RPC server.
- * @param options Fetch options.
- * @returns An object containing RPC functions.
- */
-export function rpc(url: string, options?: object): {
-  [fn: string]: (params: any) => any
-};
