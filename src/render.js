@@ -122,8 +122,9 @@ function createNode(config, ns) {
   const el = createElement(tag ?? tagName, namespaceURI);
   ns = el.namespaceURI;
   // create shadow root if defined
+  let shadowRoot;
   if (shadowRootMode) {
-    el.attachShadow({ mode: shadowRootMode });
+    shadowRoot = el.attachShadow({ mode: shadowRootMode });
   }
   // watch for reactive properties
   const cleanups = [];
@@ -224,7 +225,7 @@ function createNode(config, ns) {
   }
   // parse children
   if (!isUndefined(children)) {
-    const target = shadowRootMode && el.shadowRoot ? el.shadowRoot : el;
+    const target = shadowRoot || el;
     resolve(children, (value, index, op) => {
       if (op === 'del') {
         const oldChild = target.children[index];
