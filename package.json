@@ -1,6 +1,6 @@
 {
   "name": "neux",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "A lightweight frontend library for building dynamic user interfaces using declarative element definitions and reactive signals to modify them.",
   "author": "Anton Skshidlevsky <meefik@gmail.com>",
   "main": "src/index.js",
@@ -31,6 +31,6 @@
     "eslint": "^9.22.0",
     "globals": "^16.0.0",
     "jsdom": "^26.0.0",
-    "rollup": "^4.35.0"
+    "rollup": "^4.36.0"
   }
 }
