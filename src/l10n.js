@@ -25,21 +25,24 @@ export function l10n(locales, options) {
     }
     const arr = `${path}`.split('.');
     let text = arr.reduce((o, k) => (isObject(o) ? o[k] : ''), locales[lang]);
-    for (const k in data) {
-      const re = new RegExp(`%\\{${k}\\}`, 'gu');
-      let replaceValue = data[k];
-      if (isArray(replaceValue)) {
-        const [value, format] = replaceValue;
-        if (isObject(format)) {
-          if (isNumber(value)) {
-            replaceValue = value.toLocaleString(lang, format);
-          }
-          else if (isDate(value)) {
-            replaceValue = value.toLocaleString(lang, format);
+    if (isString(text)) {
+      for (const k in data) {
+        const re = new RegExp(`%\\{${k}\\}`, 'gu');
+        let replaceValue = data[k];
+        if (isArray(replaceValue)) {
+          const [value, format] = replaceValue;
+          replaceValue = value;
+          if (isObject(format)) {
+            if (isNumber(value)) {
+              replaceValue = value.toLocaleString(lang, format);
+            }
+            else if (isDate(value)) {
+              replaceValue = value.toLocaleString(lang, format);
+            }
           }
         }
+        text = text.replace(re, replaceValue);
       }
-      text = text.replace(re, replaceValue);
     }
     return text;
   };
