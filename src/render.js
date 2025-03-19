@@ -109,6 +109,7 @@ function createNode(config, ns) {
     tagName = 'div',
     namespaceURI = ns,
     shadowRootMode,
+    adoptedStyleSheets,
     classList,
     attributes,
     style,
@@ -125,6 +126,9 @@ function createNode(config, ns) {
   let shadowRoot;
   if (shadowRootMode) {
     shadowRoot = el.attachShadow({ mode: shadowRootMode });
+    if (shadowRoot && adoptedStyleSheets) {
+      shadowRoot.adoptedStyleSheets = adoptedStyleSheets;
+    }
   }
   // watch for reactive properties
   const cleanups = [];
