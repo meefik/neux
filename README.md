@@ -902,9 +902,9 @@ mount(el, document.body);
 
 Try it in the playground:
 
-- [To-Do App](https://livecodes.io/?x=id/v5zg2ajb4p3)
-- [15 Puzzle](https://livecodes.io/?x=id/ye2c7gd7dpw)
-- [Tic-Tac-Toe](https://livecodes.io/?x=id/bg3vy6gyubq)
-- [SVG Clock](https://livecodes.io/?x=id/fre8jw79dnc)
-- [Sketch](https://livecodes.io/?x=id/6xu6zkckiad)
-- [File Tree](https://livecodes.io/?x=id/c77bi6y5nvh)
+- [To-Do App](https://livecodes.io/?x=id/a9bjhc39pqb)
+- [15 Puzzle](https://livecodes.io/?x=id/rczueuxxxus)
+- [Tic-Tac-Toe](https://livecodes.io/?x=id/p5296dy5syc)
+- [SVG Clock](https://livecodes.io/?x=id/w7yya5nzch4)
+- [Sketch](https://livecodes.io/?x=id/tamthnz796p)
+- [File Tree](https://livecodes.io/?x=id/vcziud93f55)
