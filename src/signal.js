@@ -125,9 +125,6 @@ export function signal(data = {}) {
   const watcher = new EventListener();
   const updater = new EventListener();
   const tools = {
-    $(key) {
-      return state['$' + key];
-    },
     $$on(event, handler) {
       return listener.on(event, handler);
     },
@@ -158,9 +155,12 @@ export function signal(data = {}) {
         return tools[prop];
       }
       if (isString(prop) && dollarRe.test(prop)) {
-        prop = prop.slice(1);
+        prop = prop.slice(1) || '*';
         if (!isFunction(obj[prop])) {
           writeContext(context, state, prop);
+        }
+        if (prop === '*') {
+          return obj;
         }
       }
       return Reflect.get(obj, prop);

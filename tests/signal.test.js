@@ -5,6 +5,7 @@ import { signal, effect } from '../dist/neux.esm.js';
 suite('signal', () => {
   test('initial', async (t) => {
     const now = new Date();
+    let flag = false;
     const state = signal({
       counter: 3,
       double: obj => obj.$counter * 2,
@@ -22,6 +23,9 @@ suite('signal', () => {
         text: 'Item 3',
       }],
       filtered: obj => obj.$arr.filter(item => item.checked),
+      $: () => {
+        flag = true;
+      },
     });
     await t.test('regular field', () => {
       assert.equal(state.counter, 3);
@@ -47,6 +51,9 @@ suite('signal', () => {
       state.arr[1].checked = true;
       assert.equal(state.filtered.length, 2);
     });
+    await t.test('$ field', () => {
+      assert.equal(flag, true);
+    });
   });
 
   test('changing', async (t) => {
@@ -71,6 +78,14 @@ suite('signal', () => {
     await t.test('computed field', () => {
       state.double = obj => obj.$counter * 2;
       assert.equal(state.double, 4);
+    });
+    await t.test('$ field', () => {
+      let flag = false;
+      state.$ = () => {
+        flag = true;
+      };
+      state.counter++;
+      assert.equal(flag, true);
     });
   });
 
