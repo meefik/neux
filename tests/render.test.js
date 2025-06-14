@@ -360,7 +360,7 @@ suite('render', () => {
         cls: ['a', 'b'],
       });
       const el = render({
-        classList: () => state.$cls,
+        classList: () => state.cls.$,
       });
       state.cls.push('c');
       assert.equal(el.className, state.cls.join(' '));
@@ -377,7 +377,7 @@ suite('render', () => {
       });
       const el = render({
         tag: 'ul',
-        children: () => state.list.$$map((item) => {
+        children: () => state.list.$.map((item) => {
           return {
             tag: 'li',
             children: [{

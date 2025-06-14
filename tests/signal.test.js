@@ -5,7 +5,8 @@ import { signal, effect } from '../dist/neux.esm.js';
 suite('signal', () => {
   test('initial', async (t) => {
     const now = new Date();
-    let flag = false;
+    let flag1 = false;
+    let flag2 = false;
     const state = signal({
       counter: 3,
       double: obj => obj.$counter * 2,
@@ -22,17 +23,16 @@ suite('signal', () => {
       }, {
         text: 'Item 3',
       }],
-      filtered: obj => obj.$arr.filter(item => item.checked),
+      checked: obj => obj.arr.$$.filter(item => item.checked).length,
       $: () => {
-        flag = true;
+        flag1 = true;
+      },
+      $$: () => {
+        flag2 = true;
       },
     });
     await t.test('regular field', () => {
       assert.equal(state.counter, 3);
-    });
-    await t.test('computed field', () => {
-      assert.equal(state.double, 6);
-      assert.equal(state.name, 'name');
     });
     await t.test('date object', () => {
       assert.equal(state.timestamp, now);
@@ -47,27 +47,35 @@ suite('signal', () => {
       assert.equal(state.arr[1].text, 'Item 2');
       assert.equal(state.arr[2].text, 'Item 3');
     });
-    await t.test('computed array field', () => {
-      state.arr[1].checked = true;
-      assert.equal(state.filtered.length, 2);
+    await t.test('computed field', () => {
+      assert.equal(state.double, 6);
+      assert.equal(state.name, 'name');
+    });
+    await t.test('computed nested field', () => {
+      assert.equal(state.checked, 1);
     });
     await t.test('$ field', () => {
-      assert.equal(flag, true);
+      assert.equal(flag1, false);
+    });
+    await t.test('$$ field', () => {
+      assert.equal(flag2, false);
     });
   });
 
   test('changing', async (t) => {
-    const state = signal();
     await t.test('regular field', () => {
+      const state = signal();
       state.counter = 2;
       assert.equal(state.counter, 2);
     });
     await t.test('object field', () => {
+      const state = signal();
       state.obj = {};
       state.obj.x = 1;
       assert.equal(state.obj.x, 1);
     });
     await t.test('array field', () => {
+      const state = signal();
       state.arr = [];
       state.arr.push([{ checked: false }]);
       state.arr[0].checked = true;
@@ -76,16 +84,35 @@ suite('signal', () => {
       assert.ok(!state.arr[0]);
     });
     await t.test('computed field', () => {
+      const state = signal();
+      state.counter = 2;
       state.double = obj => obj.$counter * 2;
       assert.equal(state.double, 4);
     });
-    await t.test('$ field', () => {
-      let flag = false;
+    await t.test('computed nested field', () => {
+      const state = signal();
+      state.arr = [{ text: 'Item 1', checked: true }, { text: 'Item 2' }, { text: 'Item 3' }];
+      state.checked = obj => obj.arr.$$.filter(item => item.checked).length;
+      state.arr[1].checked = true;
+      assert.equal(state.checked, 2);
+    });
+    await t.test('track changes', () => {
+      let flag1 = false;
+      let flag2 = false;
+      const state = signal();
+      state.x = 1;
+      state.obj = { x: 1 };
       state.$ = () => {
-        flag = true;
+        flag1 = true;
       };
-      state.counter++;
-      assert.equal(flag, true);
+      state.$$ = () => {
+        flag2 = true;
+      };
+      state.obj.x++;
+      assert.equal(flag1, false);
+      assert.equal(flag2, true);
+      state.x++;
+      assert.equal(flag1, true);
     });
   });
 
@@ -247,38 +274,6 @@ suite('signal', () => {
           }
         });
         state.$$emit('myevent', '1', '2');
-      });
-      assert.ok(true);
-    }
-    catch (err) {
-      assert.fail(err.message);
-    }
-  });
-
-  test('map', { timeout: 100 }, async () => {
-    try {
-      const state = signal({
-        arr: [{ v: 1 }, { v: 2 }],
-        computed: obj => obj.arr.$$map(item => item.v),
-      });
-      const stages = [
-        { prop: '2', newv: 3 },
-        { prop: '1', newv: 4, oldv: 2 },
-        { prop: '2', oldv: 3 },
-      ];
-      await new Promise((resolve, reject) => {
-        state.computed.$$on('*', (newv, oldv, prop) => {
-          const stage = stages.shift();
-          if (prop !== stage.prop || newv !== stage.newv || oldv !== stage.oldv) {
-            reject(new Error('Incorrect value'));
-          }
-          if (!stages.length) {
-            resolve();
-          }
-        });
-        state.arr.push({ v: 3 });
-        state.arr.splice(1, 1, { v: 4 });
-        state.arr.pop();
       });
       assert.ok(true);
     }

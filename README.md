@@ -10,7 +10,7 @@
 - Intuitive two-way reactivity with direct DOM changes without virtual DOM.
 - Built-in localization support for dynamic language adaptation.
 - Easy integration with CSS modules, Tailwind CSS, and other styling solutions.
-- Minimal bundle size (~4kb gzipped) for fast loading.
+- Minimal bundle size (~3kb gzipped) for fast loading.
 - Open source and available under the MIT license.
 
 ## Content
@@ -104,7 +104,7 @@ Signals in NEUX are reactive proxies for objects. They track changes automatical
 For example:
 
 ```js
-// Reactive state with fields and computed properties
+// Reactive state with fields, computed properties, and listeners
 const state = signal({
   count: 1,
   multiplier: 2,
@@ -112,18 +112,26 @@ const state = signal({
     { text: 'Item 1' },
     { text: 'Item 2', checked: true },
   ],
+  // computed field
   double: obj => obj.$count * 2,
-  filtered: obj => obj.$list.filter(item => item.checked),
+  // computed field that tracks all changes, including nested objects
+  filtered: obj => obj.list.$$.filter(item => item.checked),
+  // track changes the "double" field
   $double: (newv, oldv) => console.log(newv, oldv),
-  $: (newv, oldv, prop) => console.log(newv, oldv, prop),
+  // track changes only one level of depth
+  $: (newv, oldv, prop, obj) => console.log(newv, oldv, prop, obj),
+  // track all changes, including nested objects
+  $$: (newv, oldv, prop, obj, nested) => console.log(newv, oldv, prop, obj, nested),
 });
-// Update computed field
+// Update the computed field
 state.double = obj => state.$count * state.$multiplier;
-// Modify state
+// Modify fields
 state.count++;
 state.list.push({ text: 'Item 3' });
-// Remove field and listeners
+// Remove the field and its related reactive effects
 delete state.double;
+// Remove its listener
+delete state.$double;
 ```
 
 In computed fields, prefixing a property name with `$` marks it as reactive. When the property's value changes, the computed function is automatically invoked with its new value.
@@ -188,6 +196,8 @@ state.$$once('double', handler);
 state.$$off('double', handler);
 // Remove all listeners for the 'double' property
 state.$$off('double');
+// Subscribe to changes on this object
+state.$$on('#', handler);
 // Subscribe to any changes on this object and all nested children
 state.$$on('*', handler);
 ```
@@ -197,7 +207,8 @@ In this example:
 - Using `$$on()`, you can add persistent listeners.
 - With `$$once()`, the listener triggers only the first time the change occurs.
 - The `$$off()` method allows you to remove specific or all listeners for a given property.
-- The wildcard `'*'` subscribes the handler to any changes across the entire reactive structure.
+- The hash `'#'` subscribes the handler to any changes on this object.
+- The wildcard `'*'` subscribes the handler to any changes on this object and all nested children.
 
 This flexibility lets you efficiently track and respond to state mutations across your application.
 
@@ -300,7 +311,7 @@ el.remove();
 
 In the `mount()` function, the second argument can be a target HTML element or CSS selector that will be used to find the target.
 
-You can use the `$$map()` method of arrays in state to optimize the rendering of child elements. Instead of re-rendering the entire list when the associated array changes, only the elements that have been added, updated, or removed are affected. This minimizes unnecessary DOM manipulations, resulting in smoother and more efficient UI updates, especially when dealing with large or frequently changing arrays.
+You can also use the `$` sign to track changes in the object or array without tracking changes in nested objects:
 
 ```js
 // Create a reactive state with an array
@@ -314,16 +325,22 @@ const state = signal({
 const el = render({
   tag: 'ul',
   children: () => {
-    return state.list.$$map((item) => {
+    // Track changes in the list array,
+    // such as adding, replacing, or deleting items, 
+    // except for nested objects
+    return state.list.$.map((item) => {
       return {
         tag: 'li',
+        // Track changes the specific field
         textContent: () => item.$text,
       };
     });
   },
 });
-// Add item to the array
+// Add new item to the array and then re-render the list
 state.list.push({ text: 'Item 3' });
+// Change the `li` element without rerendering the entire list
+state.list[0].text = 'Item 1 was changed';
 ```
 
 You can include any SVG icon as HTML markup and change its styles (size, color) via the `classList` or `attributes` parameters (raw import works with Vite):
@@ -856,9 +873,9 @@ const el = render({
   }, {
     tag: 'ul',
     children: () => {
-      // Redraw the list if any child element is added, replaced or removed.
-      // Any updates inside children are ignored.
-      return state.list.$$map((item) => {
+      // Redraw the list if any child items is added, replaced or removed.
+      // Any updates inside nested objects are ignored.
+      return state.list.$.map((item) => {
         return {
           tag: 'li',
           children: [{
@@ -903,8 +920,8 @@ mount(el, document.body);
 Try it in the playground:
 
 - [To-Do App](https://livecodes.io/?x=id/a9bjhc39pqb)
-- [15 Puzzle](https://livecodes.io/?x=id/rczueuxxxus)
-- [Tic-Tac-Toe](https://livecodes.io/?x=id/p5296dy5syc)
+- [15 Puzzle](https://livecodes.io/?x=id/exp5yjaut7f)
+- [Tic-Tac-Toe](https://livecodes.io/?x=id/spv9vuqhq72)
 - [SVG Clock](https://livecodes.io/?x=id/w7yya5nzch4)
 - [Sketch](https://livecodes.io/?x=id/tamthnz796p)
-- [File Tree](https://livecodes.io/?x=id/vcziud93f55)
+- [File Tree](https://livecodes.io/?x=id/9h7tszkucxz)

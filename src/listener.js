@@ -47,19 +47,21 @@ export default class EventListener {
   }
 
   emit(event, ...args) {
-    const list = this._list;
-    const events = event === '*' ? Object.keys(list) : [].concat(event);
-    for (const ev of events) {
-      if (list[ev]) {
-        for (const [handler, cleanup] of list[ev]) {
-          try {
-            handler.apply(this._context, args);
-            if (isFunction(cleanup) ? cleanup() : cleanup) {
-              this.off(ev, handler);
+    if (event) {
+      const list = this._list;
+      const events = [].concat(event);
+      for (const ev of events) {
+        if (list[ev]) {
+          for (const [handler, cleanup] of list[ev]) {
+            try {
+              handler.apply(this._context, args);
+              if (isFunction(cleanup) ? cleanup() : cleanup) {
+                this.off(ev, handler);
+              }
             }
-          }
-          catch (err) {
-            console.error(err);
+            catch (err) {
+              console.error(err);
+            }
           }
         }
       }
