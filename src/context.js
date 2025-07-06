@@ -19,7 +19,7 @@ export function createContext(ctx) {
  * @param {object} ctx Context object.
  * @param {object} obj Target object.
  * @param {string} prop Property name.
- * @param {function} [value] Additional parameter.
+ * @param {*} value Property value.
  */
 export function writeContext(ctx, obj, prop, value) {
   const store = ctx[contextKey];
@@ -36,7 +36,7 @@ export function writeContext(ctx, obj, prop, value) {
  * @param {object} ctx Context object.
  * @param {function} getter Getter function with reactive properties.
  * @param {function} handler Handler function with found properties.
- * @returns {*}
+ * @returns {*} Value returned by the getter function.
  */
 export function readContext(ctx, getter, handler) {
   if (ctx[contextKey]) {

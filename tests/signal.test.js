@@ -2,292 +2,280 @@ import { suite, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { signal, effect } from '../dist/neux.esm.js';
 
-suite('signal', () => {
-  test('initial', async (t) => {
-    const now = new Date();
-    let flag = false;
+const timeout = (cb, t = 100) => {
+  setTimeout(() => cb(new Error('Timeout')), t);
+};
+
+suite('signal', async () => {
+  await test('regular field', () => {
     const state = signal({
-      counter: 3,
-      double: obj => obj.$counter * 2,
-      name: (obj, prop) => prop,
+      counter: 1,
+    });
+
+    assert.equal(state.counter, 1);
+
+    state.counter = 2;
+
+    assert.equal(state.counter, 2);
+  });
+
+  await test('date object', () => {
+    let now = new Date();
+    const state = signal({
       timestamp: now,
+    });
+
+    assert.equal(state.timestamp, now);
+
+    now = new Date();
+    state.timestamp = now;
+
+    assert.equal(state.timestamp, now);
+  });
+
+  await test('object field', () => {
+    const state = signal({
       obj: {
-        text: () => 'Text',
+        text: () => 'A',
       },
+    });
+
+    assert.equal(state.obj.text, 'A');
+
+    state.obj.text = 'B';
+
+    assert.equal(state.obj.text, 'B');
+  });
+
+  await test('array field', () => {
+    const state = signal({
       arr: [{
-        text: 'Item 1',
+        text: 'A',
+      }, {
+        text: 'B',
         checked: true,
       }, {
+        text: 'C',
+      }],
+    });
+
+    assert.equal(state.arr.length, 3);
+    assert.equal(state.arr[0].text, 'A');
+    assert.equal(state.arr[1].text, 'B');
+    assert.equal(state.arr[1].checked, true);
+    assert.equal(state.arr[2].text, 'C');
+
+    state.arr[1].checked = false;
+    state.arr.shift();
+    state.arr.pop();
+    state.arr.push({ text: 'D' });
+
+    assert.equal(state.arr.length, 2);
+    assert.equal(state.arr[0].text, 'B');
+    assert.equal(state.arr[0].checked, false);
+    assert.equal(state.arr[1].text, 'D');
+  });
+
+  await test('computed field', () => {
+    const state = signal({
+      counter: 2,
+      double: obj => obj.$counter * 2,
+      name: (obj, prop) => prop,
+    });
+
+    assert.equal(state.double, 4);
+    assert.equal(state.name, 'name');
+
+    state.counter++;
+    state.name = 'name2';
+
+    assert.equal(state.double, 6);
+    assert.equal(state.name, 'name2');
+  });
+
+  await test('computed nested field', () => {
+    const state = signal({
+      arr: [{
+        text: 'Item 1',
+      }, {
         text: 'Item 2',
+        checked: true,
       }, {
         text: 'Item 3',
+        checked: true,
       }],
-      filtered: obj => obj.$arr.filter(item => item.checked),
-      $: () => {
-        flag = true;
-      },
+      checked1: obj => obj.arr.$.filter(item => item.checked).length,
+      checked2: obj => obj.arr.$$.filter(item => item.checked).length,
     });
-    await t.test('regular field', () => {
-      assert.equal(state.counter, 3);
-    });
-    await t.test('computed field', () => {
-      assert.equal(state.double, 6);
-      assert.equal(state.name, 'name');
-    });
-    await t.test('date object', () => {
-      assert.equal(state.timestamp, now);
-    });
-    await t.test('object field', () => {
-      assert.equal(state.obj.text, 'Text');
-    });
-    await t.test('array field', () => {
-      assert.equal(state.arr.length, 3);
-      assert.equal(state.arr[0].text, 'Item 1');
-      assert.equal(state.arr[0].checked, true);
-      assert.equal(state.arr[1].text, 'Item 2');
-      assert.equal(state.arr[2].text, 'Item 3');
-    });
-    await t.test('computed array field', () => {
-      state.arr[1].checked = true;
-      assert.equal(state.filtered.length, 2);
-    });
-    await t.test('$ field', () => {
-      assert.equal(flag, true);
-    });
+
+    assert.equal(state.checked1, 2);
+    assert.equal(state.checked2, 2);
+
+    state.arr[1].checked = false;
+
+    assert.equal(state.checked1, 2);
+    assert.equal(state.checked2, 1);
   });
 
-  test('changing', async (t) => {
-    const state = signal();
-    await t.test('regular field', () => {
-      state.counter = 2;
-      assert.equal(state.counter, 2);
-    });
-    await t.test('object field', () => {
-      state.obj = {};
-      state.obj.x = 1;
-      assert.equal(state.obj.x, 1);
-    });
-    await t.test('array field', () => {
-      state.arr = [];
-      state.arr.push([{ checked: false }]);
-      state.arr[0].checked = true;
-      assert.equal(state.arr[0].checked, true);
-      state.arr.pop();
-      assert.ok(!state.arr[0]);
-    });
-    await t.test('computed field', () => {
-      state.double = obj => obj.$counter * 2;
-      assert.equal(state.double, 4);
-    });
-    await t.test('$ field', () => {
-      let flag = false;
-      state.$ = () => {
-        flag = true;
-      };
-      state.counter++;
-      assert.equal(flag, true);
-    });
-  });
-
-  test('on', async (t) => {
-    await t.test('any changes', { timeout: 100 }, async () => {
-      try {
-        await new Promise((resolve) => {
-          const events = ['counter', 'double'];
-          const state = signal({
-            counter: 1,
-            double: obj => obj.$counter * 2,
-          });
-          state.$$on('*', (newv, oldv, prop) => {
-            const index = events.indexOf(prop);
-            if (index > -1) {
-              events.splice(index, 1);
-            }
-            if (!events.length) {
-              resolve();
-            }
-          });
-          state.counter = 2;
-        });
-        assert.ok(true);
-      }
-      catch (err) {
-        assert.fail(err.message);
-      }
-    });
-    await t.test('regular field', { timeout: 100 }, async () => {
-      try {
-        await new Promise((resolve) => {
-          const state = signal({
-            counter: 1,
-          });
-          state.$$on('counter', (newv, oldv, prop) => {
-            if (prop === 'counter' && newv === 2 && oldv === 1) {
-              resolve();
-            }
-          });
-          state.counter = 2;
-        });
-        assert.ok(true);
-      }
-      catch (err) {
-        assert.fail(err.message);
-      }
-    });
-    await t.test('computed field', { timeout: 100 }, async () => {
-      try {
-        await new Promise((resolve) => {
-          const state = signal({
-            counter: 1,
-            double: obj => obj.$counter * 2,
-          });
-          state.$$on('double', (newv, oldv, prop) => {
-            if (prop === 'double' && newv === 4 && oldv === 2) {
-              resolve();
-            }
-          });
-          state.counter = 2;
-        });
-        assert.ok(true);
-      }
-      catch (err) {
-        assert.fail(err.message);
-      }
-    });
-    await t.test('array field', { timeout: 100 }, async () => {
-      try {
-        await new Promise((resolve, reject) => {
-          const state = signal({
-            arr: [1, 2],
-          });
-          const stages = [
-            { prop: '2', newv: 3 },
-            { prop: '1', newv: 4, oldv: 2 },
-            { prop: '2', oldv: 3 },
-          ];
-          state.$$on('*', (newv, oldv, prop) => {
-            const stage = stages.shift();
-            if (prop !== stage.prop || newv !== stage.newv || oldv !== stage.oldv) {
-              reject(new Error('Incorrect value'));
-            }
-          });
-          state.arr.$$on('length', (newv) => {
-            if (newv !== state.arr.length) {
-              reject(new Error('Incorrect array length'));
-            }
-            else if (!stages.length) {
-              resolve();
-            }
-          });
-          state.arr.push(3);
-          state.arr.splice(1, 1, 4);
-          state.arr.pop();
-        });
-        assert.ok(true);
-      }
-      catch (err) {
-        assert.fail(err.message);
-      }
-    });
-  });
-
-  test('once', async () => {
-    try {
-      await new Promise((resolve, reject) => {
+  await test('on', async (t) => {
+    await t.test('any self changes', () => {
+      return new Promise((resolve, reject) => {
+        timeout(reject);
         const state = signal({
           counter: 1,
         });
-        let c = 0;
-        state.$$once('counter', () => {
-          if (++c > 1) {
-            clearTimeout(timer);
-            reject(new Error('Event triggered again'));
-          }
-        });
-        const timer = setTimeout(resolve, 100);
-        state.counter = 2;
-        state.counter = 3;
-      });
-      assert.ok(true);
-    }
-    catch (err) {
-      assert.fail(err.message);
-    }
-  });
-
-  test('off', async () => {
-    try {
-      await new Promise((resolve, reject) => {
-        const state = signal({
-          counter: 1,
-        });
-        const handler = () => {
-          clearTimeout(timer);
-          reject(new Error('Event triggered anyway'));
-        };
-        state.$$on('counter', handler);
-        state.$$off('counter', handler);
-        const timer = setTimeout(resolve, 100);
-        state.counter = 2;
-      });
-      assert.ok(true);
-    }
-    catch (err) {
-      assert.fail(err.message);
-    }
-  });
-
-  test('emit', { timeout: 100 }, async () => {
-    try {
-      await new Promise((resolve) => {
-        const state = signal();
-        state.$$on('myevent', (a, b) => {
-          if (a === '1' && b === '2') {
+        state.$$on('#', (newv, oldv, prop) => {
+          if (prop === 'counter' && newv === 2 && oldv === 1) {
             resolve();
           }
+          else {
+            reject(new Error('Incorrect value'));
+          }
         });
-        state.$$emit('myevent', '1', '2');
+        state.counter = 2;
       });
-      assert.ok(true);
-    }
-    catch (err) {
-      assert.fail(err.message);
-    }
-  });
+    });
 
-  test('map', { timeout: 100 }, async () => {
-    try {
-      const state = signal({
-        arr: [{ v: 1 }, { v: 2 }],
-        computed: obj => obj.arr.$$map(item => item.v),
+    await t.test('any self and nested changes', () => {
+      return new Promise((resolve, reject) => {
+        timeout(reject);
+        const state = signal({
+          nested: {
+            text: '1',
+          },
+        });
+        state.$$on('*', (newv, oldv, prop, obj, rest) => {
+          if (prop === 'text' && newv === '2' && oldv === '1' && rest[0] === 'nested') {
+            resolve();
+          }
+          else {
+            reject(new Error('Incorrect value'));
+          }
+        });
+        state.nested.text = '2';
       });
-      const stages = [
-        { prop: '2', newv: 3 },
-        { prop: '1', newv: 4, oldv: 2 },
-        { prop: '2', oldv: 3 },
-      ];
-      await new Promise((resolve, reject) => {
-        state.computed.$$on('*', (newv, oldv, prop) => {
+    });
+
+    await t.test('regular field', () => {
+      return new Promise((resolve, reject) => {
+        timeout(reject);
+        const state = signal({
+          counter: 1,
+        });
+        state.$$on('counter', (newv, oldv, prop) => {
+          if (prop === 'counter' && newv === 2 && oldv === 1) {
+            resolve();
+          }
+          else {
+            reject(new Error('Incorrect value'));
+          }
+        });
+        state.counter = 2;
+      });
+    });
+
+    await t.test('computed field', () => {
+      return new Promise((resolve, reject) => {
+        timeout(reject);
+        const state = signal({
+          counter: 1,
+          double: obj => obj.$counter * 2,
+        });
+        state.$$on('double', (newv, oldv, prop) => {
+          if (prop === 'double' && newv === 4 && oldv === 2) {
+            resolve();
+          }
+          else {
+            reject(new Error('Incorrect value'));
+          }
+        });
+        state.counter = 2;
+      });
+    });
+
+    await t.test('array field', () => {
+      return new Promise((resolve, reject) => {
+        timeout(reject);
+        const state = signal({
+          arr: [1, 2],
+        });
+        const stages = [
+          { prop: '2', newv: 3 },
+          { prop: '1', newv: 4, oldv: 2 },
+          { prop: '2', oldv: 3 },
+        ];
+        state.arr.$$on('#', (newv, oldv, prop) => {
           const stage = stages.shift();
           if (prop !== stage.prop || newv !== stage.newv || oldv !== stage.oldv) {
             reject(new Error('Incorrect value'));
           }
-          if (!stages.length) {
+        });
+        state.arr.$$on('length', (newv) => {
+          if (newv !== state.arr.length) {
+            reject(new Error('Incorrect array length'));
+          }
+          else if (!stages.length) {
             resolve();
           }
         });
-        state.arr.push({ v: 3 });
-        state.arr.splice(1, 1, { v: 4 });
+        state.arr.push(3);
+        state.arr.splice(1, 1, 4);
         state.arr.pop();
       });
-      assert.ok(true);
-    }
-    catch (err) {
-      assert.fail(err.message);
-    }
+    });
   });
 
-  test('context', () => {
+  await test('once', () => {
+    return new Promise((resolve, reject) => {
+      const state = signal({
+        counter: 1,
+      });
+      let c = 0;
+      state.$$once('counter', () => {
+        if (++c > 1) {
+          clearTimeout(timer);
+          reject(new Error('Event triggered again'));
+        }
+      });
+      const timer = setTimeout(resolve, 100);
+      state.counter = 2;
+      state.counter = 3;
+    });
+  });
+
+  await test('off', () => {
+    return new Promise((resolve, reject) => {
+      const state = signal({
+        counter: 1,
+      });
+      const handler = () => {
+        clearTimeout(timer);
+        reject(new Error('Event triggered anyway'));
+      };
+      state.$$on('counter', handler);
+      state.$$off('counter', handler);
+      const timer = setTimeout(resolve, 100);
+      state.counter = 2;
+    });
+  });
+
+  await test('emit', () => {
+    return new Promise((resolve, reject) => {
+      timeout(reject);
+      const state = signal();
+      state.$$on('myevent', (a, b) => {
+        if (a === '1' && b === '2') {
+          resolve();
+        }
+        else {
+          reject(new Error('Incorrect value'));
+        }
+      });
+      state.$$emit('myevent', '1', '2');
+    });
+  });
+
+  await test('context', () => {
     const context = {};
     const state1 = signal.call(context, {
       counter: 1,
@@ -303,25 +291,23 @@ suite('signal', () => {
     assert.equal(state3.double, 2);
   });
 
-  test('effect', { timeout: 100 }, async () => {
-    try {
-      await new Promise((resolve) => {
-        const state = signal({
-          counter: 1,
-        });
-        effect(() => {
-          return state.$counter * 2;
-        }, (value) => {
-          if (value === 4) {
-            resolve();
-          }
-        });
-        state.counter = 2;
+  await test('effect', () => {
+    return new Promise((resolve, reject) => {
+      timeout(reject);
+      const stages = [2, 4];
+      const state = signal({
+        counter: 1,
       });
-      assert.ok(true);
-    }
-    catch (err) {
-      assert.fail(err.message);
-    }
+      effect(() => {
+        return state.$counter * 2;
+      }, (value) => {
+        const double = stages.shift();
+        if (value !== double) {
+          reject(new Error('Incorrect value'));
+        }
+        if (!stages.length) resolve();
+      });
+      state.counter = 2;
+    });
   });
 });

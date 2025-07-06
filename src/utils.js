@@ -26,14 +26,3 @@ export function isObject(obj) {
 export function isDate(obj) {
   return obj instanceof Date;
 }
-
-export function clone(obj) {
-  if (!isObject(obj)) {
-    return obj;
-  }
-  const res = isArray(obj) ? [] : {};
-  for (const k in obj) {
-    res[k] = clone(obj[k]);
-  }
-  return res;
-}

@@ -2,7 +2,7 @@ import { suite, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { l10n } from '../dist/neux.esm.js';
 
-suite('l10n', () => {
+suite('l10n', async () => {
   const translate = l10n({
     en: {
       say: {
@@ -23,30 +23,30 @@ suite('l10n', () => {
     fallback: 'en',
   });
 
-  test('default locale', () => {
+  await test('default locale', () => {
     assert.equal(translate('say.hello', { name: 'Joe' }), 'Привет Joe!');
   });
 
-  test('change locale', () => {
+  await test('change locale', () => {
     assert.equal(translate('say.hello', { name: 'Joe' }, 'en'), 'Hello Joe!');
   });
 
-  test('unknown locale', () => {
+  await test('unknown locale', () => {
     assert.equal(translate('say.hello', { name: 'Joe' }, 'fr'), 'Hello Joe!');
   });
 
-  test('unknown key', () => {
+  await test('unknown key', () => {
     assert.equal(translate('say.hi'), undefined);
   });
 
-  test('Intl.NumberFormat', () => {
+  await test('Intl.NumberFormat', () => {
     assert.equal(translate('number', { val: [
       12345,
       { style: 'currency', currency: 'USD' },
     ] }, 'en'), 'Number: $12,345.00');
   });
 
-  test('Intl.DateTimeFormat', () => {
+  await test('Intl.DateTimeFormat', () => {
     assert.equal(translate('date', { val: [
       new Date('2021-01-01'),
       { dateStyle: 'full' },

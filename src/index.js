@@ -1,3 +1,3 @@
-export * from './signal';
-export * from './render';
 export * from './l10n';
+export * from './render';
+export * from './signal';

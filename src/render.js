@@ -83,7 +83,7 @@ function createElement(tag, ns) {
  * @returns {Node}
  */
 function createNode(config, ns) {
-  const { document, Node } = window;
+  const { document, Node, CustomEvent } = window;
   const context = createContext(this);
   if (isFunction(config)) {
     config = config.call(context);
@@ -230,33 +230,38 @@ function createNode(config, ns) {
   // parse children
   if (!isUndefined(children)) {
     const target = shadowRoot || el;
-    resolve(children, (value, index, op) => {
-      if (op === 'del') {
-        const oldChild = target.children[index];
-        if (oldChild) {
-          target.removeChild(oldChild);
-        }
-      }
-      else if (op === 'add') {
-        const newChild = createNode.call(context, value, ns);
-        if (newChild) {
-          target.appendChild(newChild);
-        }
-      }
-      else if (op === 'upd') {
-        const oldChild = target.children[index];
-        if (oldChild) {
-          const newChild = createNode.call(context, value, ns);
-          if (newChild) {
-            target.replaceChild(newChild, oldChild);
-          }
-        }
-      }
-      else {
+    resolve(children, (value, index, arr) => {
+      if (!arr) {
         target.innerHTML = '';
         const fragment = createNode.call(context, value, ns);
         if (fragment instanceof Node) {
           target.appendChild(fragment);
+        }
+      }
+      else {
+        // remove child by index
+        if (isUndefined(value)) {
+          const oldChild = target.children[index];
+          if (oldChild) {
+            target.removeChild(oldChild);
+          }
+        }
+        // replace child by index
+        else if (target.children[index]) {
+          const oldChild = target.children[index];
+          if (oldChild) {
+            const newChild = createNode.call(context, value, ns);
+            if (newChild) {
+              target.replaceChild(newChild, oldChild);
+            }
+          }
+        }
+        // append new child
+        else {
+          const newChild = createNode.call(context, value, ns);
+          if (newChild) {
+            target.appendChild(newChild);
+          }
         }
       }
     });

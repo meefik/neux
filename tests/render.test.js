@@ -3,23 +3,27 @@ import { JSDOM } from 'jsdom';
 import { suite, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-suite('render', () => {
+const timeout = (cb, t = 100) => {
+  setTimeout(() => cb(new Error('Timeout')), t);
+};
+
+suite('render', async () => {
   const { window } = new JSDOM('', {
     url: 'http://localhost',
     contentType: 'text/html',
   });
   global.window = window;
 
-  test('initial', async (t) => {
-    test('tag', async (t) => {
-      t.test('tag name', () => {
+  await test('initial', async (t) => {
+    await test('tag', async (t) => {
+      await t.test('tag name', () => {
         const el = render({
           tag: 'p',
         });
         assert.equal(el.tagName, 'P');
       });
 
-      t.test('CSS selector', () => {
+      await t.test('CSS selector', () => {
         const el = render({
           tag: 'p#my-id.my-class1.my-class2',
         });
@@ -217,129 +221,125 @@ suite('render', () => {
       assert.equal(window.document.body.firstChild, null);
     });
 
-    await t.test('on:mounted', { timeout: 100 }, async () => {
-      try {
-        let el = null;
-        await new Promise((resolve) => {
-          el = render({
-            on: {
-              mounted: () => resolve(),
-            },
-          });
-          mount(el, window.document.body);
-        }).finally(() => {
-          el?.remove();
+    await t.test('on:mounted', async () => {
+      let el = null;
+      return new Promise((resolve, reject) => {
+        timeout(reject);
+        el = render({
+          on: {
+            mounted: () => resolve(),
+          },
         });
-        assert.ok(true);
-      }
-      catch (err) {
-        assert.fail(err.message);
-      }
+        mount(el, window.document.body);
+      }).finally(() => {
+        el?.remove();
+      });
     });
 
-    await t.test('on:changed', { timeout: 100 }, async () => {
-      try {
-        let el = null;
-        await new Promise((resolve, reject) => {
-          el = render({
-            attributes: {
-              'my-attr': '1',
+    await t.test('on:changed', async () => {
+      let el = null;
+      return new Promise((resolve, reject) => {
+        timeout(reject);
+        el = render({
+          attributes: {
+            'my-attr': '1',
+          },
+          on: {
+            mounted(e) {
+              e.target.setAttribute('my-attr', '2');
             },
-            on: {
-              mounted(e) {
-                e.target.setAttribute('my-attr', '2');
-              },
-              changed(e) {
-                if (e.detail.attributeName === 'my-attr'
-                  && e.detail.newValue === '2' && e.detail.oldValue === '1') {
-                  resolve();
-                }
-                else {
-                  reject(new Error('Incorrect event'));
-                }
-              },
+            changed(e) {
+              if (e.detail.attributeName === 'my-attr'
+                && e.detail.newValue === '2' && e.detail.oldValue === '1') {
+                resolve();
+              }
+              else {
+                reject(new Error('Incorrect event'));
+              }
             },
-          });
-          mount(el, window.document.body);
-        }).finally(() => {
-          el?.remove();
+          },
         });
-        assert.ok(true);
-      }
-      catch (err) {
-        assert.fail(err.message);
-      }
+        mount(el, window.document.body);
+      }).finally(() => {
+        el?.remove();
+      });
     });
 
-    await t.test('on:removed', { timeout: 100 }, async () => {
-      try {
-        let el = null;
-        await new Promise((resolve) => {
-          el = render({
-            on: {
-              mounted: e => e.target.remove(),
-              removed: () => resolve(),
-            },
-          });
-          mount(el, window.document.body);
-        }).finally(() => {
-          el?.remove();
+    await t.test('on:removed', async () => {
+      let el = null;
+      return new Promise((resolve, reject) => {
+        timeout(reject);
+        el = render({
+          on: {
+            mounted: e => e.target.remove(),
+            removed: () => resolve(),
+          },
         });
-        assert.ok(true);
-      }
-      catch (err) {
-        assert.fail(err.message);
-      }
+        mount(el, window.document.body);
+      }).finally(() => {
+        el?.remove();
+      });
     });
   });
 
-  test('reactivity', async (t) => {
-    await t.test('parameters', () => {
+  await test('reactivity', async (t) => {
+    await t.test('textContent', () => {
       const state = signal({
-        counter: 1,
-        text: 'Text',
-        color: 'red',
-        dataId: '1',
+        text: '',
       });
       const el = render({
-        children: [{
-          tagName: 'input',
-          type: 'number',
-          value: () => state.$counter,
-        }, {
-          textContent: () => state.$text,
-        }, {
-          style: {
-            color: () => state.$color,
-          },
-        }, {
-          dataset: {
-            id: () => state.$dataId,
-          },
-        }, {
-          style() {
-            return {
-              color: state.$color,
-            };
-          },
-        }, {
-          dataset() {
-            return {
-              id: state.$dataId,
-            };
-          },
-        }],
+        textContent: () => state.$text,
       });
-      state.counter++;
-      assert.equal(el.children[0].value, `${state.counter}`);
       state.text = 'Hello';
-      assert.equal(el.children[1].textContent, state.text);
+      assert.equal(el.textContent, state.text);
+    });
+
+    await t.test('style', () => {
+      // object
+      const state = signal({
+        color: 'red',
+      });
+      const el1 = render({
+        style() {
+          return {
+            color: state.$color,
+          };
+        },
+      });
       state.color = 'blue';
-      assert.equal(el.children[2].style.color, state.color);
-      assert.equal(el.children[4].style.color, state.color);
+      assert.equal(el1.style.color, state.color);
+      // nested field
+      const el2 = render({
+        style: {
+          color: () => state.$color,
+        },
+      });
+      state.color = 'green';
+      assert.equal(el2.style.color, state.color);
+    });
+
+    await t.test('dataset', async () => {
+      // object
+      const state = signal({
+        dataId: '1',
+      });
+      const el1 = render({
+        dataset() {
+          return {
+            id: state.$dataId,
+          };
+        },
+      });
       state.dataId = '2';
-      assert.equal(el.children[3].dataset.id, state.dataId);
-      assert.equal(el.children[5].dataset.id, state.dataId);
+      assert.equal(el1.dataset.id, state.dataId);
+      // nested field
+      const el2 = render({
+        dataset: {
+          id: () => state.$dataId,
+        },
+      });
+      state.dataId = '3';
+      assert.equal(el2.dataset.id, state.dataId);
     });
 
     await t.test('attributes', () => {
@@ -360,7 +360,7 @@ suite('render', () => {
         cls: ['a', 'b'],
       });
       const el = render({
-        classList: () => state.$cls,
+        classList: () => state.cls.$,
       });
       state.cls.push('c');
       assert.equal(el.className, state.cls.join(' '));
@@ -377,7 +377,7 @@ suite('render', () => {
       });
       const el = render({
         tag: 'ul',
-        children: () => state.list.$$map((item) => {
+        children: () => state.list.$map((item) => {
           return {
             tag: 'li',
             children: [{
