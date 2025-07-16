@@ -1,7 +1,8 @@
-import { signal, render, mount } from '../dist/neux.esm.js';
 import { JSDOM } from 'jsdom';
 import { suite, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { render, mount } from '../src/render.js';
+import { signal } from '../src/signal.js';
 
 const timeout = (cb, t = 100) => {
   setTimeout(() => cb(new Error('Timeout')), t);

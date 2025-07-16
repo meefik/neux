@@ -1,6 +1,6 @@
 import { suite, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { l10n } from '../dist/neux.esm.js';
+import { l10n } from '../src/l10n.js';
 
 suite('l10n', async () => {
   const translate = l10n({

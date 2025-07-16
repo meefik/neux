@@ -1,6 +1,6 @@
-import { isUndefined, isArray, isFunction, isObject, isString } from './utils';
-import { createContext, readContext, writeContext } from './context';
-import EventListener from './listener';
+import { isUndefined, isArray, isFunction, isObject, isString } from './utils.js';
+import { createContext, readContext, writeContext } from './context.js';
+import EventListener from './listener.js';
 
 const signalKey = Symbol('signal');
 

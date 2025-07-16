@@ -1,3 +1,3 @@
-export * from './l10n';
-export * from './render';
-export * from './signal';
+export * from './l10n.js';
+export * from './render.js';
+export * from './signal.js';

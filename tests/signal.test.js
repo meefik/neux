@@ -1,6 +1,6 @@
 import { suite, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { signal, effect } from '../dist/neux.esm.js';
+import { signal, effect } from '../src/signal.js';
 
 const timeout = (cb, t = 100) => {
   setTimeout(() => cb(new Error('Timeout')), t);

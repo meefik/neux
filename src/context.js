@@ -1,4 +1,4 @@
-import { isObject } from './utils';
+import { isObject } from './utils.js';
 
 const contextKey = Symbol('context');
 const globalContext = {};

@@ -1,4 +1,4 @@
-import { isArray, isNumber, isObject, isString, isDate } from './utils';
+import { isArray, isNumber, isObject, isString, isDate } from './utils.js';
 
 /**
  * Create a localization.
