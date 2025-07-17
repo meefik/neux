@@ -172,7 +172,7 @@ function createNode(config, ns) {
   if (!isUndefined(classList)) {
     resolve(classList, (value) => {
       if (Array.isArray(value)) {
-        el.classList = value.join(' ');
+        el.classList = value.filter(Boolean).join(' ');
       }
       else if (isString(value)) {
         el.classList = value;
