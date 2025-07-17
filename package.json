@@ -20,10 +20,23 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./src/index.js",
-    "./l10n": "./src/l10n.js",
-    "./render": "./src/render.js",
-    "./signal": "./src/signal.js"
+    ".": {
+      "import": "./dist/neux.esm.js",
+      "require": "./dist/neux.umd.js",
+      "types": "./types/index.d.ts"
+    },
+    "./l10n": {
+      "import": "./src/l10n.js",
+      "types": "./types/l10n.d.ts"
+    },
+    "./render": {
+      "import": "./src/render.js",
+      "types": "./types/render.d.ts"
+    },
+    "./signal": {
+      "import": "./src/signal.js",
+      "types": "./types/signal.d.ts"
+    }
   },
   "scripts": {
     "build": "rollup -c",
