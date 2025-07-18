@@ -318,10 +318,10 @@ export function mount(el, target) {
     for (const mutation of mutationList) {
       if (mutation.type === 'childList') {
         mutation.addedNodes.forEach((node) => {
-          dispatchEvent(node, 'mounted');
+          if (node.parentElement) dispatchEvent(node, 'mounted');
         });
         mutation.removedNodes.forEach((node) => {
-          dispatchEvent(node, 'removed');
+          if (!node.parentElement) dispatchEvent(node, 'removed');
           if (node === el) observer.disconnect();
         });
       }
