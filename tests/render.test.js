@@ -18,10 +18,31 @@ suite('render', async () => {
   await test('initial', async (t) => {
     await test('tag', async (t) => {
       await t.test('tag name', () => {
-        const el = render({
+        // as string
+        const el1 = render({
           tag: 'p',
         });
-        assert.equal(el.tagName, 'P');
+        assert.equal(el1.tagName, 'P');
+        // nested element
+        const View = () => {
+          return {
+            tag: 'p',
+          };
+        };
+        // as object
+        const el2 = render({
+          tag: View(),
+          textContent: 'Hello',
+        });
+        assert.equal(el2.tagName, 'P');
+        assert.equal(el2.textContent, 'Hello');
+        // as function
+        const el3 = render({
+          tag: View,
+          textContent: 'Hello',
+        });
+        assert.equal(el3.tagName, 'P');
+        assert.equal(el3.textContent, 'Hello');
       });
 
       await t.test('CSS selector', () => {
