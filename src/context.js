@@ -39,13 +39,12 @@ export function writeContext(ctx, obj, prop, value) {
  * @returns {*} Value returned by the getter function.
  */
 export function readContext(ctx, getter, handler) {
-  if (ctx[contextKey]) {
-    throw Error('Collision in signal binding');
-  }
   const store = new Map();
+  const oldStore = ctx[contextKey];
   ctx[contextKey] = store;
   const val = getter();
-  delete ctx[contextKey];
+  if (oldStore) ctx[contextKey] = oldStore;
+  else delete ctx[contextKey];
   for (const kv of store) {
     const [obj, props] = kv;
     for (const prop in props) {
