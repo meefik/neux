@@ -13,4 +13,4 @@ export function l10n(
     language?: string,
     fallback?: string,
   }
-): (path: string, data?: object | string, lang?: string) => string;
+): (path: string | number | Date, data?: object | string, lang?: string) => string;

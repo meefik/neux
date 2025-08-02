@@ -40,16 +40,18 @@ suite('l10n', async () => {
   });
 
   await test('Intl.NumberFormat', () => {
-    assert.equal(translate('number', { val: [
-      12345,
-      { style: 'currency', currency: 'USD' },
-    ] }, 'en'), 'Number: $12,345.00');
+    const format = { style: 'currency', currency: 'USD' };
+    const value = 12345;
+    const result = '$12,345.00';
+    assert.equal(translate('number', { val: [value, format] }, 'en'), `Number: ${result}`);
+    assert.equal(translate(value, format, 'en'), result);
   });
 
   await test('Intl.DateTimeFormat', () => {
-    assert.equal(translate('date', { val: [
-      new Date('2021-01-01'),
-      { dateStyle: 'full' },
-    ] }, 'en'), 'Date: Friday, January 1, 2021');
+    const format = { dateStyle: 'full' };
+    const value = new Date('2021-01-01');
+    const result = 'Friday, January 1, 2021';
+    assert.equal(translate('date', { val: [value, format] }, 'en'), `Date: ${result}`);
+    assert.equal(translate(value, format, 'en'), result);
   });
 });

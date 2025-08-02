@@ -1,4 +1,4 @@
-import { isArray, isNumber, isObject, isString, isDate } from './utils.js';
+import { isArray, isObject, isString, isFunction } from './utils.js';
 
 /**
  * Create a localization.
@@ -23,27 +23,27 @@ export function l10n(locales, options) {
     if (!lang || !locales[lang]) {
       lang = fallback;
     }
-    const arr = `${path}`.split('.');
-    let text = arr.reduce((o, k) => (isObject(o) ? o[k] : ''), locales[lang]);
-    if (isString(text)) {
+    if (isString(path)) {
+      let text = path.split('.').reduce((o, k) => (isObject(o) ? o[k] : ''), locales[lang]);
       for (const k in data) {
         const re = new RegExp(`%\\{${k}\\}`, 'gu');
-        let replaceValue = data[k];
-        if (isArray(replaceValue)) {
-          const [value, format] = replaceValue;
-          replaceValue = value;
-          if (isObject(format)) {
-            if (isNumber(value)) {
-              replaceValue = value.toLocaleString(lang, format);
-            }
-            else if (isDate(value)) {
-              replaceValue = value.toLocaleString(lang, format);
-            }
+        let newValue = data[k];
+        if (isArray(newValue)) {
+          const [value, options] = newValue;
+          if (isFunction(value?.toLocaleString)) {
+            newValue = value.toLocaleString(lang, options);
+          }
+          else {
+            newValue = value;
           }
         }
-        text = text.replace(re, replaceValue);
+        text = text.replace(re, newValue);
       }
+      return text;
     }
-    return text;
+    else if (isFunction(path?.toLocaleString)) {
+      return path.toLocaleString(lang, data);
+    }
+    return path;
   };
 }
