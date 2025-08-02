@@ -5,18 +5,23 @@ import { l10n } from '../src/l10n.js';
 suite('l10n', async () => {
   const translate = l10n({
     en: {
-      say: {
+      'hello': 'Hello',
+      'say': {
         hello: 'Hello %{name}!',
       },
-      number: 'Number: %{val}',
-      date: 'Date: %{val}',
+      'say.goodbye': 'Goodbye',
+      'number': 'Number: %{val}',
+      'date': 'Date: %{val}',
+      'unique': 'Unique',
     },
     ru: {
-      say: {
+      'hello': 'Привет',
+      'say': {
         hello: 'Привет %{name}!',
       },
-      number: 'Число: %{val}',
-      date: 'Дата: %{val}',
+      'say.goodbye': 'До свидания',
+      'number': 'Число: %{val}',
+      'date': 'Дата: %{val}',
     },
   }, {
     language: 'ru',
@@ -24,19 +29,26 @@ suite('l10n', async () => {
   });
 
   await test('default locale', () => {
+    assert.equal(translate('hello'), 'Привет');
     assert.equal(translate('say.hello', { name: 'Joe' }), 'Привет Joe!');
+    assert.equal(translate('say.goodbye'), 'До свидания');
   });
 
   await test('change locale', () => {
+    assert.equal(translate('hello', 'en'), 'Hello');
     assert.equal(translate('say.hello', { name: 'Joe' }, 'en'), 'Hello Joe!');
+    assert.equal(translate('say.goodbye', 'en'), 'Goodbye');
   });
 
-  await test('unknown locale', () => {
+  await test('fallback', () => {
+    assert.equal(translate('hello', 'fr'), 'Hello');
     assert.equal(translate('say.hello', { name: 'Joe' }, 'fr'), 'Hello Joe!');
+    assert.equal(translate('unique', 'ru'), 'Unique');
   });
 
   await test('unknown key', () => {
-    assert.equal(translate('say.hi'), undefined);
+    assert.equal(translate('say.hi'), 'say.hi');
+    assert.equal(translate('Value: %{val}', { val: 1 }), 'Value: 1');
   });
 
   await test('Intl.NumberFormat', () => {

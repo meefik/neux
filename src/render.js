@@ -122,7 +122,7 @@ function createNode(config, ns) {
   // create element
   const el = (isObject(tag) || isFunction(tag))
     ? createNode.call(context, tag, namespaceURI)
-    : createElement(tag ?? tagName, namespaceURI);
+    : createElement(tag || tagName, namespaceURI);
   ns = el.namespaceURI;
   // create shadow root if defined
   let shadowRoot;
