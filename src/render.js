@@ -320,10 +320,10 @@ export function mount(el, target) {
     for (const mutation of mutationList) {
       if (mutation.type === 'childList') {
         mutation.addedNodes.forEach((node) => {
-          if (node.parentElement) dispatchEvent(node, 'mounted');
+          if (node.parentNode) dispatchEvent(node, 'mounted');
         });
         mutation.removedNodes.forEach((node) => {
-          if (!node.parentElement) dispatchEvent(node, 'removed');
+          if (!node.parentNode) dispatchEvent(node, 'removed');
           if (node === el) observer.disconnect();
         });
       }
