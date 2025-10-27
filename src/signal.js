@@ -1,6 +1,6 @@
 import { isUndefined, isArray, isFunction, isObject, isString } from './utils.js';
 import { createContext, readContext, writeContext } from './context.js';
-import EventListener from './listener.js';
+import EventEmitter from './emitter.js';
 
 const signalKey = Symbol('signal');
 
@@ -29,7 +29,7 @@ function parsePropery(prop) {
  * @param {object} state Reactive state.
  * @param {string} prop Property name.
  * @param {function} getter Getter function.
- * @param {EventListener} cleaner Event listener for cleanup.
+ * @param {EventEmitter} cleaner Event emitter for cleanup.
  * @returns {*} Getter value.
  */
 function setUpdater(ctx, state, prop, getter, cleaner) {
@@ -50,7 +50,7 @@ function setUpdater(ctx, state, prop, getter, cleaner) {
  * @param {object} state Reactive state.
  * @param {string} prop Property name.
  * @param {object} child Child reactive state.
- * @param {EventListener} cleaner Event listener for cleanup.
+ * @param {EventEmitter} cleaner Event emitter for cleanup.
  */
 function setWatcher(state, prop, child, cleaner) {
   cleaner.emit(prop);
@@ -108,21 +108,21 @@ export function signal(data = {}) {
     return data;
   }
   const context = createContext(this);
-  const listener = new EventListener(context);
-  const watcher = new EventListener();
-  const updater = new EventListener();
+  const emitter = new EventEmitter(context);
+  const watcher = new EventEmitter();
+  const updater = new EventEmitter();
   const tools = {
     $$on(event, handler) {
-      return listener.on(event, handler);
+      return emitter.on(event, handler);
     },
     $$once(event, handler) {
-      return listener.once(event, handler);
+      return emitter.once(event, handler);
     },
     $$off(event, handler) {
-      return listener.off(event, handler);
+      return emitter.off(event, handler);
     },
     $$emit(event, ...args) {
-      return listener.emit(event, ...args);
+      return emitter.emit(event, ...args);
     },
   };
   const handler = {
@@ -165,7 +165,7 @@ export function signal(data = {}) {
         return false;
       }
       if (changed) {
-        listener.emit(isLengthProp ? prop : [prop, '#', '*'], value, oldv, prop, state);
+        emitter.emit(isLengthProp ? prop : [prop, '#', '*'], value, oldv, prop, state);
       }
       return true;
     },
@@ -179,7 +179,7 @@ export function signal(data = {}) {
       }
       watcher.emit(prop);
       updater.emit(prop);
-      listener.emit([prop, '#', '*'], undefined, oldv, prop, state);
+      emitter.emit([prop, '#', '*'], undefined, oldv, prop, state);
       return true;
     },
   };

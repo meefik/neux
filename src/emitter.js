@@ -1,60 +1,62 @@
 /**
- * Event listener.
+ * Event emitter.
  */
-export default class EventListener {
+export default class EventEmitter extends Map {
   constructor(context) {
-    this._lst = {};
+    super();
     this._ctx = context;
   }
 
-  on(event, handler, once) {
+  on(event, handler) {
     if (event && handler) {
-      const list = this._lst;
       const events = [].concat(event);
       for (const ev of events) {
-        if (!list[ev]) {
-          list[ev] = new Map();
+        if (!this.has(ev)) {
+          this.set(ev, new Map());
         }
-        list[ev].set(handler, once);
+        this.get(ev).set(handler, false);
       }
     }
   }
 
   once(event, handler) {
-    this.on(event, handler, true);
+    if (event && handler) {
+      const events = [].concat(event);
+      for (const ev of events) {
+        if (!this.has(ev)) {
+          this.set(ev, new Map());
+        }
+        this.get(ev).set(handler, true);
+      }
+    }
   }
 
   off(event, handler) {
     if (event) {
-      const list = this._lst;
       const events = [].concat(event);
       for (const ev of events) {
-        if (list[ev]) {
+        if (this.has(ev)) {
           if (handler) {
-            list[ev].delete(handler);
-            if (!list[ev].size) {
-              delete list[ev];
+            this.get(ev).delete(handler);
+            if (!this.get(ev).size) {
+              this.delete(ev);
             }
           }
           else {
-            list[ev].clear();
-            delete list[ev];
+            this.get(ev).clear();
+            this.delete(ev);
           }
         }
       }
-    }
-    else {
-      this._lst = {};
     }
   }
 
   emit(event, ...args) {
     if (event) {
-      const list = this._lst;
       const events = [].concat(event);
       for (const ev of events) {
-        if (list[ev]) {
-          for (const [handler, once] of list[ev]) {
+        if (this.has(ev)) {
+          for (const [handler, once] of this.get(ev)) {
             if (once) {
               this.off(ev, handler);
             }
