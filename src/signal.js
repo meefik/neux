@@ -184,7 +184,8 @@ export function signal(data = {}) {
     },
   };
   const state = new Proxy(data, handler);
-  for (let prop in data) {
+  const props = Object.keys(data);
+  for (const prop of props) {
     const [event] = parsePropery(prop);
     if (event) continue;
     if (isFunction(data[prop])) {
