@@ -243,184 +243,298 @@ suite('render', async () => {
       assert.equal(window.document.body.firstChild, null);
     });
 
-    await t.test('on:mounted', async () => {
-      let el = null;
-      return new Promise((resolve, reject) => {
+    await t.test('on:updated', async () => {
+      await new Promise((resolve, reject) => {
         timeout(reject);
-        el = render({
+        let count = 0;
+        let key = 'a';
+        const stack = [
+          { property: 'dataset.key', value: 'a' },
+          { property: 'textContent', value: 'Count: 0' },
+          { property: 'dataset.key', value: 'b' },
+          { property: 'textContent', value: 'Count: 1' },
+        ];
+        const el = render({
+          dataset: {
+            key: () => key,
+          },
+          textContent: () => {
+            return `Count: ${count}`;
+          },
           on: {
-            mounted: () => resolve(),
+            updated: (e) => {
+              const item = stack.find((item) => {
+                return item.property === e.detail?.property
+                  && item.value === e.detail?.value;
+              });
+              if (item) stack.splice(stack.indexOf(item), 1);
+              if (stack.length === 0) {
+                resolve();
+              }
+            },
           },
         });
-        mount(el, window.document.body);
-      }).finally(() => {
-        el?.remove();
+        count = 1;
+        key = 'b';
+        el.dispatchEvent(new window.CustomEvent('refresh', { detail: ['textContent', 'dataset.key'] }));
       });
+    });
+
+    await t.test('on:mounted', async () => {
+      let el = null;
+      try {
+        await new Promise((resolve, reject) => {
+          timeout(reject);
+          el = render({
+            on: {
+              mounted: () => resolve(),
+            },
+          });
+          mount(el, window.document.body);
+        });
+      }
+      finally {
+        el?.remove();
+      }
     });
 
     await t.test('on:changed', async () => {
       let el = null;
-      return new Promise((resolve, reject) => {
-        timeout(reject);
-        el = render({
-          attributes: {
-            'my-attr': '1',
-          },
-          on: {
-            mounted(e) {
-              e.target.setAttribute('my-attr', '2');
+      try {
+        await new Promise((resolve, reject) => {
+          timeout(reject);
+          el = render({
+            attributes: {
+              'my-attr': '1',
             },
-            changed(e) {
-              if (e.detail.attributeName === 'my-attr'
-                && e.detail.newValue === '2' && e.detail.oldValue === '1') {
-                resolve();
-              }
-              else {
-                reject(new Error('Incorrect event'));
-              }
+            on: {
+              mounted(e) {
+                e.target.setAttribute('my-attr', '2');
+              },
+              changed(e) {
+                if (e.detail.attributeName === 'my-attr'
+                  && e.detail.newValue === '2' && e.detail.oldValue === '1') {
+                  resolve();
+                }
+                else {
+                  reject(new Error('Incorrect event'));
+                }
+              },
             },
-          },
+          });
+          mount(el, window.document.body);
         });
-        mount(el, window.document.body);
-      }).finally(() => {
+      }
+      finally {
         el?.remove();
-      });
+      }
     });
 
     await t.test('on:removed', async () => {
       let el = null;
-      return new Promise((resolve, reject) => {
-        timeout(reject);
-        el = render({
-          on: {
-            mounted: e => e.target.remove(),
-            removed: () => resolve(),
-          },
+      try {
+        await new Promise((resolve, reject) => {
+          timeout(reject);
+          el = render({
+            on: {
+              mounted: e => e.target.remove(),
+              removed: () => resolve(),
+            },
+          });
+          mount(el, window.document.body);
         });
-        mount(el, window.document.body);
-      }).finally(() => {
+      }
+      finally {
         el?.remove();
-      });
+      }
     });
   });
 
   await test('reactivity', async (t) => {
-    await t.test('textContent', () => {
-      const state = signal({
-        text: '',
+    await t.test('textContent', async () => {
+      await new Promise((resolve, reject) => {
+        timeout(reject);
+        const state = signal({
+          text: '',
+        });
+        render({
+          textContent: () => state.$text,
+          on: {
+            updated: (e) => {
+              if (e.detail?.property === 'textContent' && e.target.textContent === 'Hello') {
+                resolve();
+              }
+            },
+          },
+        });
+        state.text = 'Hello';
       });
-      const el = render({
-        textContent: () => state.$text,
-      });
-      state.text = 'Hello';
-      assert.equal(el.textContent, state.text);
     });
 
-    await t.test('style', () => {
+    await t.test('style', async () => {
       // object
-      const state = signal({
-        color: 'red',
+      await new Promise((resolve, reject) => {
+        timeout(reject);
+        const state = signal({
+          color: 'red',
+        });
+        render({
+          style() {
+            return {
+              color: state.$color,
+            };
+          },
+          on: {
+            updated: (e) => {
+              if (e.detail?.property === 'style.color' && e.target.style.color === 'blue') {
+                resolve();
+              }
+            },
+          },
+        });
+        state.color = 'blue';
       });
-      const el1 = render({
-        style() {
-          return {
-            color: state.$color,
-          };
-        },
-      });
-      state.color = 'blue';
-      assert.equal(el1.style.color, state.color);
       // nested field
-      const el2 = render({
-        style: {
-          color: () => state.$color,
-        },
+      await new Promise((resolve, reject) => {
+        timeout(reject);
+        const state = signal({
+          color: 'red',
+        });
+        render({
+          style: {
+            color: () => state.$color,
+          },
+          on: {
+            updated: (e) => {
+              if (e.detail?.property === 'style.color' && e.target.style.color === 'blue') {
+                resolve();
+              }
+            },
+          },
+        });
+        state.color = 'blue';
       });
-      state.color = 'green';
-      assert.equal(el2.style.color, state.color);
     });
 
     await t.test('dataset', async () => {
       // object
-      const state = signal({
-        dataId: '1',
+      await new Promise((resolve, reject) => {
+        timeout(reject);
+        const state = signal({
+          dataId: '1',
+        });
+        render({
+          dataset() {
+            return {
+              id: state.$dataId,
+            };
+          },
+          on: {
+            updated: (e) => {
+              if (e.detail?.property === 'dataset.id' && e.target.dataset.id === '2') {
+                resolve();
+              }
+            },
+          },
+        });
+        state.dataId = '2';
       });
-      const el1 = render({
-        dataset() {
-          return {
-            id: state.$dataId,
-          };
-        },
-      });
-      state.dataId = '2';
-      assert.equal(el1.dataset.id, state.dataId);
       // nested field
-      const el2 = render({
-        dataset: {
-          id: () => state.$dataId,
-        },
+      await new Promise((resolve, reject) => {
+        timeout(reject);
+        const state = signal({
+          dataId: '1',
+        });
+        render({
+          dataset: {
+            id: () => state.$dataId,
+          },
+          on: {
+            updated: (e) => {
+              if (e.detail?.property === 'dataset.id' && e.target.dataset.id === '2') {
+                resolve();
+              }
+            },
+          },
+        });
+        state.dataId = '2';
       });
-      state.dataId = '3';
-      assert.equal(el2.dataset.id, state.dataId);
     });
 
-    await t.test('attributes', () => {
-      const state = signal({
-        attr: '',
+    await t.test('attributes', async () => {
+      await new Promise((resolve, reject) => {
+        timeout(reject);
+        const state = signal({
+          attr: '',
+        });
+        render({
+          attributes: {
+            for: () => state.$attr,
+          },
+          on: {
+            updated: (e) => {
+              if (e.detail?.property === 'attributes.for' && e.target.getAttribute('for') === 'my-input') {
+                resolve();
+              }
+            },
+          },
+        });
+        state.attr = 'my-input';
       });
-      const el = render({
-        attributes: {
-          for: () => state.$attr,
-        },
-      });
-      state.attr = 'my-input';
-      assert.equal(el.getAttribute('for'), state.attr);
     });
 
-    await t.test('classList', () => {
-      const state = signal({
-        cls: ['a', 'b'],
+    await t.test('classList', async () => {
+      await new Promise((resolve, reject) => {
+        timeout(reject);
+        const state = signal({
+          cls: ['a', 'b'],
+        });
+        render({
+          classList: () => state.cls.$,
+          on: {
+            updated: (e) => {
+              if (e.detail?.property === 'classList' && e.target.className === 'a b c') {
+                resolve();
+              }
+            },
+          },
+        });
+        state.cls.push('c');
       });
-      const el = render({
-        classList: () => state.cls.$,
-      });
-      state.cls.push('c');
-      assert.equal(el.className, state.cls.join(' '));
     });
 
-    await t.test('children', () => {
-      const state = signal({
-        list: [{
-          text: 'Item 1',
-          checked: true,
-        }, {
-          text: 'Item 2',
-        }],
+    await t.test('children', async () => {
+      await new Promise((resolve, reject) => {
+        timeout(reject);
+        const state = signal({
+          list: [
+            { text: 'Item 1' },
+            { text: 'Item 2' },
+          ],
+        });
+        render({
+          tag: 'ul',
+          children: () => state.list.$.map((item) => {
+            return {
+              tag: 'li',
+              textContent: item.text,
+            };
+          }),
+          on: {
+            updated: (e) => {
+              if (e.detail?.property === 'children'
+                && e.target.children.length === 2
+                && e.target.children[0].textContent === 'Item 3'
+                && e.target.children[1].textContent === 'Item 4') {
+                resolve();
+              }
+            },
+          },
+        });
+        state.list.unshift({ text: 'Item 3' });
+        state.list.splice(1, 1, { text: 'Item 4' });
+        state.list.pop();
       });
-      const el = render({
-        tag: 'ul',
-        children: () => state.list.$map((item) => {
-          return {
-            tag: 'li',
-            children: [{
-              tag: 'input',
-              type: 'checkbox',
-              checked: () => item.$checked,
-            }, {
-              tag: 'label',
-              textContent: () => item.$text,
-            }],
-          };
-        }),
-      });
-      state.list.push({ text: 'Item 3' });
-      assert.equal(el.children[2].children[1].textContent, 'Item 3');
-      state.list.splice(1, 1, { text: 'Item 4' });
-      assert.equal(el.children[1].children[1].textContent, 'Item 4');
-      state.list.pop();
-      assert.equal(el.children.length, state.list.length);
-      state.list[0].checked = false;
-      assert.equal(el.children[0].children[0].checked, false);
     });
   });
 });

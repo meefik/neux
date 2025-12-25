@@ -10,7 +10,7 @@ export default class EventEmitter extends Map {
   on(event, handler) {
     if (event && handler) {
       const events = [].concat(event);
-      for (const ev of events) {
+      for (let ev of events) {
         if (!this.has(ev)) {
           this.set(ev, new Map());
         }
@@ -22,7 +22,7 @@ export default class EventEmitter extends Map {
   once(event, handler) {
     if (event && handler) {
       const events = [].concat(event);
-      for (const ev of events) {
+      for (let ev of events) {
         if (!this.has(ev)) {
           this.set(ev, new Map());
         }
@@ -34,7 +34,7 @@ export default class EventEmitter extends Map {
   off(event, handler) {
     if (event) {
       const events = [].concat(event);
-      for (const ev of events) {
+      for (let ev of events) {
         if (this.has(ev)) {
           if (handler) {
             this.get(ev).delete(handler);
@@ -54,9 +54,9 @@ export default class EventEmitter extends Map {
   emit(event, ...args) {
     if (event) {
       const events = [].concat(event);
-      for (const ev of events) {
+      for (let ev of events) {
         if (this.has(ev)) {
-          for (const [handler, once] of this.get(ev)) {
+          for (let [handler, once] of this.get(ev)) {
             if (once) {
               this.off(ev, handler);
             }

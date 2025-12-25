@@ -24,7 +24,7 @@ export function l10n(locales, options) {
 
   const populate = (text, data, lang) => {
     if (isString(text)) {
-      for (const k in data) {
+      for (let k in data) {
         const re = new RegExp(`%\\{${k}\\}`, 'gu');
         let newValue = data[k];
         if (isArray(newValue)) {

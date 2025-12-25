@@ -1,4 +1,4 @@
-import { isArray, isFunction, isObject, isString, isUndefined } from './utils.js';
+import { isArray, isFunction, isObject, isString, isUndefined, isEmpty } from './utils.js';
 import { createContext } from './context.js';
 import { effect } from './signal.js';
 
@@ -27,7 +27,7 @@ function createElement(tag, ns) {
     else {
       // if tag is a tag string with optional id and class names
       const match = tag.match(/([.#]?[^\s#.]+)/ug) || [];
-      for (const item of match) {
+      for (let item of match) {
         const firstChar = item[0];
         if (firstChar === '.') classList.push(item.slice(1));
         else if (firstChar === '#') id = item.slice(1);
@@ -96,7 +96,7 @@ function createNode(config, ns) {
   }
   if (isArray(config)) {
     const fragment = document.createDocumentFragment();
-    for (const item of config) {
+    for (let item of config) {
       const child = createNode.call(context, item, ns);
       if (child instanceof Node) {
         fragment.appendChild(child);
@@ -110,15 +110,32 @@ function createNode(config, ns) {
     namespaceURI = ns,
     shadowRootMode,
     adoptedStyleSheets,
-    classList,
-    attributes,
-    style,
-    dataset,
     on,
-    children,
     ref,
     ...rest
   } = config;
+  // allocate and dispose bindings
+  const bindings = new Map();
+  const dispose = (key) => {
+    if (key) {
+      for (let k of bindings.keys()) {
+        if (k.startsWith(key)) {
+          for (let fn of bindings.get(k)) fn();
+          bindings.delete(k);
+        }
+      }
+    }
+    else {
+      for (let fns of bindings.values()) {
+        for (let fn of fns) fn();
+      }
+      bindings.clear();
+    }
+  };
+  const allocate = (key, fn) => {
+    if (bindings.has(key)) bindings.get(key).push(fn);
+    else bindings.set(key, [fn]);
+  };
   // create element
   const el = (isObject(tag) || isFunction(tag))
     ? createNode.call(context, tag, namespaceURI)
@@ -132,20 +149,9 @@ function createNode(config, ns) {
       shadowRoot.adoptedStyleSheets = adoptedStyleSheets;
     }
   }
-  // watch for reactive properties
-  const cleanups = [];
-  const resolve = (getter, setter) => {
-    if (isFunction(getter)) {
-      const dispose = effect.call(context, getter, setter);
-      cleanups.push(dispose);
-    }
-    else {
-      setter(getter);
-    }
-  };
   // parse event handlers
   if (!isUndefined(on)) {
-    for (const ev in on) {
+    for (let ev in on) {
       const handler = on[ev];
       if (isFunction(handler)) {
         el.addEventListener(ev, e => handler.call(context, e));
@@ -154,7 +160,7 @@ function createNode(config, ns) {
   }
   // add custom event listeners
   const dispatchEvent = ({ children }, event) => {
-    for (const child of children) {
+    for (let child of children) {
       const ev = new CustomEvent(event, { cancelable: true });
       child.dispatchEvent(ev);
     }
@@ -166,108 +172,149 @@ function createNode(config, ns) {
   });
   el.addEventListener('removed', (e) => {
     if (!e.defaultPrevented) {
+      dispose();
       dispatchEvent(el, 'removed');
-      for (const cleanup of cleanups) cleanup();
     }
   });
-  // parse classList
-  if (!isUndefined(classList)) {
-    resolve(classList, (value) => {
-      if (Array.isArray(value)) {
-        el.classList = value.filter(Boolean).join(' ');
-      }
-      else if (isString(value)) {
-        el.classList = value;
-      }
-    });
-  }
-  // parse attributes
-  if (!isUndefined(attributes)) {
-    resolve(attributes, (attributes) => {
-      for (const attr in attributes) {
-        resolve(attributes[attr], (value) => {
-          if (isUndefined(value)) el.removeAttribute(attr);
-          else el.setAttribute(attr, value);
-        });
-      }
-    });
-  }
-  // parse styles
-  if (!isUndefined(style)) {
-    resolve(style, (style) => {
-      for (const prop in style) {
-        resolve(style[prop], (value) => {
-          if (/[A-Z]/u.test(prop)) {
-            // camelCase
-            if (isUndefined(value)) delete el.style[prop];
-            else el.style[prop] = value;
-          }
-          else {
-            // kebab-case
-            if (isUndefined(value)) el.style.removeProperty(prop);
-            else el.style.setProperty(prop, value);
-          }
-        });
-      }
-    });
-  }
-  // parse dataset
-  if (!isUndefined(dataset)) {
-    resolve(dataset, (dataset) => {
-      for (const prop in dataset) {
-        resolve(dataset[prop], (value) => {
-          if (isUndefined(value)) delete el.dataset[prop];
-          else el.dataset[prop] = value;
-        });
-      }
-    });
-  }
-  // set rest element parameters
-  for (const prop in rest) {
-    resolve(rest[prop], (value) => {
-      if (isUndefined(value)) delete el[prop];
-      else el[prop] = value;
-    });
-  }
-  // parse children
-  if (!isUndefined(children)) {
-    const target = shadowRoot || el;
-    resolve(children, (value, index, arr) => {
-      if (!arr) {
-        target.innerHTML = '';
-        const fragment = createNode.call(context, value, ns);
-        if (fragment instanceof Node) {
-          target.appendChild(fragment);
-        }
+  el.addEventListener('refresh', (e) => {
+    if (!e.defaultPrevented) {
+      if (!e.detail) {
+        patchNode(rest);
       }
       else {
-        // remove child by index
-        if (isUndefined(value)) {
-          const oldChild = target.children[index];
-          if (oldChild) {
-            target.removeChild(oldChild);
-          }
-        }
-        // replace child by index
-        else if (target.children[index]) {
-          const oldChild = target.children[index];
-          if (oldChild) {
-            const newChild = createNode.call(context, value, ns);
-            if (newChild) {
-              target.replaceChild(newChild, oldChild);
-            }
-          }
-        }
-        // append new child
-        else {
-          const newChild = createNode.call(context, value, ns);
-          if (newChild) {
-            target.appendChild(newChild);
-          }
+        const props = [].concat(e.detail);
+        for (let prop of props) {
+          const path = prop.split('.');
+          const params = path.reduce((acc, key, index) => {
+            return acc && (index >= path.length - 1
+              ? { [key]: acc[key] }
+              : acc[key]);
+          }, rest);
+          patchNode(params, path.slice(0, -1));
         }
       }
-    });
-  }
+    }
+  });
+  // apply parameters to the element
+  const patchNode = (params, path = []) => {
+    for (let key in params) {
+      const subpath = [...path, key];
+      const pathKey = subpath.join('.');
+      const [root, prop] = subpath;
+      const getter = params[key];
+      dispose(pathKey);
+      const dp = effect.call(context, getter, (value) => {
+        const preserved = prop || isString(prop);
+        // children
+        if (root === 'children') {
+          const target = shadowRoot || el;
+          const fragment = createNode.call(context, value, ns);
+          if (fragment instanceof Node) {
+            const oldChildren = Array.from(target[root]);
+            const isFragment = fragment.nodeType === Node.DOCUMENT_FRAGMENT_NODE;
+            const newChildren = Array.from(isFragment ? fragment[root] : [fragment]);
+            syncDOM(target, oldChildren, newChildren);
+          }
+          else {
+            target.innerHTML = '';
+            dispose(pathKey + '.');
+          }
+          value = fragment;
+        }
+        // classList
+        else if (root === 'classList') {
+          if (Array.isArray(value)) {
+            value = value.filter(Boolean).join(' ');
+          }
+          else if (!isString(value)) {
+            value = '';
+          }
+          el.className = value;
+        }
+        // attributes
+        else if (root === 'attributes') {
+          if (prop) {
+            if (preserved) el.setAttribute(prop, value);
+            else el.removeAttribute(prop);
+          }
+          else if (isEmpty(value)) {
+            const keys = Object.keys(el[root]);
+            for (let key of keys) {
+              delete el[root][key].name;
+            }
+            dispose(pathKey + '.');
+          }
+          else {
+            return patchNode(value, subpath);
+          }
+        }
+        // style
+        else if (root === 'style') {
+          if (prop) {
+            if (/[A-Z]/u.test(prop)) { // camelCase
+              if (preserved) el[root][prop] = value;
+              else delete el[root][prop];
+            }
+            else { // kebab-case
+              if (preserved) el[root].setProperty(prop, value);
+              else el[root].removeProperty(prop);
+            }
+          }
+          else if (isEmpty(value)) {
+            el.removeAttribute('style');
+            dispose(pathKey + '.');
+          }
+          else {
+            return patchNode(value, subpath);
+          }
+        }
+        // dataset
+        else if (root === 'dataset') {
+          if (prop) {
+            if (preserved) el[root][prop] = value;
+            else delete el[root][prop];
+          }
+          else if (isEmpty(value)) {
+            const keys = Object.keys(el[root]);
+            for (let key of keys) {
+              delete el[root][key];
+            }
+            dispose(pathKey + '.');
+          }
+          else {
+            return patchNode(value, subpath);
+          }
+        }
+        // other properties
+        else {
+          const { obj, key } = subpath.reduce((acc, key, index) => {
+            if (index === subpath.length - 1) {
+              return { obj: acc, key };
+            }
+            else if (isUndefined(acc[key])) {
+              acc[key] = {};
+            }
+            return acc[key];
+          }, el);
+          if (isUndefined(value)) {
+            delete obj[key];
+            dispose(pathKey + '.');
+          }
+          else {
+            obj[key] = value;
+          }
+        }
+        // dispatch the "updated" event
+        el.dispatchEvent(new CustomEvent('updated', {
+          detail: { property: pathKey, value },
+          cancelable: true,
+        }));
+      });
+      if (dp) allocate(pathKey, dp);
+    }
+  };
+  // initial patch
+  patchNode(rest);
   // set reference
   if (isFunction(ref)) {
     ref.call(context, el);
@@ -296,7 +343,10 @@ export function render(tag, config, children) {
     children = config;
     config = {};
   }
-  return createNode.call(this, { tag, children, ...config });
+  if (!isUndefined(children)) {
+    config = { children, ...config };
+  }
+  return createNode.call(this, { tag, ...config });
 }
 
 /**
@@ -306,10 +356,9 @@ export function render(tag, config, children) {
  * @param {Element|DocumentFragment|string} target Target element or selector.
  */
 export function mount(el, target) {
-  const { MutationObserver, CustomEvent, Element, document } = window;
-  const { ELEMENT_NODE } = Element;
+  const { MutationObserver, CustomEvent, Node, document } = window;
   const dispatchEvent = (node, event) => {
-    if (node.nodeType !== ELEMENT_NODE) return;
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
     const ev = new CustomEvent(event, { cancelable: true });
     node.dispatchEvent(ev);
   };
@@ -317,7 +366,7 @@ export function mount(el, target) {
     target = document.querySelector(target);
   }
   const observer = new MutationObserver((mutationList) => {
-    for (const mutation of mutationList) {
+    for (let mutation of mutationList) {
       if (mutation.type === 'childList') {
         mutation.addedNodes.forEach((node) => {
           if (node.parentNode) dispatchEvent(node, 'mounted');
@@ -347,4 +396,92 @@ export function mount(el, target) {
     attributeOldValue: true,
   });
   target.appendChild(el);
+}
+
+/**
+ * Sync DOM children between old and new lists with minimal operations.
+ *
+ * @param {Element} parent Parent element.
+ * @param {Element[]} oldList Old elements.
+ * @param {Element[]} newList New elements.
+ */
+function syncDOM(parent, oldList, newList) {
+  let oldStart = 0;
+  let newStart = 0;
+  let oldEnd = oldList.length - 1;
+  let newEnd = newList.length - 1;
+
+  // 1. Prefix sync
+  while (oldStart <= oldEnd && newStart <= newEnd) {
+    if (oldList[oldStart].isEqualNode(newList[newStart])) {
+      oldStart++;
+      newStart++;
+    }
+    else break;
+  }
+
+  // 2. Suffix sync
+  while (oldStart <= oldEnd && newStart <= newEnd) {
+    if (oldList[oldEnd].isEqualNode(newList[newEnd])) {
+      oldEnd--;
+      newEnd--;
+    }
+    else break;
+  }
+
+  // 3. Simple addition (new elements only)
+  if (oldStart > oldEnd) {
+    const referenceNode = oldList[oldEnd + 1] || null;
+    while (newStart <= newEnd) {
+      parent.insertBefore(newList[newStart++], referenceNode);
+    }
+  }
+  // 4. Simple removal (old elements only)
+  else if (newStart > newEnd) {
+    while (oldStart <= oldEnd) {
+      parent.removeChild(oldList[oldStart++]);
+    }
+  }
+  // 5. Complex Diff (Moves, Additions, Removals)
+  else {
+    const oldMap = new Map();
+    // Optimization: Use a Map of the remaining old nodes
+    for (let i = oldStart; i <= oldEnd; i++) {
+      oldMap.set(oldList[i], i);
+    }
+
+    while (newStart <= newEnd) {
+      const newNode = newList[newStart];
+      let oldMatch = null;
+
+      // Find a matching old node
+      for (let [oldNode] of oldMap) {
+        if (oldNode.isEqualNode(newNode)) {
+          oldMatch = oldNode;
+          break;
+        }
+      }
+
+      // Reference node is the CURRENT node at the oldStart position
+      const referenceNode = parent.children[oldStart];
+
+      if (oldMatch) {
+        // Move existing node to current position
+        parent.insertBefore(oldMatch, referenceNode);
+        oldMap.delete(oldMatch);
+      }
+      else {
+        // It's a brand new node
+        parent.insertBefore(newNode, referenceNode);
+      }
+
+      newStart++;
+      oldStart++; // Keep live DOM index in sync with newStart
+    }
+
+    // Cleanup nodes that weren't reused
+    for (let [node] of oldMap) {
+      parent.removeChild(node);
+    }
+  }
 }

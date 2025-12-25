@@ -1,4 +1,4 @@
-import { isUndefined, isArray, isFunction, isObject, isString } from './utils.js';
+import { isArray, isFunction, isObject, isString } from './utils.js';
 import { createContext, readContext, writeContext } from './context.js';
 import EventEmitter from './emitter.js';
 
@@ -68,33 +68,30 @@ function setWatcher(state, prop, child, cleaner) {
  *
  * @param {function} getter Getter function.
  * @param {function} [setter] Setter function.
- * @returns {function} Dispose function.
+ * @returns {function} Dispose function if needed.
  */
 export function effect(getter, setter) {
   const context = createContext(this);
   const getValue = isFunction(getter) ? getter.bind(context) : () => getter;
   const setValue = setter ? setter.bind(context) : () => {};
-  const cleanups = [];
-  const value = readContext(context, getValue, (obj, prop, value) => {
-    const getItemValue = prop === '#' && isFunction(value) ? value.bind(context) : null;
-    const handler = getItemValue
-      ? (newv, oldv, idx, arr) => {
-          const index = +idx;
-          const value = isUndefined(newv) ? newv : getItemValue(newv, index, arr);
-          setter(value, index, arr);
-        }
-      : () => {
-          const value = getValue();
-          setValue(value);
-        };
+  const cleanup = new Set();
+  const value = readContext(context, getValue, (obj, prop) => {
+    let timer;
+    const handler = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => setValue(getValue()), 0);
+    };
     obj.$$on(prop, handler);
-    cleanups.push(() => obj.$$off(prop, handler));
+    cleanup.add(() => obj.$$off(prop, handler));
   });
   setValue(value);
-  const dispose = () => {
-    for (const fn of cleanups) fn();
-  };
-  return dispose;
+  if (cleanup.size > 0) {
+    const dispose = () => {
+      for (let fn of cleanup) fn();
+      cleanup.clear();
+    };
+    return dispose;
+  }
 }
 
 /**
@@ -135,12 +132,6 @@ export function signal(data = {}) {
       }
       const [event, cleanProp] = parsePropery(prop);
       if (event) {
-        if (cleanProp === 'map' && isArray(obj)) {
-          return (fn, thisArg = context) => {
-            writeContext(context, state, '#', fn.bind(thisArg));
-            return state.map(fn, thisArg);
-          };
-        }
         writeContext(context, state, event);
         if (!cleanProp) return state;
       }
@@ -185,7 +176,7 @@ export function signal(data = {}) {
   };
   const state = new Proxy(data, handler);
   const props = Object.keys(data);
-  for (const prop of props) {
+  for (let prop of props) {
     const [event] = parsePropery(prop);
     if (event) continue;
     if (isFunction(data[prop])) {

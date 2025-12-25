@@ -22,3 +22,8 @@ export function isObject(obj) {
   return typeof obj === 'object' && obj !== null
     && (obj.constructor === Object || obj.constructor === Array);
 }
+
+export function isEmpty(obj) {
+  for (let key in obj) return false;
+  return true;
+}

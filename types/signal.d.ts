@@ -13,9 +13,9 @@ export function signal(data?: object): {
  *
  * @param getter Getter function that will be called when the reactive state changes.
  * @param setter Setter function that will be called after the getter function.
- * @returns Dispose function.
+ * @returns Dispose function if needed.
  */
 export function effect(
   getter: () => any,
   setter?: (value: any) => void
-): () => void;
+): (() => void) | void;
