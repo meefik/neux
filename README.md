@@ -941,7 +941,7 @@ mount(el, document.body);
 
 Try it in the playground:
 
-- [To-Do App](https://v47.livecodes.io/?x=id/jxghzemwwai)
+- [To-Do App](https://v47.livecodes.io/?x=id/uhkch4mgxfp)
 - [15 Puzzle](https://v47.livecodes.io/?x=id/efx9s47xqrr)
 - [Tic-Tac-Toe](https://v47.livecodes.io/?x=id/r4cjbuidtb3)
 - [SVG Clock](https://v47.livecodes.io/?x=id/mr5hs94hd5i)
