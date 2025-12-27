@@ -204,7 +204,7 @@ function createNode(config, ns) {
       const getter = params[key];
       dispose(pathKey);
       const dp = effect.call(context, getter, (value) => {
-        const preserved = prop || isString(prop);
+        const off = value === null || value === undefined;
         // children
         if (root === 'children') {
           const target = shadowRoot || el;
@@ -229,13 +229,13 @@ function createNode(config, ns) {
           else if (!isString(value)) {
             value = '';
           }
-          el.className = value;
+          el.classList = value;
         }
         // attributes
         else if (root === 'attributes') {
           if (prop) {
-            if (preserved) el.setAttribute(prop, value);
-            else el.removeAttribute(prop);
+            if (off) el.removeAttribute(prop);
+            else el.setAttribute(prop, value);
           }
           else if (isEmpty(value)) {
             const keys = Object.keys(el[root]);
@@ -252,12 +252,12 @@ function createNode(config, ns) {
         else if (root === 'style') {
           if (prop) {
             if (/[A-Z]/u.test(prop)) { // camelCase
-              if (preserved) el[root][prop] = value;
-              else delete el[root][prop];
+              if (off) delete el[root][prop];
+              else el[root][prop] = value;
             }
             else { // kebab-case
-              if (preserved) el[root].setProperty(prop, value);
-              else el[root].removeProperty(prop);
+              if (off) el[root].removeProperty(prop);
+              else el[root].setProperty(prop, value);
             }
           }
           else if (isEmpty(value)) {
@@ -271,8 +271,8 @@ function createNode(config, ns) {
         // dataset
         else if (root === 'dataset') {
           if (prop) {
-            if (preserved) el[root][prop] = value;
-            else delete el[root][prop];
+            if (off) delete el[root][prop];
+            else el[root][prop] = value;
           }
           else if (isEmpty(value)) {
             const keys = Object.keys(el[root]);
@@ -296,7 +296,7 @@ function createNode(config, ns) {
             }
             return acc[key];
           }, el);
-          if (isUndefined(value)) {
+          if (off) {
             delete obj[key];
             dispose(pathKey + '.');
           }
