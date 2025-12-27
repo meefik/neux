@@ -240,7 +240,8 @@ function createNode(config, ns) {
           else if (isEmpty(value)) {
             const keys = Object.keys(el[root]);
             for (let key of keys) {
-              delete el[root][key].name;
+              const name = el[root][key]?.name;
+              if (name) el.removeAttribute(name);
             }
             dispose(pathKey + '.');
           }
@@ -252,8 +253,7 @@ function createNode(config, ns) {
         else if (root === 'style') {
           if (prop) {
             if (/[A-Z]/u.test(prop)) { // camelCase
-              if (off) delete el[root][prop];
-              else el[root][prop] = value;
+              el[root][prop] = off ? '' : value;
             }
             else { // kebab-case
               if (off) el[root].removeProperty(prop);
@@ -296,7 +296,7 @@ function createNode(config, ns) {
             }
             return acc[key];
           }, el);
-          if (off) {
+          if (isUndefined(value)) {
             delete obj[key];
             dispose(pathKey + '.');
           }
