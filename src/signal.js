@@ -79,12 +79,16 @@ export function effect(getter, setter) {
     let timer;
     const handler = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => setValue(getValue()), 0);
+      timer = setTimeout(async () => {
+        const value = await getValue();
+        setValue(value);
+      }, 0);
     };
     obj.$$on(prop, handler);
     cleanup.add(() => obj.$$off(prop, handler));
   });
-  setValue(value);
+  if (value instanceof Promise) value.then(setValue);
+  else setValue(value);
   if (cleanup.size > 0) {
     const dispose = () => {
       for (let fn of cleanup) fn();
@@ -139,7 +143,7 @@ export function signal(data = {}) {
     },
     set: (obj, prop, value) => {
       const [event] = parsePropery(prop);
-      if (event) return false;
+      if (event) return;
       const oldv = obj[prop];
       if (isFunction(value)) {
         const getter = value;
@@ -152,9 +156,7 @@ export function signal(data = {}) {
       const isLengthProp = prop === 'length' && isArray(obj);
       const changed = obj[prop] !== value || isLengthProp;
       const res = Reflect.set(obj, prop, value);
-      if (!res) {
-        return false;
-      }
+      if (!res) return;
       if (changed) {
         emitter.emit(isLengthProp ? prop : [prop, '#', '*'], value, oldv, prop, state);
       }
@@ -162,12 +164,10 @@ export function signal(data = {}) {
     },
     deleteProperty: (obj, prop) => {
       const [event] = parsePropery(prop);
-      if (event) return false;
+      if (event) return;
       const oldv = obj[prop];
       const res = Reflect.deleteProperty(obj, prop);
-      if (!res) {
-        return false;
-      }
+      if (!res) return;
       watcher.emit(prop);
       updater.emit(prop);
       emitter.emit([prop, '#', '*'], undefined, oldv, prop, state);
