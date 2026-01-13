@@ -76,9 +76,9 @@ function createElement(tag, ns) {
 }
 
 /**
- * Create an element with specified configuration.
+ * Create a node with specified configuration.
  *
- * @param {any} [config] Element configuration.
+ * @param {any} [config] Node configuration.
  * @param {string} [ns] Namespace URI.
  * @returns {Node}
  */
@@ -210,9 +210,9 @@ function createNode(config, ns) {
           const target = shadowRoot || el;
           const fragment = createNode.call(context, value, ns);
           if (fragment instanceof Node) {
-            const oldChildren = Array.from(target[root]);
+            const oldChildren = Array.from(target.childNodes);
             const isFragment = fragment.nodeType === Node.DOCUMENT_FRAGMENT_NODE;
-            const newChildren = Array.from(isFragment ? fragment[root] : [fragment]);
+            const newChildren = isFragment ? Array.from(fragment.childNodes) : [fragment];
             syncDOM(target, oldChildren, newChildren);
           }
           else {
@@ -401,9 +401,9 @@ export function mount(el, target) {
 /**
  * Sync DOM children between old and new lists with minimal operations.
  *
- * @param {Element} parent Parent element.
- * @param {Element[]} oldList Old elements.
- * @param {Element[]} newList New elements.
+ * @param {Node} parent Parent node.
+ * @param {Node[]} oldList Old nodes.
+ * @param {Node[]} newList New nodes.
  */
 function syncDOM(parent, oldList, newList) {
   let oldStart = 0;
@@ -463,7 +463,7 @@ function syncDOM(parent, oldList, newList) {
       }
 
       // Reference node is the CURRENT node at the oldStart position
-      const referenceNode = parent.children[oldStart];
+      const referenceNode = parent.childNodes[oldStart];
 
       if (oldMatch) {
         // Move existing node to current position
