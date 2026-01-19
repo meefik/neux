@@ -324,27 +324,42 @@ In computed fields, prefixing a property name with `$` marks it as reactive. Whe
 You can use the `$$` sign to subscribe to any changes in this object, array, or any of its nested objects. Alternatively, use the `$` sign to track changes in the object or array without tracking changes in nested objects:
 
 ```js
+// Reactive list of items
+const list = signal([
+  { id: 1, text: 'Item 1' },
+  { id: 2, text: 'Item 2' },
+]);
 // Create an HTML element
 const el = render({
   tag: 'ul',
   children: () => {
-    // Track changes in the list array,
+    // Track changes in the list array using `$` sign,
     // such as adding, replacing, or deleting items, 
     // except for nested objects
-    return state.list.$.map((item) => {
+    return list.$.map((item) => {
       return {
         tag: 'li',
+        dataset: {
+          id: item.id,
+        },
         // Track changes the specific field
         textContent: () => item.$text,
       };
     });
   },
 });
+// Mount to DOM
+mount(el, document.body);
 // Add new item to the array and then re-render the list
-state.list.push({ text: 'Item 3' });
-// Change the `li` element without rerendering the entire list
-state.list[0].text = 'Item 1 was changed';
+list.push({ id: 3, text: 'Item 3' });
+// Replace the existing item with a new one that has the same values
+// you should change the `id` to a unique value to force rerendering
+list.splice(1, 1, { id: 4, text: 'Item 2' });
+// Change the text content of the `li` element without replacing the element
+list[1].text = 'Item 2 was changed';
 ```
+
+You may encounter a problem when trying to replace an array item with a new object that contains the same values. The NEUX calculates DOM changes by value. In this case, the element will not be replaced, even if the object in the state is replaced. This behavior may lead to unexpected results when using reactive properties on child elements based on array items. To solve this problem, add a unique identifier to each array item and use it as a data attribute key for each element. 
 
 You can creates a reactive effect that computes a derived value and triggers a side effect.
 
