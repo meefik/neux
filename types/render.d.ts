@@ -9,17 +9,17 @@
 export function render(
   tag: string | Element | object | Array<any>,
   config?: object | Array<any>,
-  children?: Array<any>
+  children?: Array<any>,
 ): Element | DocumentFragment;
 
 /**
- * Mount an element to the DOM with moutation observer.
- * 
+ * Mount an element to the DOM with mutation observer.
+ *
  * @param el Source element.
  * @param target Target element or selector.
  * @returns void
  */
 export function mount(
   el: Element | DocumentFragment,
-  target: Element | DocumentFragment | string
+  target: Element | DocumentFragment | string,
 ): void;

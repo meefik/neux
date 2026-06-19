@@ -41,8 +41,7 @@ export default class EventEmitter extends Map {
             if (!this.get(ev).size) {
               this.delete(ev);
             }
-          }
-          else {
+          } else {
             this.get(ev).clear();
             this.delete(ev);
           }
@@ -62,8 +61,7 @@ export default class EventEmitter extends Map {
             }
             try {
               handler.apply(this._ctx, args);
-            }
-            catch (err) {
+            } catch (err) {
               console.error(err);
             }
           }

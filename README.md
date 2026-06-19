@@ -4,7 +4,7 @@
 
 **Key features:**
 
-- No JSX, no compiler, just in real-time.
+- No JSX, no compiler — works in real-time.
 - Framework-agnostic, use any part of the library independently.
 - Declarative element definitions using plain objects powered by reactive state management.
 - Intuitive two-way reactivity with direct DOM changes without virtual DOM.
@@ -30,14 +30,14 @@
 
 ## Getting Started
 
-Getting started with NEUX is quick and effortless. You can include NEUX directly in your project without any additional build steps. However, you can use the library with bundlers like Vite if it needed.
+Getting started with NEUX is quick and effortless. You can include NEUX directly in your project without any additional build steps. However, you can use the library with bundlers like Vite if needed.
 
 To use NEUX in the browser, simply add the following to your HTML page:
 
 ```html
 <script src="https://unpkg.com/neux"></script>
 <script>
-  // Import NUEX functions
+  // Import NEUX functions
   const { render, mount, signal, effect, l10n } = window.neux;
   // Start building your app right away!
 </script>
@@ -47,8 +47,8 @@ Or you can import it as an ES module:
 
 ```html
 <script type="module">
-  // Import NUEX functions
-  import { render, mount, signal, effect, l10n } from 'https://esm.sh/neux';
+  // Import NEUX functions
+  import { render, mount, signal, effect, l10n } from "https://esm.sh/neux";
   // Start building your app right away!
 </script>
 ```
@@ -61,7 +61,7 @@ const state = signal({ count: 1 });
 // Render button element
 const el = render({
   // Tag name
-  tag: 'button',
+  tag: "button",
   // Event listeners
   on: {
     // Increment count on click
@@ -82,7 +82,7 @@ const state = signal({ count: 1 });
 // Render button element
 const el = render(
   // Tag name
-  'button',
+  "button",
   {
     // Event listeners
     on: {
@@ -107,7 +107,7 @@ You should use the `render()` function to create an `Element` or `DocumentFragme
 - `classList`: (Array of Strings or Function) Specifies one or more CSS classes to add to the element. It can be a static array or a function that returns an array based on dynamic context.
 - `attributes`: (Object or Function) Maps attribute names to their corresponding values. Use a static object for fixed attributes or a function for dynamic assignment.
 - `style`: (Object or Function) Sets inline CSS styles via an object where keys are CSS property names. This can also be defined as a function to handle dynamic styling.
-- `dataset`: (Object or Function) Assigns custom data attributes (data-*) through a static mapping or a function that returns the mapping.
+- `dataset`: (Object or Function) Assigns custom data attributes (data-\*) through a static mapping or a function that returns the mapping.
 - `on`: (Object) Adds event listeners to the element. Each key represents an event name (e.g., "click", "change") with its corresponding handler function.
 - `children`: (String, Array of Elements, or Function) Defines the inner content of the element. This can be a direct string, an array of element definitions, or a function that returns child nodes for dynamic rendering.
 - `ref`: (Function) A callback that receives the created element, allowing you to store a reference or perform additional operations immediately after creation.
@@ -122,27 +122,26 @@ You can also include any other parameters specific to particular elements. This 
 
 ```js
 const el = render({
-  tag: 'ul',
-  classList: ['list'],
-  ref: ref => {
+  tag: "ul",
+  classList: ["list"],
+  ref: (ref) => {
     console.log(ref);
   },
-  children: ['Item 1', 'Item 2']
-    .map((item, index) => {
-      return {
-        tag: 'li',
-        style: {
-          color: 'red',
-        },
-        attributes: {
-          title: item,
-        },
-        dataset: {
-          index,
-        },
-        textContent: item,
-      };
-    }),
+  children: ["Item 1", "Item 2"].map((item, index) => {
+    return {
+      tag: "li",
+      style: {
+        color: "red",
+      },
+      attributes: {
+        title: item,
+      },
+      dataset: {
+        index,
+      },
+      textContent: item,
+    };
+  }),
 });
 ```
 
@@ -174,24 +173,24 @@ const el = render({
   // Event listeners
   on: {
     mounted(e) {
-      console.log('Element mounted:', e);
+      console.log("Element mounted:", e);
     },
     changed(e) {
-      console.log('Element changed:', e);
+      console.log("Element changed:", e);
     },
     removed(e) {
       // you can prevent the default behavior
       // e.preventDefault();
-      console.log('Element removed:', e);
+      console.log("Element removed:", e);
     },
   },
-  textContent: 'Hello World!',
+  textContent: "Hello World!",
 });
 // Mount to DOM and set up lifecycle events
 mount(el, document.body);
 // Change the element attribute
-el.setAttribute('title', 'Text');
-// Remove the element fomr DOM
+el.setAttribute("title", "Text");
+// Remove the element from DOM
 el.remove();
 ```
 
@@ -200,15 +199,15 @@ In the `mount()` function, the second argument can be a target HTML element or C
 You can include any SVG icon as HTML markup and change its styles (size, color) via the `classList` or `attributes` parameters (raw import works with Vite):
 
 ```js
-import githubIcon from '@svg-icons/fa-brands/github.svg?raw';
+import githubIcon from "@svg-icons/fa-brands/github.svg?raw";
 
 const svgElement = render({
   tag: githubIcon,
-  classList: ['icon'],
+  classList: ["icon"],
   attributes: {
-    width: '64px',
-    height: '64px'
-  }
+    width: "64px",
+    height: "64px",
+  },
 });
 ```
 
@@ -217,29 +216,26 @@ Additionally, you can create a [DocumentFragment](https://developer.mozilla.org/
 ```js
 // Create DocumentFragment
 const fragment = render([
-  { tag: 'span', textContent: 'Item 1' },
-  { tag: 'span', textContent: 'Item 2' },
-  { tag: 'span', textContent: 'Item 3' },
+  { tag: "span", textContent: "Item 1" },
+  { tag: "span", textContent: "Item 2" },
+  { tag: "span", textContent: "Item 3" },
 ]);
 // Mount to DOM
 mount(fragment, document.body);
 ```
 
-Probably you want to change the element properties dynamically. NEUX allows you to use functions for most of the element parameters. These functions are reactive and will be re-evaluated by specific triggers such as `refresh` event or signals.
+You probably want to change the element properties dynamically. NEUX allows you to use functions for most of the element parameters. These functions are reactive and will be re-evaluated by specific triggers such as `refresh` event or signals.
 
 Look at the example below:
 
 ```js
-const list = [
-  { text: 'Item 1' },
-  { text: 'Item 2' },
-];
+const list = [{ text: "Item 1" }, { text: "Item 2" }];
 const el = render({
-  tag: 'ul',
+  tag: "ul",
   children: () => {
-    return list.map(item => {
+    return list.map((item) => {
       return {
-        tag: 'li',
+        tag: "li",
         textContent: () => item.text,
       };
     });
@@ -255,15 +251,20 @@ You can even use asynchronous functions to fetch data or perform other asynchron
 ```js
 const el = render({
   children: async () => {
-    const response = await fetch('https://jsonplaceholder.typicode.com/posts/1');
+    const response = await fetch(
+      "https://jsonplaceholder.typicode.com/posts/1",
+    );
     const data = await response.json();
-    return [{
-      tag: 'h3',
-      textContent: data.title,
-    }, {
-      tag: 'p',
-      textContent: data.body,
-    }]
+    return [
+      {
+        tag: "h3",
+        textContent: data.title,
+      },
+      {
+        tag: "p",
+        textContent: data.body,
+      },
+    ];
   },
 });
 mount(el, document.body);
@@ -273,13 +274,15 @@ When you want to update the list or change the text of an item, you can modify t
 
 ```js
 // Add a new item to the list
-list.push({ text: 'Item 3' });
+list.push({ text: "Item 3" });
 // Re-render the entire element
-el.dispatchEvent(new CustomEvent('refresh'));
+el.dispatchEvent(new CustomEvent("refresh"));
 // Update the text of the first item
-list[0].text = 'Updated Item 1';
+list[0].text = "Updated Item 1";
 // Update only specific properties
-el.children[0].dispatchEvent(new CustomEvent('refresh', { detail: ['textContent'] }));
+el.children[0].dispatchEvent(
+  new CustomEvent("refresh", { detail: ["textContent"] }),
+);
 ```
 
 Note that when dispatching the `refresh` event, you can optionally provide a `detail` array that specifies which properties should be updated. If no detail is provided, all reactive functions will be re-evaluated on the target element. It's good to know that only the changed elements are replaced when lists like `children` are updated.
@@ -297,20 +300,17 @@ For example:
 const state = signal({
   count: 1,
   multiplier: 2,
-  list: [
-    { text: 'Item 1' },
-    { text: 'Item 2', checked: true },
-  ],
+  list: [{ text: "Item 1" }, { text: "Item 2", checked: true }],
   // computed field
-  double: obj => obj.$count * 2,
+  double: (obj) => obj.$count * 2,
   // computed field that tracks all changes, including nested objects
-  filtered: obj => obj.list.$$.filter(item => item.checked),
+  filtered: (obj) => obj.list.$$.filter((item) => item.checked),
 });
 // Update the computed field
-state.double = obj => state.$count * state.$multiplier;
+state.double = (obj) => state.$count * state.$multiplier;
 // Modify fields
 state.count++;
-state.list.push({ text: 'Item 3' });
+state.list.push({ text: "Item 3" });
 // Remove the field and its related reactive effects
 delete state.double;
 ```
@@ -318,6 +318,7 @@ delete state.double;
 In computed fields, prefixing a property name with `$` marks it as reactive. When the property's value changes, the computed function is automatically invoked with its new value.
 
 **ATTENTION**
+
 - Removing or replacing the observed object/array will break all bindings.
 - Only the fields accessed during the initial synchronous execution are tracked for updates.
 
@@ -326,19 +327,19 @@ You can use the `$$` sign to subscribe to any changes in this object, array, or 
 ```js
 // Reactive list of items
 const list = signal([
-  { id: 1, text: 'Item 1' },
-  { id: 2, text: 'Item 2' },
+  { id: 1, text: "Item 1" },
+  { id: 2, text: "Item 2" },
 ]);
 // Create an HTML element
 const el = render({
-  tag: 'ul',
+  tag: "ul",
   children: () => {
     // Track changes in the list array using `$` sign,
-    // such as adding, replacing, or deleting items, 
+    // such as adding, replacing, or deleting items,
     // except for nested objects
     return list.$.map((item) => {
       return {
-        tag: 'li',
+        tag: "li",
         dataset: {
           id: item.id,
         },
@@ -351,17 +352,17 @@ const el = render({
 // Mount to DOM
 mount(el, document.body);
 // Add new item to the array and then re-render the list
-list.push({ id: 3, text: 'Item 3' });
+list.push({ id: 3, text: "Item 3" });
 // Replace the existing item with a new one that has the same values
 // you should change the `id` to a unique value to force rerendering
-list.splice(1, 1, { id: 4, text: 'Item 2' });
+list.splice(1, 1, { id: 4, text: "Item 2" });
 // Change the text content of the `li` element without replacing the element
-list[1].text = 'Item 2 was changed';
+list[1].text = "Item 2 was changed";
 ```
 
-You may encounter a problem when trying to replace an array item with a new object that contains the same values. The NEUX calculates DOM changes by value. In this case, the element will not be replaced, even if the object in the state is replaced. This behavior may lead to unexpected results when using reactive properties on child elements based on array items. To solve this problem, add a unique identifier to each array item and use it as a data attribute key for each element. 
+You may encounter a problem when trying to replace an array item with a new object that contains the same values. The NEUX calculates DOM changes by value. In this case, the element will not be replaced, even if the object in the state is replaced. This behavior may lead to unexpected results when using reactive properties on child elements based on array items. To solve this problem, add a unique identifier to each array item and use it as a data attribute key for each element.
 
-You can creates a reactive effect that computes a derived value and triggers a side effect.
+Creates a reactive effect that computes a derived value and triggers a side effect.
 
 For example:
 
@@ -394,36 +395,37 @@ Here’s the example:
 ```js
 // Define a handler function that receives state change details
 const handler = (newv, oldv, prop, obj, nested) => {
-  console.log('New value:', newv);
-  console.log('Old value:', oldv);
-  console.log('Changed property:', prop);
-  console.log('Reactive object:', obj);
-  console.log('Nested fields (if any):', nested);
+  console.log("New value:", newv);
+  console.log("Old value:", oldv);
+  console.log("Changed property:", prop);
+  console.log("Reactive object:", obj);
+  console.log("Nested fields (if any):", nested);
 
   // Determine if the property was added, updated, or deleted
   if (newv === undefined) {
-    console.log('Property deleted');
+    console.log("Property deleted");
   } else if (oldv === undefined) {
-    console.log('Property added');
+    console.log("Property added");
   } else {
-    console.log('Property updated');
+    console.log("Property updated");
   }
 };
 // Subscribe to changes on the 'double' property
-state.$$on('double', handler);
+state.$$on("double", handler);
 // Subscribe with a one-time listener for the 'double' property
-state.$$once('double', handler);
+state.$$once("double", handler);
 // Unsubscribe a specific listener from the 'double' property
-state.$$off('double', handler);
+state.$$off("double", handler);
 // Remove all listeners for the 'double' property
-state.$$off('double');
+state.$$off("double");
 // Subscribe to any changes on this object
-state.$$on('#', handler);
+state.$$on("#", handler);
 // Subscribe to any changes on this object and all nested children
-state.$$on('*', handler);
+state.$$on("*", handler);
 ```
 
 In this example:
+
 - The handler function logs useful details about state changes.
 - Using `$$on()`, you can add persistent listeners.
 - With `$$once()`, the listener triggers only the first time the change occurs.
@@ -435,53 +437,62 @@ This flexibility lets you efficiently track and respond to state mutations acros
 
 ## Localization
 
-Localization is used to display the application interface in different languages.You can use localized number and date formatting with [Intl.NumberFormat](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat) and [Intl.DateTimeFormat](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat).
+Localization is used to display the application interface in different languages. You can use localized number and date formatting with [Intl.NumberFormat](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat) and [Intl.DateTimeFormat](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat).
 
 Translation example:
 
 ```js
-const t = l10n({
-  en: {
-    say: {
-      hello: "Hello %{name}!"
+const t = l10n(
+  {
+    en: {
+      say: {
+        hello: "Hello %{name}!",
+      },
+      number: "number: %{val}",
+      date: "date: %{val}",
     },
-    number: 'number: %{val}',
-    date: 'date: %{val}'
+    ru: {
+      say: {
+        hello: "Привет %{name}!",
+      },
+      number: "число: %{val}",
+      date: "дата: %{val}",
+    },
   },
-  ru: {
-    say: {
-      hello: "Привет %{name}!"
-    },
-    number: 'число: %{val}',
-    date: 'дата: %{val}'
-  }
-}, {
-  language: navigator.language,
-  fallback: 'en'
-});
+  {
+    language: navigator.language,
+    fallback: "en",
+  },
+);
 
-const msgEn = t('say.hello', { name: 'World' });
+const msgEn = t("say.hello", { name: "World" });
 console.log(msgEn); // Hello World!
 
-const numberMsg = t('number', {
-  val: [12345, {
-    style: 'currency',
-    currency: 'USD'
-  }]
+const numberMsg = t("number", {
+  val: [
+    12345,
+    {
+      style: "currency",
+      currency: "USD",
+    },
+  ],
 });
 console.log(numberMsg); // number: $12,345.00
 
-const dateMsg = t('date', {
-  val: [new Date('2025-01-15'), {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  }]
+const dateMsg = t("date", {
+  val: [
+    new Date("2025-01-15"),
+    {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    },
+  ],
 });
 console.log(dateMsg); // date: Wednesday, January 15, 2025
 
-const msgRu = t('say.hello', { name: 'Мир' }, 'ru');
+const msgRu = t("say.hello", { name: "Мир" }, "ru");
 console.log(msgRu); // Привет Мир!
 ```
 
@@ -493,26 +504,27 @@ Here’s an example of how to use a custom context:
 
 ```js
 // Custom context
-const context = { hi: 'hello' };
+const context = { hi: "hello" };
 // Signal with custom context
 const state = signal.call(context, {
   count() {
-    console.log('signal', this.hi); // hello
+    console.log("signal", this.hi); // hello
     return 1;
-  }
+  },
 });
 // Render with the same context
 const el = render.call(context, {
   textContent() {
-    console.log('render', this.hi); // hello
+    console.log("render", this.hi); // hello
     return state.$count;
-  }
+  },
 });
 // Mount to DOM
 mount(el, document.body);
 ```
 
 In this example:
+
 - A custom context object is created with a property `hi`.
 - The `signal` function is called with the custom context using `signal.call(context, {...})`.
 - The `render` function is also called with the same custom context using `render.call(context, {...})`.
@@ -527,20 +539,20 @@ NEUX lets you implement routing simply with reactive state. By tracking the URL 
 ```js
 // Initialize routing state
 const state = signal({
-  path: location.hash.slice(1) || 'Home',
+  path: location.hash.slice(1) || "Home",
 });
 // Route components
 const Home = () => ({
-  tag: 'div',
-  textContent: 'Welcome to the Home Page!',
+  tag: "div",
+  textContent: "Welcome to the Home Page!",
 });
 const About = () => ({
-  tag: 'div',
-  textContent: 'This is the About Page.',
+  tag: "div",
+  textContent: "This is the About Page.",
 });
 const NotFound = () => ({
-  tag: 'div',
-  textContent: '404 - Page Not Found',
+  tag: "div",
+  textContent: "404 - Page Not Found",
 });
 // Route views
 const views = { Home, About };
@@ -549,24 +561,28 @@ const el = render({
   children: [
     // Navigation links
     {
-      tag: 'nav',
-      children: [{
-        tag: 'a',
-        href: '#Home',
-        textContent: 'Home',
-      }, {
-        tag: 'a',
-        href: '#About',
-        textContent: 'About',
-      }, {
-        tag: 'a',
-        href: '#Blog',
-        textContent: 'Blog',
-      }],
+      tag: "nav",
+      children: [
+        {
+          tag: "a",
+          href: "#Home",
+          textContent: "Home",
+        },
+        {
+          tag: "a",
+          href: "#About",
+          textContent: "About",
+        },
+        {
+          tag: "a",
+          href: "#Blog",
+          textContent: "Blog",
+        },
+      ],
     },
     // Main content
     {
-      tag: 'main',
+      tag: "main",
       children: () => {
         const View = views[state.$path];
         return View ? View() : NotFound();
@@ -575,7 +591,7 @@ const el = render({
   ],
 });
 // Update state on hash change
-window.addEventListener('hashchange', () => {
+window.addEventListener("hashchange", () => {
   state.path = location.hash.slice(1);
 });
 // Mount to DOM
@@ -583,6 +599,7 @@ mount(el, document.body);
 ```
 
 In this setup:
+
 - The reactive state holds the current path.
 - Navigation links update the URL hash, which triggers a state change.
 - The main content area dynamically renders the corresponding view.
@@ -609,13 +626,13 @@ npm install --save-dev neux
 **3.** Paste your application code into the `src/main.js` file:
 
 ```js
-import { render, mount } from 'neux';
+import { render, mount } from "neux";
 
 const el = render({
-  textContent: 'Hello World!',
+  textContent: "Hello World!",
 });
 
-mount(el, '#app');
+mount(el, "#app");
 ```
 
 **4.** Run the project:
@@ -639,13 +656,11 @@ npm install --save-dev tailwindcss @tailwindcss/vite
 **2.** Create the file `vite.config.js`:
 
 ```js
-import { defineConfig } from 'vite';
-import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [
-    tailwindcss(),
-  ],
+  plugins: [tailwindcss()],
 });
 ```
 
@@ -658,16 +673,16 @@ export default defineConfig({
 **4.** Replace the contents of the `src/main.js` file with the example:
 
 ```js
-import './style.css';
-import { render, mount } from 'neux';
+import "./style.css";
+import { render, mount } from "neux";
 
 const el = render({
-  tag: 'h1',
-  classList: ['text-3xl', 'font-bold', 'underline'],
-  textContent: 'Hello world!',
+  tag: "h1",
+  classList: ["text-3xl", "font-bold", "underline"],
+  textContent: "Hello world!",
 });
 
-mount(el, '#app');
+mount(el, "#app");
 ```
 
 ## Using with daisyUI
@@ -691,43 +706,47 @@ npm install --save-dev daisyui
 **3.** Replace the contents of the `src/main.js` file with the example:
 
 ```js
-import './style.css';
-import { signal, render, mount } from 'neux';
+import "./style.css";
+import { signal, render, mount } from "neux";
 
 const state = signal({ count: 0 });
 
 const el = render({
-  classList: ['container', 'm-auto', 'p-8', 'flex', 'gap-4'],
-  children: [{
-    tag: 'button',
-    classList: ['btn', 'btn-primary'],
-    textContent: '-1',
-    on: {
-      click: () => {
-        state.count--;
+  classList: ["container", "m-auto", "p-8", "flex", "gap-4"],
+  children: [
+    {
+      tag: "button",
+      classList: ["btn", "btn-primary"],
+      textContent: "-1",
+      on: {
+        click: () => {
+          state.count--;
+        },
       },
     },
-  }, {
-    tag: 'input',
-    type: 'number',
-    classList: ['input', 'input-bordered', 'w-full'],
-    value: () => state.$count,
-    on: {
-      change: ({ target }) => {
-        state.count = parseInt(target.value);
+    {
+      tag: "input",
+      type: "number",
+      classList: ["input", "input-bordered", "w-full"],
+      value: () => state.$count,
+      on: {
+        change: ({ target }) => {
+          state.count = parseInt(target.value);
+        },
       },
     },
-  }, {
-    tag: 'button',
-    classList: ['btn', 'btn-primary'],
-    textContent: '+1',
-    on: {
-      click: () => state.count++,
+    {
+      tag: "button",
+      classList: ["btn", "btn-primary"],
+      textContent: "+1",
+      on: {
+        click: () => state.count++,
+      },
     },
-  }],
+  ],
 });
 
-mount(el, '#app');
+mount(el, "#app");
 ```
 
 ## Using with Web Components
@@ -745,56 +764,66 @@ npm install --save-dev @blueprintui/components @blueprintui/themes @blueprintui/
 **2.** Import styles in the `src/style.css` file:
 
 ```css
-@import '@blueprintui/layout/index.min.css';
-@import '@blueprintui/typography/index.min.css';
-@import '@blueprintui/themes/index.min.css';
+@import "@blueprintui/layout/index.min.css";
+@import "@blueprintui/typography/index.min.css";
+@import "@blueprintui/themes/index.min.css";
 ```
 
 **3.** Replace the contents of the `src/main.js` file with the example:
 
 ```js
-import './style.css';
-import '@blueprintui/components/include/button.js';
-import '@blueprintui/components/include/card.js';
-import '@blueprintui/components/include/input.js';
-import { render, mount } from 'neux';
+import "./style.css";
+import "@blueprintui/components/include/button.js";
+import "@blueprintui/components/include/card.js";
+import "@blueprintui/components/include/input.js";
+import { render, mount } from "neux";
 
 const el = render({
-  tag: 'bp-card',
-  children: [{
-    tag: 'h2',
-    slot: 'header',
-    attributes: {
-      'bg-text': 'section',
-    },
-    textContent: 'Heading',
-  }, {
-    tag: 'bp-field',
-    children: [{
-      tag: 'label',
-      textContent: 'label',
-    }, {
-      tag: 'bp-input',
-    }],
-  }, {
-    slot: 'footer',
-    attributes: {
-      'bp-layout': 'inline gap:xs inline:end',
-    },
-    children: [{
-      tag: 'bp-button',
+  tag: "bp-card",
+  children: [
+    {
+      tag: "h2",
+      slot: "header",
       attributes: {
-        action: 'secondary',
+        "bg-text": "section",
       },
-      textContent: 'Cancel',
-    }, {
-      tag: 'bp-button',
+      textContent: "Heading",
+    },
+    {
+      tag: "bp-field",
+      children: [
+        {
+          tag: "label",
+          textContent: "label",
+        },
+        {
+          tag: "bp-input",
+        },
+      ],
+    },
+    {
+      slot: "footer",
       attributes: {
-        status: 'accent',
+        "bp-layout": "inline gap:xs inline:end",
       },
-      textContent: 'Confirm',
-    }],
-  }],
+      children: [
+        {
+          tag: "bp-button",
+          attributes: {
+            action: "secondary",
+          },
+          textContent: "Cancel",
+        },
+        {
+          tag: "bp-button",
+          attributes: {
+            status: "accent",
+          },
+          textContent: "Confirm",
+        },
+      ],
+    },
+  ],
 });
 
 mount(el, document.body);
@@ -807,23 +836,22 @@ You can create your own components using [one of the libraries](https://open-wc.
 Here is an example of a web component definition:
 
 ```js
-import { signal, render, mount } from 'neux';
+import { signal, render, mount } from "neux";
 
 // Create a custom web component
 class Counter extends HTMLElement {
   // List of attributes to observe for changes
-  static observedAttributes = ['value'];
+  static observedAttributes = ["value"];
   // The component constructor override
   constructor() {
     super();
     const context = {};
     this.attrs = signal.call(context, {});
-    this.attrs.$$on(
-      this.constructor.observedAttributes,
-      (newv, oldv, prop) => this.setAttribute(prop, newv),
+    this.attrs.$$on(this.constructor.observedAttributes, (newv, oldv, prop) =>
+      this.setAttribute(prop, newv),
     );
     const el = render.call(context, this.render());
-    const shadowRoot = this.attachShadow({ mode: 'open' });
+    const shadowRoot = this.attachShadow({ mode: "open" });
     mount(el, shadowRoot);
   }
   // Called when an observed attribute is changed
@@ -832,43 +860,51 @@ class Counter extends HTMLElement {
   }
   // Describe the object to render the component
   render() {
-    return [{
-      tag: 'input',
-      type: 'number',
-      value: () => this.attrs.$value,
-      on: {
-        change: (e) => {
-          this.attrs.value = e.target.value;
+    return [
+      {
+        tag: "input",
+        type: "number",
+        value: () => this.attrs.$value,
+        on: {
+          change: (e) => {
+            this.attrs.value = e.target.value;
+          },
         },
       },
-    }, {
-      children: [{
-        tag: 'slot',
-        name: 'label',
-      }, {
-        tag: 'span',
-        textContent: () => this.attrs.$value,
-      }]
-    }];
+      {
+        children: [
+          {
+            tag: "slot",
+            name: "label",
+          },
+          {
+            tag: "span",
+            textContent: () => this.attrs.$value,
+          },
+        ],
+      },
+    ];
   }
 }
 // Define custom element
-customElements.define('ne-counter', Counter);
+customElements.define("ne-counter", Counter);
 ```
 
 Use this web component:
 
 ```js
 const el = render({
-  tag: 'ne-counter',
+  tag: "ne-counter",
   attributes: {
     value: 5,
   },
-  children: [{
-    tag: 'span',
-    slot: 'label',
-    textContent: 'Count: ',
-  }],
+  children: [
+    {
+      tag: "span",
+      slot: "label",
+      textContent: "Count: ",
+    },
+  ],
 });
 
 mount(el, document.body);
@@ -883,91 +919,105 @@ This example shows how to write a simple app (To-Do List):
 const state = signal({
   // Todo items
   list: [
-    { text: 'Item 1' },
-    { text: 'Item 2', checked: true },
-    { text: 'Item 3' },
+    { text: "Item 1" },
+    { text: "Item 2", checked: true },
+    { text: "Item 3" },
   ],
   // List of checked items
   filtered: (obj) => {
-    return obj.list.$$.filter(item => !item.checked);
+    return obj.list.$$.filter((item) => !item.checked);
   },
 });
 // Create HTML elements
 const el = render({
-  children: [{
-    tag: 'h1',
-    textContent: 'To Do',
-  }, {
-    tag: 'input',
-    placeholder: 'Enter your task...',
-    autofocus: true,
-    on: {
-      keyup(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          state.list.push({ text: e.target.value });
-          e.target.value = '';
-        }
-      },
+  children: [
+    {
+      tag: "h1",
+      textContent: "To Do",
     },
-  }, {
-    children: [{
-      tag: 'input',
-      type: 'checkbox',
+    {
+      tag: "input",
+      placeholder: "Enter your task...",
+      autofocus: true,
       on: {
-        change(e) {
-          const checked = e.target.checked;
-          state.list.forEach((item) => {
-            item.checked = checked;
-          });
+        keyup(e) {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            state.list.push({ text: e.target.value });
+            e.target.value = "";
+          }
         },
       },
-    }, {
-      tag: 'label',
-      textContent: 'Mark all as complete',
-    }],
-  }, {
-    tag: 'ul',
-    children: () => {
-      // Redraw the list partially if any child items are added, replaced, or removed.
-      // Any updates inside nested objects are ignored.
-      return state.list.$.map((item) => {
-        return {
-          tag: 'li',
-          children: [{
-            tag: 'input',
-            type: 'checkbox',
-            checked: () => item.$checked,
-            on: {
-              change(e) {
-                item.checked = e.target.checked;
-              },
-            },
-          }, {
-            tag: 'label',
-            style: {
-              textDecoration: () => item.$checked ? 'line-through' : 'none',
-            },
-            textContent: () => item.$text,
-          }, {
-            tag: 'button',
-            textContent: 'x',
-            on: {
-              click(e) {
-                e.preventDefault();
-                const index = state.list.indexOf(item);
-                state.list.splice(index, 1);
-              },
-            },
-          }],
-        };
-      });
     },
-  }, {
-    textContent: () => {
-      return `Total items: ${state.$filtered.length} / ${state.list.$length}`;
+    {
+      children: [
+        {
+          tag: "input",
+          type: "checkbox",
+          on: {
+            change(e) {
+              const checked = e.target.checked;
+              state.list.forEach((item) => {
+                item.checked = checked;
+              });
+            },
+          },
+        },
+        {
+          tag: "label",
+          textContent: "Mark all as complete",
+        },
+      ],
     },
-  }],
+    {
+      tag: "ul",
+      children: () => {
+        // Redraw the list partially if any child items are added, replaced, or removed.
+        // Any updates inside nested objects are ignored.
+        return state.list.$.map((item) => {
+          return {
+            tag: "li",
+            children: [
+              {
+                tag: "input",
+                type: "checkbox",
+                checked: () => item.$checked,
+                on: {
+                  change(e) {
+                    item.checked = e.target.checked;
+                  },
+                },
+              },
+              {
+                tag: "label",
+                style: {
+                  textDecoration: () =>
+                    item.$checked ? "line-through" : "none",
+                },
+                textContent: () => item.$text,
+              },
+              {
+                tag: "button",
+                textContent: "x",
+                on: {
+                  click(e) {
+                    e.preventDefault();
+                    const index = state.list.indexOf(item);
+                    state.list.splice(index, 1);
+                  },
+                },
+              },
+            ],
+          };
+        });
+      },
+    },
+    {
+      textContent: () => {
+        return `Total items: ${state.$filtered.length} / ${state.list.$length}`;
+      },
+    },
+  ],
 });
 // Mount to the DOM
 mount(el, document.body);

@@ -1,8 +1,8 @@
-import { isArray, isFunction, isObject, isString } from './utils.js';
-import { createContext, readContext, writeContext } from './context.js';
-import EventEmitter from './emitter.js';
+import { isArray, isFunction, isObject, isString } from "./utils.js";
+import { createContext, readContext, writeContext } from "./context.js";
+import EventEmitter from "./emitter.js";
 
-const signalKey = Symbol('signal');
+const signalKey = Symbol("signal");
 
 /**
  * Check if a property is a reactive property.
@@ -10,17 +10,17 @@ const signalKey = Symbol('signal');
  * @param {string} prop Property name.
  * @returns {Array} Array with event name and clean property name.
  */
-function parsePropery(prop) {
+function parseProperty(prop) {
   let level = 0;
   if (isString(prop)) {
-    while (prop.startsWith('$')) {
+    while (prop.startsWith("$")) {
       prop = prop.slice(1);
       level++;
     }
   }
-  const event = (prop || (level > 1 ? '*' : '#'));
+  const event = prop || (level > 1 ? "*" : "#");
   return [level > 0 && event, prop];
-};
+}
 
 /**
  * Set up an updater for a reactive state.
@@ -56,10 +56,10 @@ function setWatcher(state, prop, child, cleaner) {
   cleaner.emit(prop);
   if (child[signalKey]) {
     const handler = (newv, oldv, key, obj, rest = []) => {
-      state.$$emit('*', newv, oldv, key, obj, [...rest, prop]);
+      state.$$emit("*", newv, oldv, key, obj, [...rest, prop]);
     };
-    child.$$on('*', handler);
-    cleaner.once(prop, () => child.$$off('*', handler));
+    child.$$on("*", handler);
+    cleaner.once(prop, () => child.$$off("*", handler));
   }
 }
 
@@ -134,7 +134,7 @@ export function signal(data = {}) {
       if (prop in tools) {
         return tools[prop];
       }
-      const [event, cleanProp] = parsePropery(prop);
+      const [event, cleanProp] = parseProperty(prop);
       if (event) {
         writeContext(context, state, event);
         if (!cleanProp) return state;
@@ -142,7 +142,7 @@ export function signal(data = {}) {
       return Reflect.get(obj, cleanProp);
     },
     set: (obj, prop, value) => {
-      const [event] = parsePropery(prop);
+      const [event] = parseProperty(prop);
       if (event) return;
       const oldv = obj[prop];
       if (isFunction(value)) {
@@ -153,31 +153,37 @@ export function signal(data = {}) {
         value = signal.call(context, value);
         setWatcher(state, prop, value, watcher);
       }
-      const isLengthProp = prop === 'length' && isArray(obj);
+      const isLengthProp = prop === "length" && isArray(obj);
       const changed = obj[prop] !== value || isLengthProp;
       const res = Reflect.set(obj, prop, value);
       if (!res) return;
       if (changed) {
-        emitter.emit(isLengthProp ? prop : [prop, '#', '*'], value, oldv, prop, state);
+        emitter.emit(
+          isLengthProp ? prop : [prop, "#", "*"],
+          value,
+          oldv,
+          prop,
+          state,
+        );
       }
       return true;
     },
     deleteProperty: (obj, prop) => {
-      const [event] = parsePropery(prop);
+      const [event] = parseProperty(prop);
       if (event) return;
       const oldv = obj[prop];
       const res = Reflect.deleteProperty(obj, prop);
       if (!res) return;
       watcher.emit(prop);
       updater.emit(prop);
-      emitter.emit([prop, '#', '*'], undefined, oldv, prop, state);
+      emitter.emit([prop, "#", "*"], undefined, oldv, prop, state);
       return true;
     },
   };
   const state = new Proxy(data, handler);
   const props = Object.keys(data);
   for (let prop of props) {
-    const [event] = parsePropery(prop);
+    const [event] = parseProperty(prop);
     if (event) continue;
     if (isFunction(data[prop])) {
       const getter = data[prop];

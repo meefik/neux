@@ -1,6 +1,13 @@
-import { isArray, isFunction, isObject, isString, isUndefined, isEmpty } from './utils.js';
-import { createContext } from './context.js';
-import { effect } from './signal.js';
+import {
+  isArray,
+  isFunction,
+  isObject,
+  isString,
+  isUndefined,
+  isEmpty,
+} from "./utils.js";
+import { createContext } from "./context.js";
+import { effect } from "./signal.js";
 
 /**
  * Create an element from a tag string, HTML markup or an Element.
@@ -12,30 +19,30 @@ import { effect } from './signal.js';
 function createElement(tag, ns) {
   const { document, customElements, Element } = window;
   const classList = [];
-  let el, id, tagName = 'div';
+  let el,
+    id,
+    tagName = "div";
 
   if (isString(tag)) {
     if (/[^a-zA-Z0-9-_.#]/u.test(tag)) {
       // if tag is HTML markup
-      const div = document.createElement('div');
+      const div = document.createElement("div");
       div.innerHTML = tag;
       if (div.firstChild instanceof Element) {
         el = div.firstChild;
         tagName = el.tagName;
       }
-    }
-    else {
+    } else {
       // if tag is a tag string with optional id and class names
-      const match = tag.match(/([.#]?[^\s#.]+)/ug) || [];
+      const match = tag.match(/([.#]?[^\s#.]+)/gu) || [];
       for (let item of match) {
         const firstChar = item[0];
-        if (firstChar === '.') classList.push(item.slice(1));
-        else if (firstChar === '#') id = item.slice(1);
+        if (firstChar === ".") classList.push(item.slice(1));
+        else if (firstChar === "#") id = item.slice(1);
         else tagName = item;
       }
     }
-  }
-  else if (tag instanceof Element) {
+  } else if (tag instanceof Element) {
     // if tag is an Element
     el = tag;
     tagName = el.tagName;
@@ -47,19 +54,18 @@ function createElement(tag, ns) {
     const CustomElement = customElements?.get(tagName);
     if (CustomElement) {
       el = new CustomElement();
-    }
-    else {
+    } else {
       // create element with namespace if defined
-      if (ns === 'http://www.w3.org/1999/xhtml') {
+      if (ns === "http://www.w3.org/1999/xhtml") {
         ns = null;
       }
       if (!ns) {
         switch (`${tagName}`.toLowerCase()) {
-          case 'svg':
-            ns = 'http://www.w3.org/2000/svg';
+          case "svg":
+            ns = "http://www.w3.org/2000/svg";
             break;
-          case 'math':
-            ns = 'http://www.w3.org/1998/Math/MathML';
+          case "math":
+            ns = "http://www.w3.org/1998/Math/MathML";
             break;
         }
       }
@@ -70,7 +76,7 @@ function createElement(tag, ns) {
   }
   // set id and classList if defined
   if (id) el.id = id;
-  if (classList.length) el.className = classList.join(' ');
+  if (classList.length) el.className = classList.join(" ");
 
   return el;
 }
@@ -106,7 +112,7 @@ function createNode(config, ns) {
   }
   const {
     tag,
-    tagName = 'div',
+    tagName = "div",
     namespaceURI = ns,
     shadowRootMode,
     adoptedStyleSheets,
@@ -124,8 +130,7 @@ function createNode(config, ns) {
           bindings.delete(k);
         }
       }
-    }
-    else {
+    } else {
       for (let fns of bindings.values()) {
         for (let fn of fns) fn();
       }
@@ -137,9 +142,10 @@ function createNode(config, ns) {
     else bindings.set(key, [fn]);
   };
   // create element
-  const el = (isObject(tag) || isFunction(tag))
-    ? createNode.call(context, tag, namespaceURI)
-    : createElement(tag || tagName, namespaceURI);
+  const el =
+    isObject(tag) || isFunction(tag)
+      ? createNode.call(context, tag, namespaceURI)
+      : createElement(tag || tagName, namespaceURI);
   ns = el.namespaceURI;
   // create shadow root if defined
   let shadowRoot;
@@ -154,7 +160,7 @@ function createNode(config, ns) {
     for (let ev in on) {
       const handler = on[ev];
       if (isFunction(handler)) {
-        el.addEventListener(ev, e => handler.call(context, e));
+        el.addEventListener(ev, (e) => handler.call(context, e));
       }
     }
   }
@@ -165,30 +171,29 @@ function createNode(config, ns) {
       child.dispatchEvent(ev);
     }
   };
-  el.addEventListener('mounted', (e) => {
+  el.addEventListener("mounted", (e) => {
     if (!e.defaultPrevented) {
-      dispatchEvent(el, 'mounted');
+      dispatchEvent(el, "mounted");
     }
   });
-  el.addEventListener('removed', (e) => {
+  el.addEventListener("removed", (e) => {
     if (!e.defaultPrevented) {
       dispose();
-      dispatchEvent(el, 'removed');
+      dispatchEvent(el, "removed");
     }
   });
-  el.addEventListener('refresh', (e) => {
+  el.addEventListener("refresh", (e) => {
     if (!e.defaultPrevented) {
       if (!e.detail) {
         patchNode(rest);
-      }
-      else {
+      } else {
         const props = [].concat(e.detail);
         for (let prop of props) {
-          const path = prop.split('.');
+          const path = prop.split(".");
           const params = path.reduce((acc, key, index) => {
-            return acc && (index >= path.length - 1
-              ? { [key]: acc[key] }
-              : acc[key]);
+            return (
+              acc && (index >= path.length - 1 ? { [key]: acc[key] } : acc[key])
+            );
           }, rest);
           patchNode(params, path.slice(0, -1));
         }
@@ -199,89 +204,85 @@ function createNode(config, ns) {
   const patchNode = (params, path = []) => {
     for (let key in params) {
       const subpath = [...path, key];
-      const pathKey = subpath.join('.');
+      const pathKey = subpath.join(".");
       const [root, prop] = subpath;
       const getter = params[key];
       dispose(pathKey);
       const dp = effect.call(context, getter, (value) => {
         const off = value === null || value === undefined;
         // children
-        if (root === 'children') {
+        if (root === "children") {
           const target = shadowRoot || el;
           const fragment = createNode.call(context, value, ns);
           if (fragment instanceof Node) {
             const oldChildren = Array.from(target.childNodes);
-            const isFragment = fragment.nodeType === Node.DOCUMENT_FRAGMENT_NODE;
-            const newChildren = isFragment ? Array.from(fragment.childNodes) : [fragment];
+            const isFragment =
+              fragment.nodeType === Node.DOCUMENT_FRAGMENT_NODE;
+            const newChildren = isFragment
+              ? Array.from(fragment.childNodes)
+              : [fragment];
             syncDOM(target, oldChildren, newChildren);
-          }
-          else {
-            target.innerHTML = '';
-            dispose(pathKey + '.');
+          } else {
+            target.innerHTML = "";
+            dispose(pathKey + ".");
           }
           value = fragment;
         }
         // classList
-        else if (root === 'classList') {
+        else if (root === "classList") {
           if (Array.isArray(value)) {
-            value = value.filter(Boolean).join(' ');
-          }
-          else if (!isString(value)) {
-            value = '';
+            value = value.filter(Boolean).join(" ");
+          } else if (!isString(value)) {
+            value = "";
           }
           el.classList = value;
         }
         // attributes
-        else if (root === 'attributes') {
+        else if (root === "attributes") {
           if (prop) {
             if (off) el.removeAttribute(prop);
             else el.setAttribute(prop, value);
-          }
-          else if (isEmpty(value)) {
+          } else if (isEmpty(value)) {
             const keys = Object.keys(el[root]);
             for (let key of keys) {
               const name = el[root][key]?.name;
               if (name) el.removeAttribute(name);
             }
-            dispose(pathKey + '.');
-          }
-          else {
+            dispose(pathKey + ".");
+          } else {
             return patchNode(value, subpath);
           }
         }
         // style
-        else if (root === 'style') {
+        else if (root === "style") {
           if (prop) {
-            if (/[A-Z]/u.test(prop)) { // camelCase
-              el[root][prop] = off ? '' : value;
-            }
-            else { // kebab-case
+            if (/[A-Z]/u.test(prop)) {
+              // camelCase
+              el[root][prop] = off ? "" : value;
+            } else {
+              // kebab-case
               if (off) el[root].removeProperty(prop);
               else el[root].setProperty(prop, value);
             }
-          }
-          else if (isEmpty(value)) {
-            el.removeAttribute('style');
-            dispose(pathKey + '.');
-          }
-          else {
+          } else if (isEmpty(value)) {
+            el.removeAttribute("style");
+            dispose(pathKey + ".");
+          } else {
             return patchNode(value, subpath);
           }
         }
         // dataset
-        else if (root === 'dataset') {
+        else if (root === "dataset") {
           if (prop) {
             if (off) delete el[root][prop];
             else el[root][prop] = value;
-          }
-          else if (isEmpty(value)) {
+          } else if (isEmpty(value)) {
             const keys = Object.keys(el[root]);
             for (let key of keys) {
               delete el[root][key];
             }
-            dispose(pathKey + '.');
-          }
-          else {
+            dispose(pathKey + ".");
+          } else {
             return patchNode(value, subpath);
           }
         }
@@ -290,25 +291,25 @@ function createNode(config, ns) {
           const { obj, key } = subpath.reduce((acc, key, index) => {
             if (index === subpath.length - 1) {
               return { obj: acc, key };
-            }
-            else if (isUndefined(acc[key])) {
+            } else if (isUndefined(acc[key])) {
               acc[key] = {};
             }
             return acc[key];
           }, el);
           if (isUndefined(value)) {
             delete obj[key];
-            dispose(pathKey + '.');
-          }
-          else {
+            dispose(pathKey + ".");
+          } else {
             obj[key] = value;
           }
         }
         // dispatch the "updated" event
-        el.dispatchEvent(new CustomEvent('updated', {
-          detail: { property: pathKey, value },
-          cancelable: true,
-        }));
+        el.dispatchEvent(
+          new CustomEvent("updated", {
+            detail: { property: pathKey, value },
+            cancelable: true,
+          }),
+        );
       });
       if (dp) allocate(pathKey, dp);
     }
@@ -327,7 +328,7 @@ function createNode(config, ns) {
  *
  * @param {string|Node|object|any[]} [tag] Tag name or HTML markup or element or configuration object.
  * @param {object|any[]} [config] Configuration object or children if omitted.
- * @param {any[]} [children] Element content or children elements.
+ * @param {any[]} [children] Element content or child elements.
  * @returns {Element|DocumentFragment}
  */
 export function render(tag, config, children) {
@@ -367,22 +368,21 @@ export function mount(el, target) {
   }
   const observer = new MutationObserver((mutationList) => {
     for (let mutation of mutationList) {
-      if (mutation.type === 'childList') {
+      if (mutation.type === "childList") {
         mutation.addedNodes.forEach((node) => {
-          if (node.parentNode) dispatchEvent(node, 'mounted');
+          if (node.parentNode) dispatchEvent(node, "mounted");
         });
         mutation.removedNodes.forEach((node) => {
-          if (!node.parentNode) dispatchEvent(node, 'removed');
+          if (!node.parentNode) dispatchEvent(node, "removed");
           if (node === el) observer.disconnect();
         });
-      }
-      else if (mutation.type === 'attributes') {
+      } else if (mutation.type === "attributes") {
         const node = mutation.target;
         const { attributeName } = mutation;
         const { oldValue } = mutation;
         const newValue = node.getAttribute(attributeName);
         if (oldValue !== newValue) {
-          const ev = new CustomEvent('changed', {
+          const ev = new CustomEvent("changed", {
             detail: { attributeName, oldValue, newValue },
           });
           node.dispatchEvent(ev);
@@ -416,8 +416,7 @@ function syncDOM(parent, oldList, newList) {
     if (oldList[oldStart].isEqualNode(newList[newStart])) {
       oldStart++;
       newStart++;
-    }
-    else break;
+    } else break;
   }
 
   // 2. Suffix sync
@@ -425,8 +424,7 @@ function syncDOM(parent, oldList, newList) {
     if (oldList[oldEnd].isEqualNode(newList[newEnd])) {
       oldEnd--;
       newEnd--;
-    }
-    else break;
+    } else break;
   }
 
   // 3. Simple addition (new elements only)
@@ -469,8 +467,7 @@ function syncDOM(parent, oldList, newList) {
         // Move existing node to current position
         parent.insertBefore(oldMatch, referenceNode);
         oldMap.delete(oldMatch);
-      }
-      else {
+      } else {
         // It's a brand new node
         parent.insertBefore(newNode, referenceNode);
       }

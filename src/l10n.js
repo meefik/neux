@@ -1,4 +1,10 @@
-import { isArray, isObject, isString, isFunction, isUndefined } from './utils.js';
+import {
+  isArray,
+  isObject,
+  isString,
+  isFunction,
+  isUndefined,
+} from "./utils.js";
 
 /**
  * Create a localization.
@@ -10,29 +16,25 @@ import { isArray, isObject, isString, isFunction, isUndefined } from './utils.js
  * @returns {function}
  */
 export function l10n(locales, options) {
-  const {
-    language = navigator.language,
-    fallback = 'en',
-  } = options || {};
+  const { language = navigator.language, fallback = "en" } = options || {};
 
   const lookup = (path, lang) => {
     const locale = locales[lang] || {};
     return path in locale
       ? locale[path]
-      : path.split('.').reduce((o, k) => (isObject(o) ? o[k] : ''), locale);
+      : path.split(".").reduce((o, k) => (isObject(o) ? o[k] : ""), locale);
   };
 
   const populate = (text, data, lang) => {
     if (isString(text)) {
       for (let k in data) {
-        const re = new RegExp(`%\\{${k}\\}`, 'gu');
+        const re = new RegExp(`%\\{${k}\\}`, "gu");
         let newValue = data[k];
         if (isArray(newValue)) {
           const [value, options] = newValue;
           if (isFunction(value?.toLocaleString)) {
             newValue = value.toLocaleString(lang, options);
-          }
-          else {
+          } else {
             newValue = value;
           }
         }
@@ -56,8 +58,7 @@ export function l10n(locales, options) {
         text = lookup(path, fallback);
       }
       return populate(isUndefined(text) ? path : text, data, lang);
-    }
-    else if (isFunction(path?.toLocaleString)) {
+    } else if (isFunction(path?.toLocaleString)) {
       return path.toLocaleString(lang, data);
     }
     return path;

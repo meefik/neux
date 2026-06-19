@@ -1,6 +1,6 @@
 /**
  * Create a localization.
- * 
+ *
  * @param locales Localized translations.
  * @param options Localization options.
  * @param options.language Default language.
@@ -10,7 +10,11 @@
 export function l10n(
   locales: { [key: string]: { [key: string]: string } },
   options?: {
-    language?: string,
-    fallback?: string,
-  }
-): (path: string | number | Date, data?: object | string, lang?: string) => string;
+    language?: string;
+    fallback?: string;
+  },
+): (
+  path: string | number | Date,
+  data?: object | string,
+  lang?: string,
+) => string;

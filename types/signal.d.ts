@@ -4,9 +4,7 @@
  * @param data Initial state data.
  * @returns An object containing the reactive state.
  */
-export function signal(data?: object): {
-  [key: string]: any
-};
+export function signal(data?: object): Record<string, any>;
 
 /**
  * Subscribe to reactive field changes.
@@ -17,5 +15,5 @@ export function signal(data?: object): {
  */
 export function effect(
   getter: () => any,
-  setter?: (value: any) => void
+  setter?: (value: any) => void,
 ): (() => void) | void;
