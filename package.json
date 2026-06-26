@@ -1,45 +1,38 @@
 {
   "name": "neux",
-  "version": "0.15.1",
+  "version": "0.15.2",
   "description": "A lightweight frontend library for building dynamic user interfaces using declarative element definitions and reactive signals to modify them.",
   "author": "Anton Skshidlevsky <meefik@gmail.com>",
-  "main": "src/index.js",
-  "types": "types/index.d.ts",
-  "module": "dist/neux.esm.js",
-  "unpkg": "dist/neux.umd.js",
+  "homepage": "https://meefik.dev/neux/",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/meefik/neux.git"
   },
   "keywords": [
-    "framework",
+    "declarative",
     "frontend",
-    "ux",
+    "javascript",
+    "library",
+    "reactive",
     "ui"
   ],
   "type": "module",
+  "sideEffects": false,
+  "main": "dist/neux.esm.js",
+  "module": "dist/neux.esm.js",
+  "unpkg": "dist/neux.umd.js",
+  "types": "types/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/neux.esm.js",
       "require": "./dist/neux.umd.js",
       "types": "./types/index.d.ts"
-    },
-    "./l10n": {
-      "import": "./src/l10n.js",
-      "types": "./types/l10n.d.ts"
-    },
-    "./render": {
-      "import": "./src/render.js",
-      "types": "./types/render.d.ts"
-    },
-    "./signal": {
-      "import": "./src/signal.js",
-      "types": "./types/signal.d.ts"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "types"
   ],
   "scripts": {
     "build": "rollup -c",
@@ -48,6 +41,6 @@
   "devDependencies": {
     "@rollup/plugin-terser": "^1.0.0",
     "jsdom": "^29.1.1",
-    "rollup": "^4.62.0"
+    "rollup": "^4.62.2"
   }
 }
