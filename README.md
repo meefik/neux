@@ -1025,9 +1025,9 @@ mount(el, document.body);
 
 Try it in the playground:
 
-- [To-Do App](https://v47.livecodes.io/?x=id/uhkch4mgxfp)
-- [15 Puzzle](https://v47.livecodes.io/?x=id/efx9s47xqrr)
-- [Tic-Tac-Toe](https://v47.livecodes.io/?x=id/r4cjbuidtb3)
-- [SVG Clock](https://v47.livecodes.io/?x=id/mr5hs94hd5i)
-- [Sketch](https://v47.livecodes.io/?x=id/q7tistivmkt)
-- [File Tree](https://v47.livecodes.io/?x=id/wfcdxuaqbq9)
+- [To-Do App](https://v47.livecodes.io/?x=id/665ajqjyik7)
+- [15 Puzzle](https://v47.livecodes.io/?x=id/fyaae3vyrmz)
+- [Tic-Tac-Toe](https://v47.livecodes.io/?x=id/nf76a54uc4s)
+- [SVG Clock](https://v47.livecodes.io/?x=id/arv6am8duye)
+- [Sketch](https://v47.livecodes.io/?x=id/dnsy6zbnder)
+- [File Tree](https://v47.livecodes.io/?x=id/hrrghivy6u8)
