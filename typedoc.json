@@ -1,0 +1,26 @@
+{
+  "name": "neux",
+  "cleanOutputDir": false,
+  "hideGenerator": true,
+  "hideBreadcrumbs": true,
+  "includeVersion": true,
+  "excludeInternal": true,
+  "customFooterHtml": "<a href=\"https://neux.dev\" title=\"Neux website\" target=\"_blank\">neux.dev</a> <sup>↗</sup> | <a href=\"https://github.com/meefik/neux\" title=\"Neux GitHub repository\" target=\"_blank\">GitHub</a> <sup>↗</sup> | <a href=\"/llms-full.txt\" title=\"Full documentation for LLM context\" target=\"_blank\">AI-Ready Docs</a> <sup>↗</sup>",
+  "favicon": "https://neux.dev/favicon.ico",
+  "hostedBaseUrl": "https://api.neux.dev",
+  "headings": {
+    "readme": false
+  },
+  "entryPoints": ["./src/index.ts"],
+  "plugin": ["typedoc-plugin-markdown"],
+  "outputs": [
+    {
+      "name": "html",
+      "path": "./docs"
+    },
+    {
+      "name": "markdown",
+      "path": "./docs"
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 {
   "name": "neux",
-  "version": "0.15.2",
+  "version": "0.16.0",
   "description": "A lightweight frontend library for building dynamic user interfaces using declarative element definitions and reactive signals to modify them.",
-  "author": "Anton Skshidlevsky <meefik@gmail.com>",
+  "author": "Anton Skshidlevsky <anton@meefik.dev>",
   "homepage": "https://meefik.dev/neux/",
   "license": "MIT",
   "repository": {
@@ -18,29 +18,35 @@
     "ui"
   ],
   "type": "module",
-  "sideEffects": false,
   "main": "dist/neux.esm.js",
   "module": "dist/neux.esm.js",
   "unpkg": "dist/neux.umd.js",
-  "types": "types/index.d.ts",
+  "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "import": "./dist/neux.esm.js",
       "require": "./dist/neux.umd.js",
-      "types": "./types/index.d.ts"
+      "types": "./dist/index.d.ts"
     }
   },
   "files": [
-    "dist",
-    "types"
+    "dist"
   ],
+  "sideEffects": false,
   "scripts": {
-    "build": "rollup -c",
-    "test": "node --test 'tests/**/*.test.js'"
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "docs": "typedoc && cat docs/globals.md > docs/llms.txt && cat docs/README.md docs/**/*.md | grep -v '^\\[\\*\\*' > docs/llms-full.txt"
   },
   "devDependencies": {
-    "@rollup/plugin-terser": "^1.0.0",
+    "@types/jsdom": "^28.0.3",
+    "@types/node": "^26.1.1",
     "jsdom": "^29.1.1",
-    "rollup": "^4.62.2"
+    "tsx": "^4.23.1",
+    "typedoc": "^0.28.20",
+    "typedoc-plugin-markdown": "^4.12.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.5"
   }
 }
