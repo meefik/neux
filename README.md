@@ -1,8 +1,16 @@
-# NEUX
+# Neux
 
-[NEUX](https://github.com/meefik/neux "Native Element UI eXtension") is a lightweight frontend library for building dynamic user interfaces using declarative element definitions and reactive signals to modify them. It leverages native JavaScript and DOM APIs to minimize boilerplate, making it ideal for creating single page applications (SPAs) and custom web components.
+[Neux](https://neux.dev "Native Element UI eXtension") is a lightweight frontend library for building dynamic user interfaces using declarative element definitions and reactive signals to modify them. It leverages native JavaScript and DOM APIs to minimize boilerplate, making it ideal for creating single page applications (SPAs) and custom web components.
 
-**Key features:**
+**Try it in the playground:**
+
+- 📝 [To-Do App](https://v47.livecodes.io/?x=id/pqqm958medj)
+- 🧩 [15 Puzzle](https://v47.livecodes.io/?x=id/ekwxc9u9ed6)
+- 🎲 [Tic-Tac-Toe](https://v47.livecodes.io/?x=id/52gpdppfqg2)
+- ⏰ [SVG Clock](https://v47.livecodes.io/?x=id/fgpkcvrx97r)
+- 🎨 [Sketch](https://v47.livecodes.io/?x=id/v83ejya3p54)
+
+## Features
 
 - No JSX, no compiler — works at runtime.
 - Framework-agnostic, use any part of the library independently.
@@ -13,35 +21,11 @@
 - Minimal bundle size (4 KB gzipped) with zero dependencies.
 - Open source and available under the MIT license.
 
-**Try it in the playground:**
-
-- 📝 [To-Do App](https://v47.livecodes.io/?x=id/pqqm958medj)
-- 🧩 [15 Puzzle](https://v47.livecodes.io/?x=id/ekwxc9u9ed6)
-- 🎲 [Tic-Tac-Toe](https://v47.livecodes.io/?x=id/52gpdppfqg2)
-- ⏰ [SVG Clock](https://v47.livecodes.io/?x=id/fgpkcvrx97r)
-- 🎨 [Sketch](https://v47.livecodes.io/?x=id/v83ejya3p54)
-
-## Content
-
-1. [Getting Started](#getting-started)
-2. [Rendering Elements](#rendering-elements)
-3. [Reactive Signals](#reactive-signals)
-4. [Internationalization](#internationalization)
-5. [Custom Context](#custom-context)
-6. [Simple Routing](#simple-routing)
-7. [Building with Vite](#building-with-vite)
-8. [Using with Tailwind CSS](#using-with-tailwind-css)
-9. [Using with daisyUI](#using-with-daisyui)
-10. [Using with Web Components](#using-with-web-components)
-11. [Creating your own Web Component](#creating-your-own-web-component)
-12. [Code Example](#code-example)
-13. [License](#license)
-
 ## Getting Started
 
-Getting started with NEUX is quick and effortless. You can include NEUX directly in your project without any additional build steps. Alternatively, you can use the library with bundlers like Vite if needed.
+Getting started with Neux is quick and effortless. You can include `neux` directly in your project without any additional build steps. Alternatively, you can use the library with bundlers like Vite if needed.
 
-To install NEUX via npm, run:
+To install `neux` via npm, run:
 
 ```sh
 npm install neux
@@ -51,24 +35,24 @@ Or import it as an ES module:
 
 ```html
 <script type="module">
-  // Import NEUX functions
+  // Import Neux functions
   import { render, signal } from "https://esm.sh/neux";
   // Start building your app right away!
 </script>
 ```
 
-To use NEUX directly in the browser without npm, add the following to your HTML page:
+To use Neux directly in the browser without npm, add the following to your HTML page:
 
 ```html
 <script src="https://unpkg.com/neux"></script>
 <script>
-  // Import NEUX functions
+  // Import Neux functions
   const { render, signal } = window.neux;
   // Start building your app right away!
 </script>
 ```
 
-Take a look at the example below. It creates a button that displays a counter. Every time the button is clicked, the count is incremented and the displayed text is automatically updated via NEUX's reactive state management.
+Take a look at the example below. It creates a button that displays a counter. Every time the button is clicked, the count is incremented and the displayed text is automatically updated via Neux's reactive state management.
 
 ```js
 import { render, signal } from "neux";
@@ -97,7 +81,7 @@ The `render()` function accepts an optional second argument — a target element
 
 ## Rendering Elements
 
-NEUX provides a powerful way to declaratively define HTML elements using plain JavaScript objects. You can specify various properties such as tag name, attributes, styles, event listeners, children, and other native HTML properties. The `render()` function processes these definitions and creates the corresponding DOM elements.
+Neux provides a powerful way to declaratively define HTML elements using plain JavaScript objects. You can specify various properties such as tag name, attributes, styles, event listeners, children, and other native HTML properties. The `render()` function processes these definitions and creates the corresponding DOM elements.
 
 You should use the `render()` function to create an `Element` or `DocumentFragment` from a declarative definition. Below is an overview of the most common parameters available for element configuration:
 
@@ -280,7 +264,7 @@ const fragment = render([
 console.dir(fragment);
 ```
 
-You probably want to change the element properties dynamically. NEUX allows you to use functions for most of the element parameters. These functions are reactive and will be re-evaluated automatically when the reactive signals they depend on change.
+You probably want to change the element properties dynamically. Neux allows you to use functions for most of the element parameters. These functions are reactive and will be re-evaluated automatically when the reactive signals they depend on change.
 
 See the example below:
 
@@ -325,7 +309,7 @@ Instead of using `refresh` events, you can also use reactive signals to manage s
 
 ## Reactive Signals
 
-Signals in NEUX are reactive proxies for objects. They track changes automatically and update any linked views or computed fields. Use signals to create reactive state, derived values, and listeners for side effects or debugging. All nested objects are automatically tracked for changes.
+Signals in Neux are reactive proxies for objects. They track changes automatically and update any linked views or computed fields. Use signals to create reactive state, derived values, and listeners for side effects or debugging. All nested objects are automatically tracked for changes.
 
 For example:
 
@@ -476,7 +460,7 @@ const App = () => {
 render(App, document.body);
 ```
 
-You may encounter a problem when trying to replace an array item with a new object that contains the same values. NEUX compares rendered values to detect DOM changes. In this case, the element won't be replaced, even if the object in the state is replaced. To solve this problem, add a unique identifier to each array item and use it as a data attribute key for each element.
+You may encounter a problem when trying to replace an array item with a new object that contains the same values. Neux compares rendered values to detect DOM changes. In this case, the element won't be replaced, even if the object in the state is replaced. To solve this problem, add a unique identifier to each array item and use it as a data attribute key for each element.
 
 The `effect()` function creates a reactive effect that computes a derived value and triggers a side effect:
 
@@ -591,7 +575,7 @@ console.log(msgRu); // Привет Мир!
 
 ## Custom Context
 
-By default, NEUX uses a global context for the `signal()` and `render()` functions. However, there are scenarios where you might need to use a custom context for signals and rendering. This allows you to separate multiple states, ensuring that reactivity works only within the same context. You can create an object and bind it to these functions.
+By default, Neux uses a global context for the `signal()` and `render()` functions. However, there are scenarios where you might need to use a custom context for signals and rendering. This allows you to separate multiple states, ensuring that reactivity works only within the same context. You can create an object and bind it to these functions.
 
 Here's an example of how to use a custom context:
 
@@ -627,7 +611,7 @@ This approach ensures that the reactivity and rendering logic are scoped to the 
 
 ## Simple Routing
 
-NEUX lets you implement routing simply with reactive state. By tracking the URL hash, you can switch between views dynamically. The following example demonstrates a basic routing setup.
+Neux lets you implement routing simply with reactive state. By tracking the URL hash, you can switch between views dynamically. The following example demonstrates a basic routing setup.
 
 ```js
 import { signal, render } from "neux";
@@ -693,7 +677,7 @@ In this setup:
 
 ## Building with Vite
 
-You can use NEUX with the [Vite](https://vitejs.dev) bundler.
+You can use Neux with the [Vite](https://vitejs.dev) bundler.
 
 How to set up Vite:
 
@@ -847,7 +831,7 @@ render(
 
 ## Using with Web Components
 
-You can use NEUX along with any [Web Components](https://developer.mozilla.org/docs/Web/API/Web_Components). Many component libraries can be [found here](https://open-wc.org/guides/community/component-libraries/).
+You can use Neux along with any [Web Components](https://developer.mozilla.org/docs/Web/API/Web_Components). Many component libraries can be [found here](https://open-wc.org/guides/community/component-libraries/).
 
 Let's look at an example with the [BlueprintUI](https://blueprintui.dev) library:
 
@@ -928,7 +912,7 @@ render(
 
 ## Creating your own Web Component
 
-You can create your own components using [one of the libraries](https://open-wc.org/guides/community/base-libraries/). However, you can also use NEUX to create your own Web Components.
+You can create your own components using [one of the libraries](https://open-wc.org/guides/community/base-libraries/). However, you can also use Neux to create your own Web Components.
 
 Here is an example of a custom web component:
 

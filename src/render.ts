@@ -1,3 +1,13 @@
+/**
+ * Declarative DOM rendering with reactive bindings.
+ *
+ * Parses tag selectors, creates elements (including SVG/MathML), and syncs
+ * the virtual tree to the real DOM. Property accesses inside callbacks are
+ * tracked by signal so that updates flow automatically on change.
+ *
+ * @module render
+ */
+
 import { effect, untrack } from "./signal";
 
 /** XML namespace URIs for auto-detection and explicit assignment. */
@@ -561,9 +571,9 @@ function syncDOM(
  * @category Render
  *
  * @this {object} Reactive context for signal tracking; defaults to the global context when omitted.
- *     See {@link signal} for the reactive context API.
  * @param config A node configuration — string, Node, object, or array.
  * @param target A parent element or CSS selector string to append the result into.
+ * @returns The created DOM `Node`, which may have been appended to the target.
  *
  * @example
  * ```ts

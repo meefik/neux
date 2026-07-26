@@ -1,3 +1,13 @@
+/**
+ * Reactive state management via signals and effects.
+ *
+ * Wraps plain objects in a Proxy that tracks property reads inside
+ * effect callbacks and schedules re-runs on writes. Supports
+ * isolated contexts, untracked reads, and async getters.
+ *
+ * @module signal
+ */
+
 /** Internal runtime state used for tracking active effects per context. */
 interface Runtime {
   active: Effect | null;
@@ -174,7 +184,7 @@ function wrap(
  * });
  * ```
  */
-export function signal<T extends Record<string, any> = Record<string, any>>(
+export function signal<T extends Record<PropertyKey, any> = Record<PropertyKey, any>>(
   this: object | void,
   data: T = {} as T,
 ): T {

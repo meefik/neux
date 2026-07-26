@@ -1,7 +1,14 @@
 /**
- * Signature of the translation function returned by {@link i18n}.
+ * Internationalization utilities for resolving translations and interpolating placeholders.
  *
- * @category I18n
+ * Creates a translation function that looks up strings by dot-separated keys,
+ * falls back to a default language, and formats values with `Intl` APIs.
+ *
+ * @module i18n
+ */
+
+/**
+ * Signature of the translation function returned by {@link i18n}.
  */
 export interface Translator {
   /**

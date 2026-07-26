@@ -1,25 +1,29 @@
 {
   "name": "neux",
-  "cleanOutputDir": false,
   "hideGenerator": true,
-  "hideBreadcrumbs": true,
   "includeVersion": true,
   "excludeInternal": true,
-  "customFooterHtml": "<a href=\"https://neux.dev\" title=\"Neux website\" target=\"_blank\">neux.dev</a> <sup>↗</sup> | <a href=\"https://github.com/meefik/neux\" title=\"Neux GitHub repository\" target=\"_blank\">GitHub</a> <sup>↗</sup> | <a href=\"/llms-full.txt\" title=\"Full documentation for LLM context\" target=\"_blank\">AI-Ready Docs</a> <sup>↗</sup>",
-  "favicon": "https://neux.dev/favicon.ico",
-  "hostedBaseUrl": "https://api.neux.dev",
+  "customFooterHtml": "Neux © 2023-2026",
+  "favicon": "logo.svg",
+  "hostedBaseUrl": "https://neux.dev",
   "headings": {
     "readme": false
   },
-  "entryPoints": ["./src/index.ts"],
-  "plugin": ["typedoc-plugin-markdown"],
+  "navigationLinks": {
+    "GitHub": "https://github.com/meefik/neux"
+  },
+  "llmsTxt": true,
+  "llmsTxtOutDir": "./docs",
+  "projectDocuments": ["CHANGELOG.md"],
+  "entryPoints": [
+    "./src/i18n.ts",
+    "./src/render.ts",
+    "./src/signal.ts"
+  ],
+  "plugin": ["@skillit/typedoc"],
   "outputs": [
     {
       "name": "html",
-      "path": "./docs"
-    },
-    {
-      "name": "markdown",
       "path": "./docs"
     }
   ]
