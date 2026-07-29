@@ -714,7 +714,7 @@ npm run dev
 
 ## Using with Tailwind CSS
 
-It also works well with [Tailwind CSS](https://tailwindcss.com). After [installing Tailwind CSS](https://tailwindcss.com/docs/installation) in your project, you can use CSS classes in the `className` field as `String` or `Array`.
+It also works well with [Tailwind CSS](https://tailwindcss.com). After [installing Tailwind CSS](https://tailwindcss.com/docs/installation/using-vite) in your project, you can use CSS classes in the `className` field as `String` or `Array`.
 
 Setup steps:
 
@@ -763,7 +763,7 @@ To simplify styles, you can use [daisyUI](https://daisyui.com). This is a popula
 
 Setup steps:
 
-**1.** Install the required modules:
+**1.** Install the required module:
 
 ```sh
 npm install --save-dev daisyui
@@ -833,81 +833,108 @@ render(
 
 You can use Neux along with any [Web Components](https://developer.mozilla.org/docs/Web/API/Web_Components). Many component libraries can be [found here](https://open-wc.org/guides/community/component-libraries/).
 
-Let's look at an example with the [BlueprintUI](https://blueprintui.dev) library:
+Let's look at an example with the [WebAwesome](https://webawesome.com) library:
 
-**1.** Install the required modules:
+**1.** Install the required module:
 
 ```sh
-npm install --save-dev @blueprintui/components @blueprintui/themes @blueprintui/layout @blueprintui/typography
+npm install @awesome.me/webawesome
 ```
 
-**2.** Import styles in the `src/style.css` file:
-
-```css
-@import "@blueprintui/layout/index.min.css";
-@import "@blueprintui/typography/index.min.css";
-@import "@blueprintui/themes/index.min.css";
-```
-
-**3.** Update the `src/main.js` file with the example:
+**2.** Update the `src/main.js` file with the example:
 
 ```js
-import "./style.css";
-import "@blueprintui/components/include/button.js";
-import "@blueprintui/components/include/card.js";
-import "@blueprintui/components/include/input.js";
+// Web Awesome styles
+import "@awesome.me/webawesome/dist/styles/webawesome.css";
+// Import the components you want to use
+import "@awesome.me/webawesome/dist/components/button/button.js";
+import "@awesome.me/webawesome/dist/components/card/card.js";
+import "@awesome.me/webawesome/dist/components/checkbox/checkbox.js";
+import "@awesome.me/webawesome/dist/components/input/input.js";
+
 import { render } from "neux";
 
-render(
-  {
-    tagName: "bp-card",
+const Input = ({ label, type, icon, required = true }) => {
+  return {
+    tagName: "wa-input",
+    label,
+    type,
+    attributes: {
+      required,
+    },
     children: [
       {
-        tagName: "h2",
-        slot: "header",
-        attributes: {
-          "bg-text": "section",
-        },
-        textContent: "Heading",
-      },
-      {
-        tagName: "bp-field",
-        children: [
-          {
-            tagName: "label",
-            textContent: "label",
-          },
-          {
-            tagName: "bp-input",
-          },
-        ],
-      },
-      {
-        slot: "footer",
-        attributes: {
-          "bp-layout": "inline gap:xs inline:end",
-        },
-        children: [
-          {
-            tagName: "bp-button",
-            attributes: {
-              action: "secondary",
-            },
-            textContent: "Cancel",
-          },
-          {
-            tagName: "bp-button",
-            attributes: {
-              status: "accent",
-            },
-            textContent: "Confirm",
-          },
-        ],
+        tagName: "wa-icon",
+        slot: "start",
+        name: icon,
       },
     ],
-  },
-  document.body,
-);
+  };
+};
+
+const Checkbox = ({ text }) => {
+  return {
+    tagName: "wa-checkbox",
+    textContent: text,
+  };
+};
+
+const Button = ({ text, appearance, type }) => {
+  return {
+    tagName: "wa-button",
+    appearance,
+    textContent: text,
+    type,
+  };
+};
+
+const Card = (children) => {
+  return {
+    tagName: "wa-card",
+    className: ["card-basic"],
+    children,
+  };
+};
+
+const Form = (children) => {
+  return {
+    tagName: "form",
+    className: ["wa-stack"],
+    children,
+    on: {
+      submit(e) {
+        e.preventDefault();
+        alert("All fields are valid!");
+      },
+    },
+  };
+};
+
+const LoginForm = () => {
+  return {
+    className: [
+      "wa-cloak",
+      "wa-justify-content-center",
+      "wa-align-items-center",
+    ],
+    style: {
+      width: "100vw",
+      height: "100vh",
+    },
+    children: [
+      Card(
+        Form([
+          Input({ label: "Email", type: "email", icon: "envelope" }),
+          Input({ label: "Password", type: "password", icon: "lock" }),
+          Checkbox({ text: "Remember me" }),
+          Button({ text: "Log In", appearance: "filled", type: "submit" }),
+        ]),
+      ),
+    ],
+  };
+};
+
+render(LoginForm, "#app");
 ```
 
 ## Creating your own Web Component
