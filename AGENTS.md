@@ -4,12 +4,12 @@ Lightweight frontend JS library for dynamic UIs via declarative elements and rea
 
 ## Tech Stack
 
-- TypeScript 6+ (strict)
+- TypeScript 6+ (strict, targeting ES2021)
 - Node.js (build only, browser at runtime)
 - Type checking via `tsc`
-- Testing with `node:test` + `node:assert/strict` via `tsx` ES loader
+- Testing with `node:test` + `node:assert/strict` via `tsx` ES loader and JSDOM for DOM simulation
 - Vite (UMD + ESM)
-- TypeDoc
+- TypeDoc (HTML + markdown output)
 
 ## Conventions
 
@@ -40,11 +40,11 @@ Lightweight frontend JS library for dynamic UIs via declarative elements and rea
 
 ## Testing
 
-Tests live alongside source (`src/**/*.test.ts`). Follow **Arrange → Act → Assert**. Node built-in imports use the `node:` prefix. No external test libraries — just `node:test` and `node:assert/strict`.
+Tests live alongside source (`src/**/*.test.ts`). Follow **Arrange → Act → Assert**. Node built-in imports use the `node:` prefix. JSDOM provides a simulated browser DOM for tests that interact with elements. No external test libraries — just `node:test`, `node:assert/strict`, and `jsdom`.
 
 ## Docs
 
-Run `npm run docs` to regenerate TypeDoc. Output includes `docs/llms.txt` (globals index) and `docs/llms-full.txt` (combined, for AI context).
+Run `npm run docs` to regenerate TypeDoc. Output includes HTML and Markdown documentation, plus `docs/llms.txt` (globals index).
 
 ## Releases
 
