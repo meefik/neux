@@ -1,5 +1,6 @@
 {
   "name": "neux",
+  "router": "structure",
   "hideGenerator": true,
   "includeVersion": true,
   "excludeInternal": true,
@@ -12,19 +13,21 @@
   "navigationLinks": {
     "GitHub": "https://github.com/meefik/neux"
   },
-  "llmsTxt": true,
-  "llmsTxtOutDir": "./docs",
   "projectDocuments": ["CHANGELOG.md"],
-  "entryPoints": [
-    "./src/i18n.ts",
-    "./src/render.ts",
-    "./src/signal.ts"
-  ],
-  "plugin": ["@skillit/typedoc"],
+  "entryPoints": ["./src/i18n.ts", "./src/render.ts", "./src/signal.ts"],
+  "plugin": ["typedoc-plugin-markdown"],
   "outputs": [
     {
       "name": "html",
       "path": "./docs"
+    },
+    {
+      "name": "markdown",
+      "path": "./docs",
+      "options": {
+        "cleanOutputDir": false,
+        "mergeReadme": true
+      }
     }
   ]
 }
