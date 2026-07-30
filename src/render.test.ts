@@ -556,20 +556,29 @@ suite("render", async () => {
     );
   });
 
-  await test("Calls function config without side effects", () => {
-    let called = false;
-    render(() => {
-      called = true;
-      return "";
-    });
-    ok(called, "Expected function to be called");
-  });
+  await test("Skips falsy children in arrays", () => {
+    const frag = render([
+      "A",
+      null,
+      undefined,
+      "B",
+      {
+        children: ["C", null, undefined, { textContent: "D" }],
+      },
+    ]) as DocumentFragment;
+    equal(frag.childNodes.length, 3, "Expected 3 non-falsy children");
+    equal(frag.childNodes[0].textContent, "A", "First child is A");
+    equal(frag.childNodes[1].textContent, "B", "Second child is B");
 
-  await test("createNode config function returns null", () => {
-    const el = render(() => null as unknown as string);
-    equal(el.nodeType, domWindow.Node.ELEMENT_NODE, "Expected element node");
-    if (el instanceof domWindow.Element)
-      equal(el.tagName, "DIV", "Fallback element defaults to DIV");
+    const nested = frag.childNodes[2] as Element;
+    ok(nested instanceof domWindow.Element);
+    equal(
+      nested.childNodes.length,
+      2,
+      "Nested element has 2 non-falsy children",
+    );
+    equal(nested.childNodes[0].textContent, "C", "First nested child is C");
+    equal(nested.childNodes[1].textContent, "D", "Second nested child is D");
   });
 
   await test("Non-plain-object config creates default div", () => {

@@ -8,7 +8,7 @@
  * @module render
  */
 
-import { effect, untrack } from "./signal";
+import { effect } from "./signal";
 
 /** XML namespace URIs for auto-detection and explicit assignment. */
 const XHTML_NS = "http://www.w3.org/1999/xhtml";
@@ -35,10 +35,11 @@ export type ReactiveValue<T> = T | (() => T);
 
 /**
  * A child node config value that can be passed to render or used as children.
+ * If `null` or `undefined`, the child is skipped.
  *
  * @category Render
  */
-export type RenderChild = string | Node | RenderConfig;
+export type RenderChild = string | Node | RenderConfig | null | undefined;
 
 /**
  * Configuration object passed to {@link render} or used as a child element.
@@ -58,7 +59,7 @@ export interface RenderConfig extends Record<string, ReactiveValue<unknown>> {
   on?: Record<string, (event: Event) => void>;
   /** Tag name. */
   tagName?: string;
-  /** CSS class name(s) applied to the element. */
+  /** CSS class name(s) applied to the element. Array falsy entries are filtered automatically. */
   className?: ReactiveValue<string | string[]>;
   /** Map of HTML attributes to set on the element. */
   attributes?: ReactiveValue<Record<string, unknown>>;
@@ -66,8 +67,8 @@ export interface RenderConfig extends Record<string, ReactiveValue<unknown>> {
   dataset?: ReactiveValue<Record<string, unknown>>;
   /** Map of inline CSS styles to apply. */
   style?: ReactiveValue<Record<string, unknown>>;
-  /** Child nodes or config objects rendered inside the element. */
-  children?: ReactiveValue<RenderChild[]>;
+  /** Child nodes or config objects rendered inside the element. Falsy entries are skipped automatically. */
+  children?: ReactiveValue<RenderChild | RenderChild[]>;
   /** Shadow DOM mode for attaching a shadow root to the element. */
   shadowRootMode?: "open" | "closed";
   /** Style sheets adopted by the shadow root. */
@@ -137,6 +138,7 @@ function dispatchChildren(
 }
 /**
  * Updates the element's class list by removing all current classes and adding new ones.
+ * Falsy entries (empty strings, null, undefined, etc.) are filtered out automatically.
  */
 function updateClassList(el: Element, classList: string[]): void {
   el.classList.remove(...el.classList);
@@ -211,10 +213,6 @@ function createNode(
 ): Node {
   const { document, Node } = window;
 
-  if (typeof config === "function") {
-    const fn = config;
-    config = untrack.call(context, () => fn());
-  }
   if (config instanceof Node) {
     return config;
   }
@@ -224,6 +222,7 @@ function createNode(
   if (Array.isArray(config)) {
     const fragment = document.createDocumentFragment();
     for (const item of config) {
+      if (!item) continue;
       const child = createNode(context, item, ns);
       fragment.appendChild(child);
     }
@@ -557,7 +556,6 @@ function syncDOM(
  * Creates a DOM node from a configuration value.
  *
  * Handles the following config types:
- * - `Function` — invoked in the given context (untracked), result processed recursively.
  * - `Node` — returned as-is.
  * - `string` — becomes a text node.
  * - `Array` — becomes a `DocumentFragment` with rendered children.
@@ -589,7 +587,7 @@ function syncDOM(
  */
 export function render(
   this: object | void,
-  config?: ReactiveValue<RenderChild> | ReactiveValue<RenderChild[]>,
+  config?: RenderChild | RenderChild[],
   target?: Element | DocumentFragment | string,
 ): Node {
   const { document, DocumentFragment } = window;
