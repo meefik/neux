@@ -21,11 +21,13 @@ Lightweight frontend JS library for dynamic UIs via declarative elements and rea
 ## Structure
 
 ```
-./dist/         # Build output
-./docs/         # Generated TypeDoc
-./src/          # Source + co-located unit tests
-./CHANGELOG.md  # Project changelog
-./README.md     # Project README
+dist/         # Build output
+docs/         # Generated TypeDoc
+src/          # Source + co-located unit tests
+CHANGELOG.md  # Project changelog
+README.md     # Project README
+AGENTS.md     # AI agent guidelines
+SKILL.md      # AI agent skill guidelines
 ```
 
 ## Commands
@@ -56,7 +58,7 @@ Run `npm run docs` to regenerate TypeDoc. Output includes HTML and Markdown docu
 1. Edit source in `src/`
 2. Add/update tests alongside the source file
 3. Add/update TypeDoc for public API changes
-4. Run `npm test` — all tests pass
+4. Run `npm test` — ensure all tests pass
 5. Review comments for grammar and spelling
 6. Run `npm run build` — clean compile
 7. Verify correctness: no oversights, regressions, or missed requirements

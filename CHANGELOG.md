@@ -5,11 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.16.1] - 2026-07-26
+## [0.17.0] - 2026-07-31
 
 ### Added
 
 - Skill for AI agents.
+- Instructions on how to use the AI agent skill.
+
+### Changed
+
+- `render()` now skips falsy entries in children arrays.
+- TypeDoc generation for LLMs switched to `typedoc-plugin-markdown`.
+
+### Removed
+
+- Passing a function as config (top level and children).
+
+## [0.16.1] - 2026-07-26
+
+### Added
+
 - Project logo.
 
 ### Changed
@@ -59,6 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Legacy JavaScript source and test files.
 - Manually maintained `types/*.d.ts` declaration files.
 
-[unreleased]: https://github.com/meefik/neux/compare/v0.16.1...HEAD
+[unreleased]: https://github.com/meefik/neux/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/meefik/neux/compare/v0.16.1...v0.17.0
 [0.16.1]: https://github.com/meefik/neux/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/meefik/neux/compare/v0.15.2...v0.16.0

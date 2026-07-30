@@ -4,11 +4,11 @@
 
 **Try it in the playground:**
 
-- 📝 [To-Do App](https://v47.livecodes.io/?x=id/bmgegjex8iw)
-- 🧩 [15 Puzzle](https://v47.livecodes.io/?x=id/cppw5cgjtgd)
-- 🎲 [Tic-Tac-Toe](https://v47.livecodes.io/?x=id/duz65inby2x)
-- ⏰ [SVG Clock](https://v47.livecodes.io/?x=id/6nrugbtqz7k)
-- 🎨 [Sketch](https://v47.livecodes.io/?x=id/rrek572rwx3)
+- 📝 [To-Do App](https://v47.livecodes.io/?x=id/9g9e5qijyau)
+- 🧩 [15 Puzzle](https://v47.livecodes.io/?x=id/9pnci9pcwuh)
+- 🎲 [Tic-Tac-Toe](https://v47.livecodes.io/?x=id/y5nnsa7iy62)
+- ⏰ [SVG Clock](https://v47.livecodes.io/?x=id/6m93mrn9v6k)
+- 🎨 [Sketch](https://v47.livecodes.io/?x=id/8aesmabtrjn)
 
 ## Features
 
@@ -20,6 +20,14 @@
 - Easy integration with CSS modules, Tailwind CSS, and other styling solutions.
 - Minimal bundle size (4 KB gzipped) with zero dependencies.
 - Open source and available under the MIT license.
+
+## For AI Agents
+
+Install the Neux skill to get tailored help when coding with this library:
+
+```sh
+npx skills add meefik/neux
+```
 
 ## Getting Started
 
@@ -90,7 +98,7 @@ You should use the `render()` function to create an `Element` or `DocumentFragme
 - `attributes`: (Object or Function) Maps attribute names to their corresponding values. Use a static object for fixed attributes or a function for dynamic assignment. Uses `setAttribute`/`removeAttribute` internally.
 - `style`: (Object or Function) Sets inline CSS styles via an object where keys are CSS property names. This can also be defined as a function to handle dynamic styling.
 - `dataset`: (Object or Function) Assigns custom data attributes (`data-*`) through a static mapping or a function that returns the mapping.
-- `children`: (String, Array of Nodes, or Function) Defines the inner content of the element. This can be a direct string, an array of element definitions, or a function that returns child nodes for dynamic rendering.
+- `children`: (String, Array of Nodes, or Function) Defines the inner content of the element. This can be a direct string, an array of element definitions, or a function that returns child nodes for dynamic rendering. Falsy entries in arrays are skipped automatically.
 - `on`: (Object) Adds event listeners to the element. Each key represents an event name (e.g., "click", "change") with its corresponding handler function.
 - `use`: (String or Element) Specifies a tag selector string (e.g., "div#id1.cls1"), an HTML markup to parse, or an existing Element to reuse directly.
 
@@ -206,7 +214,7 @@ HTML output:
   class="icon"
   width="64px"
   height="64px"
-  style="color: red;"
+  style="color: green;"
 >
   <circle cx="50" cy="50" r="50"></circle>
 </svg>
@@ -324,7 +332,7 @@ const state = signal({
   get double() {
     return this.count * 2;
   },
-  // non-reactive method
+  // method that mutates state
   increment() {
     this.count++;
   },
@@ -334,7 +342,7 @@ const state = signal({
 state.increment();
 state.list.push({ text: "Item 3" });
 
-// Remove the field and its related reactive effects
+// Remove the computed property
 delete state.double;
 ```
 
@@ -457,7 +465,7 @@ const App = () => {
   };
 };
 
-render(App, document.body);
+render(App(), document.body);
 ```
 
 You may encounter a problem when trying to replace an array item with a new object that contains the same values. Neux compares rendered values to detect DOM changes. In this case, the element won't be replaced, even if the object in the state is replaced. To solve this problem, add a unique identifier to each array item and use it as a data attribute key for each element.
@@ -934,7 +942,7 @@ const LoginForm = () => {
   };
 };
 
-render(LoginForm, "#app");
+render(LoginForm(), "#app");
 ```
 
 ## Creating your own Web Component
@@ -1156,7 +1164,7 @@ const App = () => {
   };
 };
 
-render(App, document.body);
+render(App(), document.body);
 ```
 
 ## License
