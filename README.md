@@ -4,11 +4,12 @@
 
 **Try it in the playground:**
 
-- 📝 [To-Do App](https://v47.livecodes.io/?x=id/9g9e5qijyau)
-- 🧩 [15 Puzzle](https://v47.livecodes.io/?x=id/9pnci9pcwuh)
-- 🎲 [Tic-Tac-Toe](https://v47.livecodes.io/?x=id/y5nnsa7iy62)
-- ⏰ [SVG Clock](https://v47.livecodes.io/?x=id/6m93mrn9v6k)
-- 🎨 [Sketch](https://v47.livecodes.io/?x=id/8aesmabtrjn)
+- 📝 [To-Do App](https://v49.livecodes.io/?x=id/yadr5hya8mm)
+- 🧩 [15 Puzzle](https://v49.livecodes.io/?x=id/d752rxemyk6)
+- 🎲 [Tic-Tac-Toe](https://v49.livecodes.io/?x=id/ryvyt24ixrn)
+- ⏰ [SVG Clock](https://v49.livecodes.io/?x=id/ufnp33xxxv4)
+- 🎨 [Sketch](https://v49.livecodes.io/?x=id/bjf7j8nk9pn)
+- 👑 [WebAwesome](https://v49.livecodes.io/?x=id/8jsi5xgduey)
 
 ## Features
 
