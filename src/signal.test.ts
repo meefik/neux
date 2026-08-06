@@ -334,7 +334,11 @@ suite("signal", async () => {
     await tick();
     await tick();
 
-    deepEqual(steps, ["A0", "B0", "A1", "B1", "A2", "B2"], "effects ran in expected order");
+    deepEqual(
+      steps,
+      ["A0", "B0", "A1", "B1", "A2", "B2"],
+      "effects ran in expected order",
+    );
   });
 
   await test("prevents infinite loop when effect writes the same signal", async () => {
@@ -454,6 +458,10 @@ suite("signal", async () => {
     await tick();
     s.val = 2;
     await tick();
-    equal(count, 1, "effect was cleaned up after throw and did not re-subscribe");
+    equal(
+      count,
+      1,
+      "effect was cleaned up after throw and did not re-subscribe",
+    );
   });
 });

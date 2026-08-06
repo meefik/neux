@@ -184,10 +184,9 @@ function wrap(
  * });
  * ```
  */
-export function signal<T extends Record<PropertyKey, any> = Record<PropertyKey, any>>(
-  this: object | void,
-  data: T = {} as T,
-): T {
+export function signal<
+  T extends Record<PropertyKey, any> = Record<PropertyKey, any>,
+>(this: object | void, data: T = {} as T): T {
   return wrap(data, new WeakMap(), this || GLOBAL) as T;
 }
 
