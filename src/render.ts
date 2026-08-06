@@ -42,7 +42,7 @@ export type ReactiveValue<T> = T | (() => T);
 export type RenderChild = string | Node | RenderConfig | null | undefined;
 
 /**
- * Configuration object passed to {@link render} or used as a child element.
+ * Configuration object passed to {@link render} or used as a child config.
  *
  * Known keys (`tagName`, `className`, `attributes`, `dataset`, `style`, `children`,
  * `shadowRootMode`, `adoptedStyleSheets`, `namespaceURI`, `on`, `use`) are handled
@@ -126,17 +126,6 @@ function dispatchEvent(
 }
 
 /**
- * Dispatch lifecycle events to child elements.
- */
-function dispatchChildren(
-  children: HTMLCollection | Node[],
-  event: keyof LifecycleEvents,
-): void {
-  for (const child of children) {
-    dispatchEvent(child, event);
-  }
-}
-/**
  * Updates the element's class list by removing all current classes and adding new ones.
  * Falsy entries (empty strings, null, undefined, etc.) are filtered out automatically.
  */
@@ -210,7 +199,7 @@ function createNode(
   context: object | void,
   config: unknown,
   ns: string | null = null,
-): Node {
+): Node | Node[] {
   const { document, Node } = window;
 
   if (config instanceof Node) {
@@ -220,13 +209,17 @@ function createNode(
     return document.createTextNode(config);
   }
   if (Array.isArray(config)) {
-    const fragment = document.createDocumentFragment();
+    const childNodes = [];
     for (const item of config) {
       if (!item) continue;
       const child = createNode(context, item, ns);
-      fragment.appendChild(child);
+      if (Array.isArray(child)) {
+        for (const c of child) childNodes.push(c);
+      } else {
+        childNodes.push(child);
+      }
     }
-    return fragment;
+    return childNodes;
   }
 
   const {
@@ -283,7 +276,9 @@ function createNode(
 
   el.addEventListener("removed", (e: Event) => {
     dispose();
-    dispatchChildren(el.children, "removed");
+    for (const child of el.children) {
+      dispatchEvent(child, "removed");
+    }
   });
 
   el.addEventListener("refresh", (e: Event) => {
@@ -339,22 +334,18 @@ function createNode(
         // Children.
         if (isChildren) {
           const target = shadowRoot ?? el;
-          const fragment = createNode(context, value, ns);
-          if (fragment instanceof Node) {
-            const newNodesList =
-              fragment.nodeType === Node.DOCUMENT_FRAGMENT_NODE
-                ? Array.from(fragment.childNodes)
-                : [fragment];
-            const [added, removed] = syncDOM(
-              target,
-              Array.from(target.childNodes),
-              newNodesList,
-            );
-            newValue = newNodesList;
+          const node = createNode(context, value, ns);
+          if (node) {
+            const oldNodes = Array.from(target.childNodes);
+            const newNodes = Array.isArray(node) ? node : [node];
+            const [added, removed] = syncDOM(target, oldNodes, newNodes);
+            newValue = newNodes;
             for (const node of removed) dispatchEvent(node, "removed");
             for (const node of added) dispatchEvent(node, "mounted");
           } else {
-            dispatchChildren(target.children, "removed");
+            for (const child of target.children) {
+              dispatchEvent(child, "removed");
+            }
             if ("innerHTML" in target) target.innerHTML = "";
             dispose(pathKey + ".");
           }
@@ -552,13 +543,25 @@ function syncDOM(
   return [newNodes, oldNodes];
 }
 
+export function render(
+  this: object | void,
+  config?: RenderChild[],
+  target?: Element | DocumentFragment | string,
+): Node[];
+
+export function render(
+  this: object | void,
+  config?: RenderChild,
+  target?: Element | DocumentFragment | string,
+): Node;
+
 /**
  * Creates a DOM node from a configuration value.
  *
  * Handles the following config types:
  * - `Node` — returned as-is.
  * - `string` — becomes a text node.
- * - `Array` — becomes a `DocumentFragment` with rendered children.
+ * - `Array` — becomes an array of rendered nodes.
  * - `object` — parsed as a {@link RenderConfig} with reactive bindings via effects.
  *
  * Lifecycle events are dispatched by the render layer (see {@link LifecycleEvents}):
@@ -589,19 +592,21 @@ export function render(
   this: object | void,
   config?: RenderChild | RenderChild[],
   target?: Element | DocumentFragment | string,
-): Node {
-  const { document, DocumentFragment } = window;
+): Node | Node[] {
+  const { document } = window;
   const el = createNode(this, config);
   const parent =
     typeof target === "string" ? document.querySelector(target) : target;
-  if (el instanceof DocumentFragment) {
-    // Shallow copy because the DocumentFragment becomes empty after appending to the DOM
-    const children = [...el.children];
-    parent?.appendChild(el);
-    if (parent) dispatchChildren(children, "mounted");
-  } else {
-    parent?.appendChild(el);
-    if (parent) dispatchEvent(el, "mounted");
+  if (parent) {
+    if (Array.isArray(el)) {
+      for (const child of el) {
+        parent.appendChild(child);
+        dispatchEvent(child, "mounted");
+      }
+    } else {
+      parent.appendChild(el);
+      dispatchEvent(el, "mounted");
+    }
   }
   return el;
 }

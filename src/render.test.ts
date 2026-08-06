@@ -24,19 +24,14 @@ suite("render", async () => {
     (globalThis as Record<string, unknown>).window = undefined;
   });
 
-  await test("Renders text nodes and document fragments", () => {
-    const text = render("Hello") as Node;
+  await test("Renders text nodes", () => {
+    const text = render("Hello");
     equal(text.nodeType, domWindow.Node.TEXT_NODE, "Expected text node");
     equal(text.textContent, "Hello", "Expected text content");
 
-    const frag = render(["A", "B"]) as DocumentFragment;
-    equal(
-      frag.nodeType,
-      domWindow.Node.DOCUMENT_FRAGMENT_NODE,
-      "Expected fragment",
-    );
-    equal(frag.childNodes[0].textContent, "A", "Expected first child");
-    equal(frag.childNodes[1].textContent, "B", "Expected second child");
+    const nodes = render(["A", "B"]);
+    equal(nodes[0].textContent, "A", "Expected first child");
+    equal(nodes[1].textContent, "B", "Expected second child");
   });
 
   await test("Passes through existing Node", () => {
@@ -146,17 +141,24 @@ suite("render", async () => {
   });
 
   await test("Renders children", () => {
+    const fragment = domWindow.document.createDocumentFragment();
+    const span = domWindow.document.createElement("li");
+    span.textContent = "Item 3";
+    fragment.appendChild(span);
+
     const el = render({
       tagName: "ul",
       children: [
         { tagName: "li", textContent: "Item 1" },
         { tagName: "li", textContent: "Item 2" },
+        fragment,
       ],
     }) as HTMLElement;
 
-    equal(el.children.length, 2, "Expected 2 children");
+    equal(el.children.length, 3, "Expected 2 children");
     equal(el.children[0].textContent, "Item 1", "Expected first item");
     equal(el.children[1].textContent, "Item 2", "Expected second item");
+    equal(el.children[2].textContent, "Item 3", "Expected third item");
   });
 
   await test("Mounts element into DOM or CSS selector target", () => {
@@ -596,7 +598,7 @@ suite("render", async () => {
   });
 
   await test("Skips falsy children in arrays", () => {
-    const frag = render([
+    const nodes = render([
       "A",
       null,
       undefined,
@@ -604,12 +606,12 @@ suite("render", async () => {
       {
         children: ["C", null, undefined, { textContent: "D" }],
       },
-    ]) as DocumentFragment;
-    equal(frag.childNodes.length, 3, "Expected 3 non-falsy children");
-    equal(frag.childNodes[0].textContent, "A", "First child is A");
-    equal(frag.childNodes[1].textContent, "B", "Second child is B");
+    ]);
+    equal(nodes.length, 3, "Expected 3 non-falsy children");
+    equal(nodes[0].textContent, "A", "First child is A");
+    equal(nodes[1].textContent, "B", "Second child is B");
 
-    const nested = frag.childNodes[2] as Element;
+    const nested = nodes[2];
     ok(nested instanceof domWindow.Element);
     equal(
       nested.childNodes.length,
