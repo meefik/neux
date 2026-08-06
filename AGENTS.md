@@ -50,8 +50,20 @@ Run `npm run docs` to regenerate TypeDoc. Output includes HTML and Markdown docu
 
 ## Releases
 
-- **Semver**: `npm version [major|minor|patch]`. Changelog in `CHANGELOG.md`.
-- **Commits**: Conventional Commits (`feat|fix|docs|refactor|test|chore`).
+- **Semver**: This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Bump the version with `npm version [major|minor|patch]`.
+- **Changelog**: Update `CHANGELOG.md` under the `[unreleased]` heading when making changes. Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions — use categorized entries (`Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`) with bullet-point descriptions of each change.
+- **Commits**: Follow Conventional Commits format: `<type>: <description>`. Use the type that best matches the change:
+
+  | Type       | When to use                                             |
+  | ---------- | ------------------------------------------------------- |
+  | `feat`     | New feature or functionality                            |
+  | `fix`      | Bug fix                                                 |
+  | `docs`     | Documentation-only changes                              |
+  | `refactor` | Code change that neither fixes a bug nor adds a feature |
+  | `test`     | Adding or updating tests                                |
+  | `chore`    | Maintenance, dependencies, tooling, or configuration    |
+
+  Do NOT create git commits unless explicitly asked.
 
 ## Dev Checklist
 
