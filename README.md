@@ -92,7 +92,7 @@ The `render()` function accepts an optional second argument — a target element
 
 Neux provides a powerful way to declaratively define HTML elements using plain JavaScript objects. You can specify various properties such as tag name, attributes, styles, event listeners, children, and other native HTML properties. The `render()` function processes these definitions and creates the corresponding DOM elements.
 
-You should use the `render()` function to create an `Element` or `DocumentFragment` from a declarative definition. Below is an overview of the most common parameters available for element configuration:
+Use the `render()` function to create one or more DOM nodes from a declarative definition. A single config object returns a `Node`, while an array of configs returns `Node[]`. Below is an overview of the most common parameters available for element configuration:
 
 - `tagName`: (String) Specifies the HTML tag name (e.g., "span", "button", "input"). Defaults to `div`.
 - `className`: (String, Array of Strings, or Function) Specifies one or more CSS classes to add to the element. It can be a static array or a function that returns an array based on dynamic context.
@@ -259,18 +259,18 @@ HTML output:
 <p>Hello</p>
 ```
 
-Additionally, you can create a [DocumentFragment](https://developer.mozilla.org/docs/Web/API/DocumentFragment) by simply passing an array to the `render()` function:
+Passing an array of configs to `render()` returns multiple nodes as a plain `Node[]`:
 
 ```js
 import { render } from "neux";
 
-const fragment = render([
+const nodes = render([
   { tagName: "span", textContent: "Item 1" },
   { tagName: "span", textContent: "Item 2" },
   { tagName: "span", textContent: "Item 3" },
 ]);
 
-console.dir(fragment);
+console.dir(nodes);
 ```
 
 You probably want to change the element properties dynamically. Neux allows you to use functions for most of the element parameters. These functions are reactive and will be re-evaluated automatically when the reactive signals they depend on change.

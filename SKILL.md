@@ -135,7 +135,7 @@ render(App(), document.body);
 render(App(), "#app");
 ```
 
-`render(config, target)` creates real DOM nodes from the config tree and appends them to `target`. It returns the created `Node`. Omit `target` to get an unmounted node you can attach later.
+`render(config, target)` creates real DOM nodes from the config tree and appends them to `target`. A single config object returns a `Node`; passing an array of configs returns `Node[]`. Omit `target` to get unmounted nodes you can attach later.
 
 On mount (append to parent), Neux dispatches a `mounted` custom event top-down through every created element:
 
@@ -191,7 +191,7 @@ Known config keys and what they do:
 - `style` (`ReactiveValue<Record<string, unknown>>`) — Inline styles applied as camelCase or kebab-case properties.
 - `attributes` (`ReactiveValue<Record<string, unknown>>`) — Arbitrary HTML attributes (`for`, `aria-label`, etc.). Use for non-property attributes.
 - `dataset` (`ReactiveValue<Record<string, unknown>>`) — Sets `element.dataset` entries (renders as `data-` attributes).
-- `children` (`ReactiveValue<(string | Node | RenderConfig)[]>`) — Child nodes or configs. Arrays render as a `DocumentFragment`. Falsy entries are skipped automatically.
+- `children` (`ReactiveValue<(string | Node | RenderConfig)[]>`) — Child nodes or configs. Falsy entries are skipped automatically.
 - `on` (`Record<string, handler>`) — Event listeners. Keys are event names (`click`, `change`, `keydown`, etc.). Handlers receive the event; `this` is bound to the element. Also accepts lifecycle keys: `mounted`, `removed`, `updated`.
 - `shadowRootMode` (`"open" | "closed"`) — Attaches a Shadow DOM root. Children render inside the shadow tree.
 - `adoptedStyleSheets` (`CSSStyleSheet[]`) — Style sheets adopted by the shadow root.
