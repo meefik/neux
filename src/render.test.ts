@@ -234,6 +234,45 @@ suite("render", async () => {
     equal(removed, 1, "Expected removed callback to fire once on removal");
   });
 
+  await test("Fires mounted once for nested render children", async () => {
+    let countA = 0;
+    let countB = 0;
+    let countC = 0;
+
+    render(
+      {
+        on: {
+          mounted() {
+            countA++;
+          },
+        },
+        children: [
+          render({
+            on: {
+              mounted() {
+                countB++;
+              },
+            },
+            children: [
+              {
+                on: {
+                  mounted() {
+                    countC++;
+                  },
+                },
+              },
+            ],
+          }),
+        ],
+      },
+      domWindow.document.body,
+    );
+
+    equal(countA, 1, "Expected outer mounted to fire once");
+    equal(countB, 1, "Expected inner mounted to fire once");
+    equal(countC, 1, "Expected nested mounted to fire once");
+  });
+
   // ── Shared context for reactivity tests ───────────────────────────
 
   const ctx = {};

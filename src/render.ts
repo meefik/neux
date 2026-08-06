@@ -598,10 +598,10 @@ export function render(
     // Shallow copy because the DocumentFragment becomes empty after appending to the DOM
     const children = [...el.children];
     parent?.appendChild(el);
-    dispatchChildren(children, "mounted");
+    if (parent) dispatchChildren(children, "mounted");
   } else {
     parent?.appendChild(el);
-    dispatchEvent(el, "mounted");
+    if (parent) dispatchEvent(el, "mounted");
   }
   return el;
 }
