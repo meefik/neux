@@ -109,7 +109,7 @@ function isPlainObjectOrArray(value: unknown): boolean {
   return (
     typeof value === "object" &&
     value !== null &&
-    (value.constructor === Object || value.constructor === Array)
+    (Object.getPrototypeOf(value) === Object.prototype || Array.isArray(value))
   );
 }
 
