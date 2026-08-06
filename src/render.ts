@@ -129,10 +129,10 @@ function dispatchEvent(
  * Dispatch lifecycle events to child elements.
  */
 function dispatchChildren(
-  source: ParentNode,
+  children: HTMLCollection | Node[],
   event: keyof LifecycleEvents,
 ): void {
-  for (const child of source.children) {
+  for (const child of children) {
     dispatchEvent(child, event);
   }
 }
@@ -283,7 +283,7 @@ function createNode(
 
   el.addEventListener("removed", (e: Event) => {
     dispose();
-    dispatchChildren(el, "removed");
+    dispatchChildren(el.children, "removed");
   });
 
   el.addEventListener("refresh", (e: Event) => {
@@ -354,7 +354,7 @@ function createNode(
             for (const node of removed) dispatchEvent(node, "removed");
             for (const node of added) dispatchEvent(node, "mounted");
           } else {
-            dispatchChildren(target, "removed");
+            dispatchChildren(target.children, "removed");
             if ("innerHTML" in target) target.innerHTML = "";
             dispose(pathKey + ".");
           }
@@ -594,12 +594,13 @@ export function render(
   const el = createNode(this, config);
   const parent =
     typeof target === "string" ? document.querySelector(target) : target;
-  if (parent) {
-    parent.appendChild(el);
-    dispatchChildren(parent, "mounted");
-  } else if (el instanceof DocumentFragment) {
-    dispatchChildren(el, "mounted");
+  if (el instanceof DocumentFragment) {
+    // Shallow copy because the DocumentFragment becomes empty after appending to the DOM
+    const children = [...el.children];
+    parent?.appendChild(el);
+    dispatchChildren(children, "mounted");
   } else {
+    parent?.appendChild(el);
     dispatchEvent(el, "mounted");
   }
   return el;
