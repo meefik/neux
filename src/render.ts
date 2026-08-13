@@ -71,7 +71,8 @@ export interface RenderConfig extends Record<string, ReactiveValue<unknown>> {
   namespaceURI?: string;
   /** Map of event names to handler functions. Includes native DOM events and
    * lifecycle events: `mounted`, `removed`, `updated`. */
-  on?: Partial<LifecycleEvents> & Record<string, (event: any) => void>;
+  on?: Partial<LifecycleEvents> &
+    Record<string, (this: Node, event: any) => void>;
   /** A tag string, optionally with id and class selectors
    * (e.g., `"div#id1.cls1.cls2"`), an HTML markup, or existing element. */
   use?: string | Element;
@@ -84,11 +85,12 @@ export interface RenderConfig extends Record<string, ReactiveValue<unknown>> {
  */
 export interface LifecycleEvents {
   /** Fired top-down when an element is appended to a parent. */
-  mounted: (event: CustomEvent) => void;
+  mounted: (this: Node, event: CustomEvent) => void;
   /** Fired top-down before cleanup when an element is removed from a parent. */
-  removed: (event: CustomEvent) => void;
+  removed: (this: Node, event: CustomEvent) => void;
   /** Fired on the bound element after its property value changes. */
   updated: (
+    this: Node,
     event: CustomEvent<{
       /** The name of the changed property. */
       property: string;
