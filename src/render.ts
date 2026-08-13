@@ -276,7 +276,8 @@ function createNode(
 
   el.addEventListener("removed", (e: Event) => {
     dispose();
-    for (const child of el.children) {
+    const container = shadowRoot ?? el;
+    for (const child of container.children) {
       dispatchEvent(child, "removed");
     }
   });
