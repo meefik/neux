@@ -31,7 +31,7 @@ const UPPER_CASE_RE = /[A-Z]/u;
  *
  * @typeParam T The type of the value.
  */
-export type ReactiveValue<T> = T | (() => T);
+export type ReactiveProperty<T> = T | ((this: Node) => T);
 
 /**
  * A child node config value that can be passed to render or used as children.
@@ -39,7 +39,7 @@ export type ReactiveValue<T> = T | (() => T);
  *
  * @category Render
  */
-export type RenderChild = string | Node | RenderConfig | null | undefined;
+export type NodeConfig = ElementConfig | Node | string | null | undefined;
 
 /**
  * Configuration object passed to {@link render} or used as a child config.
@@ -50,19 +50,25 @@ export type RenderChild = string | Node | RenderConfig | null | undefined;
  *
  * @category Render
  */
-export interface RenderConfig extends Record<string, ReactiveValue<unknown>> {
+export type ElementConfig = {
   /** Tag name. */
   tagName?: string;
   /** CSS class name(s) applied to the element. Array falsy entries are filtered automatically. */
-  className?: ReactiveValue<string | string[]>;
+  className?: ReactiveProperty<string | string[]>;
   /** Map of HTML attributes to set on the element. */
-  attributes?: ReactiveValue<Record<string, ReactiveValue<unknown>>>;
+  attributes?: ReactiveProperty<
+    Record<string, ReactiveProperty<unknown>> & ThisType<Node>
+  >;
   /** Map of `data-*` attributes to set on the element. */
-  dataset?: ReactiveValue<Record<string, ReactiveValue<unknown>>>;
+  dataset?: ReactiveProperty<
+    Record<string, ReactiveProperty<unknown>> & ThisType<Node>
+  >;
   /** Map of inline CSS styles to apply. */
-  style?: ReactiveValue<Record<string, ReactiveValue<unknown>>>;
+  style?: ReactiveProperty<
+    Record<string, ReactiveProperty<unknown>> & ThisType<Node>
+  >;
   /** Child nodes or config objects rendered inside the element. Falsy entries are skipped automatically. */
-  children?: ReactiveValue<RenderChild | RenderChild[]>;
+  children?: ReactiveProperty<NodeConfig | NodeConfig[]>;
   /** Shadow DOM mode for attaching a shadow root to the element. */
   shadowRootMode?: "open" | "closed";
   /** Style sheets adopted by the shadow root. */
@@ -71,19 +77,20 @@ export interface RenderConfig extends Record<string, ReactiveValue<unknown>> {
   namespaceURI?: string;
   /** Map of event names to handler functions. Includes native DOM events and
    * lifecycle events: `mounted`, `removed`, `updated`. */
-  on?: Partial<LifecycleEvents> &
+  on?: Partial<ElementLifecycle> &
     Record<string, (this: Node, event: any) => void>;
   /** A tag string, optionally with id and class selectors
    * (e.g., `"div#id1.cls1.cls2"`), an HTML markup, or existing element. */
   use?: string | Element;
-}
+} & Record<string, ReactiveProperty<unknown>> &
+  ThisType<Node>;
 
 /**
  * Lifecycle event handlers for elements, triggered by {@link render}.
  *
  * @category Events
  */
-export interface LifecycleEvents {
+export interface ElementLifecycle {
   /** Fired top-down when an element is appended to a parent. */
   mounted: (this: Node, event: CustomEvent) => void;
   /** Fired top-down before cleanup when an element is removed from a parent. */
@@ -118,7 +125,7 @@ function isPlainObjectOrArray(value: unknown): boolean {
  */
 function dispatchEvent(
   target: EventTarget,
-  event: keyof LifecycleEvents,
+  event: keyof ElementLifecycle,
   detail?: unknown,
 ): void {
   const { CustomEvent } = window;
@@ -546,13 +553,13 @@ function syncDOM(
 
 export function render<T extends Node[] = Node[]>(
   this: object | void,
-  config: RenderChild[],
+  config: NodeConfig[],
   target?: Element | DocumentFragment | string,
 ): T;
 
 export function render<T extends Node = Node>(
   this: object | void,
-  config: RenderChild,
+  config: NodeConfig,
   target?: Element | DocumentFragment | string,
 ): T;
 
@@ -563,9 +570,9 @@ export function render<T extends Node = Node>(
  * - `Node` — returned as-is.
  * - `string` — becomes a text node.
  * - `Array` — becomes an array of rendered nodes.
- * - `object` — parsed as a {@link RenderConfig} with reactive bindings via effects.
+ * - `object` — parsed as a {@link ElementConfig} with reactive bindings via effects.
  *
- * Lifecycle events are dispatched by the render layer (see {@link LifecycleEvents}):
+ * Lifecycle events are dispatched by the render layer (see {@link ElementLifecycle}):
  * - `mounted` — fires top-down when the element is appended to a parent.
  * - `removed` — fires top-down when the element is removed from a parent.
  * - `updated` — fires when a specific property is updated.
@@ -591,7 +598,7 @@ export function render<T extends Node = Node>(
  */
 export function render(
   this: object | void,
-  config: RenderChild | RenderChild[],
+  config: NodeConfig | NodeConfig[],
   target?: Element | DocumentFragment | string,
 ): Node | Node[] {
   const { document } = window;

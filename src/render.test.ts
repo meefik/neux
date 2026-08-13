@@ -158,10 +158,7 @@ suite("render", async () => {
   });
 
   await test("mounts element into DOM or CSS selector target", () => {
-    const el1 = render<HTMLElement>(
-      { tagName: "p" },
-      domWindow.document.body,
-    );
+    const el1 = render<HTMLElement>({ tagName: "p" }, domWindow.document.body);
     equal(domWindow.document.body.firstChild, el1, "element is mounted");
     el1.remove();
 
@@ -638,5 +635,71 @@ suite("render", async () => {
     obj.tagName = "p";
     const el = render<HTMLElement>(obj);
     equal(el.tagName, "DIV", "creates default DIV");
+  });
+
+  await test("this context is bound to node in reactive properties and handlers", async () => {
+    let classThis: Node | undefined;
+    let styleThis: Node | undefined;
+    let styleColorThis: Node | undefined;
+    let datasetIdThis: Node | undefined;
+    let childrenThis: Node | undefined;
+    let customThis: Node | undefined;
+    let mountedThis: Node | undefined;
+    let clickThis: Node | undefined;
+
+    const el = render<HTMLElement>(
+      {
+        tagName: "div",
+        className() {
+          classThis = this;
+          return [];
+        },
+        style() {
+          styleThis = this;
+          return {
+            color() {
+              styleColorThis = this;
+              return "red";
+            },
+          };
+        },
+        dataset: {
+          id() {
+            datasetIdThis = this;
+            return "1";
+          },
+        },
+        children() {
+          childrenThis = this;
+          return [];
+        },
+        customProp() {
+          customThis = this;
+          return "custom";
+        },
+        on: {
+          mounted() {
+            mountedThis = this;
+          },
+          click() {
+            clickThis = this;
+          },
+        },
+      },
+      domWindow.document.body,
+    );
+
+    // Reactive functions are called during initial render
+    equal(classThis, el, "className `this` is element");
+    equal(styleThis, el, "style `this` is element");
+    equal(styleColorThis, el, "style.color `this` is element");
+    equal(datasetIdThis, el, "dataset.id `this` is element");
+    equal(customThis, el, "custom prop `this` is element");
+    equal(mountedThis, el, "mounted `this` is element");
+
+    // Trigger click handler
+    el.dispatchEvent(new domWindow.MouseEvent("click"));
+    await tick();
+    equal(clickThis, el, "click handler `this` is element");
   });
 });
