@@ -51,22 +51,16 @@ export type RenderChild = string | Node | RenderConfig | null | undefined;
  * @category Render
  */
 export interface RenderConfig extends Record<string, ReactiveValue<unknown>> {
-  /** A tag string, optionally with id and class selectors
-   * (e.g., `"div#id1.cls1.cls2"`), an HTML markup, or existing element. */
-  use?: string | Element;
-  /** Map of event names to handler functions. Includes native DOM events and
-   * lifecycle events: `mounted`, `removed`, `updated`. */
-  on?: Record<string, (event: Event) => void>;
   /** Tag name. */
   tagName?: string;
   /** CSS class name(s) applied to the element. Array falsy entries are filtered automatically. */
   className?: ReactiveValue<string | string[]>;
   /** Map of HTML attributes to set on the element. */
-  attributes?: ReactiveValue<Record<string, unknown>>;
+  attributes?: ReactiveValue<Record<string, ReactiveValue<unknown>>>;
   /** Map of `data-*` attributes to set on the element. */
-  dataset?: ReactiveValue<Record<string, unknown>>;
+  dataset?: ReactiveValue<Record<string, ReactiveValue<unknown>>>;
   /** Map of inline CSS styles to apply. */
-  style?: ReactiveValue<Record<string, unknown>>;
+  style?: ReactiveValue<Record<string, ReactiveValue<unknown>>>;
   /** Child nodes or config objects rendered inside the element. Falsy entries are skipped automatically. */
   children?: ReactiveValue<RenderChild | RenderChild[]>;
   /** Shadow DOM mode for attaching a shadow root to the element. */
@@ -75,6 +69,12 @@ export interface RenderConfig extends Record<string, ReactiveValue<unknown>> {
   adoptedStyleSheets?: CSSStyleSheet[];
   /** Explicit namespace URI; auto-detected for SVG and MathML when omitted. */
   namespaceURI?: string;
+  /** Map of event names to handler functions. Includes native DOM events and
+   * lifecycle events: `mounted`, `removed`, `updated`. */
+  on?: Partial<LifecycleEvents> & Record<string, (event: any) => void>;
+  /** A tag string, optionally with id and class selectors
+   * (e.g., `"div#id1.cls1.cls2"`), an HTML markup, or existing element. */
+  use?: string | Element;
 }
 
 /**
@@ -89,16 +89,14 @@ export interface LifecycleEvents {
   removed: (event: CustomEvent) => void;
   /** Fired on the bound element after its property value changes. */
   updated: (
-    event: CustomEvent & {
-      detail: {
-        /** The name of the changed property. */
-        property: string;
-        /** The property value before the change. */
-        oldValue: unknown;
-        /** The property value after the change. */
-        newValue: unknown;
-      };
-    },
+    event: CustomEvent<{
+      /** The name of the changed property. */
+      property: string;
+      /** The property value before the change. */
+      oldValue: unknown;
+      /** The property value after the change. */
+      newValue: unknown;
+    }>,
   ) => void;
 }
 
@@ -543,17 +541,17 @@ function syncDOM(
   return [newNodes, oldNodes];
 }
 
-export function render(
+export function render<T extends Node[] = Node[]>(
   this: object | void,
-  config?: RenderChild[],
+  config: RenderChild[],
   target?: Element | DocumentFragment | string,
-): Node[];
+): T;
 
-export function render(
+export function render<T extends Node = Node>(
   this: object | void,
-  config?: RenderChild,
+  config: RenderChild,
   target?: Element | DocumentFragment | string,
-): Node;
+): T;
 
 /**
  * Creates a DOM node from a configuration value.
@@ -590,7 +588,7 @@ export function render(
  */
 export function render(
   this: object | void,
-  config?: RenderChild | RenderChild[],
+  config: RenderChild | RenderChild[],
   target?: Element | DocumentFragment | string,
 ): Node | Node[] {
   const { document } = window;

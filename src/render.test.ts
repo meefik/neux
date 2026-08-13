@@ -40,7 +40,7 @@ suite("render", async () => {
   });
 
   await test("sets properties: tag, id, classes, attributes, dataset, style, textContent", () => {
-    const el = render({
+    const el = render<HTMLElement>({
       tagName: "p",
       id: "my-id",
       className: ["my-class1", "my-class2"],
@@ -48,7 +48,7 @@ suite("render", async () => {
       dataset: { id: "123" },
       style: { color: "red", "background-color": "blue" },
       textContent: "Hello World",
-    }) as HTMLElement;
+    });
 
     equal(el.tagName, "P", "has P tag");
     equal(el.id, "my-id", "has correct id");
@@ -61,16 +61,16 @@ suite("render", async () => {
   });
 
   await test("sets className from array and string", () => {
-    const el = render({
+    const el = render<HTMLElement>({
       children: [{ className: ["a", "b", "c"] }, { className: "d e f" }],
-    }) as HTMLElement;
+    });
 
     equal(el.children[0].className, "a b c", "joins array classes");
     equal(el.children[1].className, "d e f", "uses string classes directly");
   });
 
   await test("infers namespace from element type", () => {
-    const el = render({
+    const el = render<HTMLElement>({
       children: [
         {
           tagName: "svg",
@@ -90,7 +90,7 @@ suite("render", async () => {
           ],
         },
       ],
-    }) as HTMLElement;
+    });
 
     const xhtmlNS = "http://www.w3.org/1999/xhtml";
     const svgNS = "http://www.w3.org/2000/svg";
@@ -112,26 +112,26 @@ suite("render", async () => {
   });
 
   await test("use: parses tag selector, HTML markup, or reuses element", () => {
-    const el1 = render({
+    const el1 = render<HTMLElement>({
       use: "p#id1.cls1.cls2",
       textContent: "Text",
-    }) as HTMLElement;
+    });
     equal(el1.tagName, "P", "has P tag");
     equal(el1.id, "id1", "has correct id");
     equal(el1.className, "cls1 cls2", "joins classes from selector");
 
-    const el2 = render({
+    const el2 = render<HTMLElement>({
       use: "<span></span>",
       className: "cls1",
-    }) as HTMLElement;
+    });
     equal(el2.tagName, "SPAN", "has SPAN tag");
     equal(el2.className, "cls1", "has correct class");
 
     const span = domWindow.document.createElement("span");
-    const el3 = render({
+    const el3 = render<HTMLElement>({
       use: span,
       className: "cls1",
-    }) as HTMLElement;
+    });
     equal(el3, span, "reuses the same element");
     equal(el3.className, "cls1", "has correct class");
   });
@@ -142,14 +142,14 @@ suite("render", async () => {
     span.textContent = "Item 3";
     fragment.appendChild(span);
 
-    const el = render({
+    const el = render<HTMLElement>({
       tagName: "ul",
       children: [
         { tagName: "li", textContent: "Item 1" },
         { tagName: "li", textContent: "Item 2" },
         fragment,
       ],
-    }) as HTMLElement;
+    });
 
     equal(el.children.length, 3, "has 3 children");
     equal(el.children[0].textContent, "Item 1", "first item renders");
@@ -158,10 +158,10 @@ suite("render", async () => {
   });
 
   await test("mounts element into DOM or CSS selector target", () => {
-    const el1 = render(
+    const el1 = render<HTMLElement>(
       { tagName: "p" },
       domWindow.document.body,
-    ) as HTMLElement;
+    );
     equal(domWindow.document.body.firstChild, el1, "element is mounted");
     el1.remove();
 
@@ -169,7 +169,7 @@ suite("render", async () => {
     wrapper.id = "test-mount";
     domWindow.document.body.appendChild(wrapper);
     try {
-      const el2 = render({ tagName: "span" }, "#test-mount") as HTMLElement;
+      const el2 = render({ tagName: "span" }, "#test-mount");
       equal(wrapper.firstChild, el2, "element is mounted via selector");
     } finally {
       wrapper.remove();
@@ -178,16 +178,17 @@ suite("render", async () => {
 
   await test("dispatches custom event handlers", () => {
     let value = 1;
-    const el = render({
+    const el = render<HTMLInputElement>({
       tagName: "input",
       type: "number",
       value,
       on: {
-        change(e: Event) {
-          value = parseInt((e.target as HTMLInputElement).value, 10);
+        change(e) {
+          const el = e.target as HTMLInputElement;
+          value = parseInt(el.value, 10);
         },
       },
-    }) as HTMLInputElement;
+    });
 
     el.value = "2";
     el.dispatchEvent(
@@ -221,7 +222,7 @@ suite("render", async () => {
             : [],
       },
       domWindow.document.body,
-    ) as HTMLElement;
+    );
 
     equal(mounted, 1, "mounted callback fires once on append");
     equal(removed, 0, "no removal yet");
@@ -290,7 +291,7 @@ suite("render", async () => {
   await test("accepts bound signal as config for render", async () => {
     const state = signal({ textContent: "Text" });
 
-    const el = render(state) as HTMLElement;
+    const el = render(state);
     equal(el.textContent, "Text", "has text content from signal");
   });
 
@@ -298,7 +299,7 @@ suite("render", async () => {
     const state = signal({ text: "" });
     const el = render({
       textContent: () => state.text,
-    }) as HTMLElement;
+    });
 
     equal(el.textContent, "", "initial text is empty");
     state.text = "Hello";
@@ -313,7 +314,7 @@ suite("render", async () => {
       attr: "",
       cls: ["a"],
     });
-    const el = render({
+    const el = render<HTMLElement>({
       style() {
         return { color: state.color };
       },
@@ -322,7 +323,7 @@ suite("render", async () => {
       },
       attributes: { for: () => state.attr },
       className: () => state.cls,
-    }) as HTMLElement;
+    });
 
     // Initial values
     equal(el.style.color, "red", "has initial red color");
@@ -348,7 +349,7 @@ suite("render", async () => {
     const el = render({
       textContent: async () =>
         new Promise<number>((res) => setTimeout(() => res(state.counter), 0)),
-    }) as HTMLElement;
+    });
 
     state.counter = 2;
     await tick();
@@ -358,15 +359,15 @@ suite("render", async () => {
   await test("reactive children", async () => {
     const state = signal({
       list: [{ text: "Item 1" }, { text: "Item 2" }],
-    }) as { list: { text: string }[] };
-    const el = render({
+    });
+    const el = render<HTMLElement>({
       tagName: "ul",
       children: () =>
         state.list.map((item) => ({
           tagName: "li",
           textContent: () => item.text,
         })),
-    }) as HTMLElement;
+    });
 
     equal(el.children.length, 2, "has 2 initial children");
     state.list = [{ text: "Item 3" }, { text: "Item 4" }];
@@ -385,7 +386,7 @@ suite("render", async () => {
     ];
     let removed = false;
 
-    const el = render({
+    const el = render<HTMLElement>({
       tagName: "ul",
       children: () =>
         list.map((item) => ({
@@ -397,7 +398,7 @@ suite("render", async () => {
             },
           },
         })),
-    }) as HTMLElement;
+    });
 
     // Reorder and insert
     list.splice(1, 2, { text: "C" }, { text: "B" });
@@ -429,14 +430,14 @@ suite("render", async () => {
 
   await test("reconciles identical children as no-op", async () => {
     let items = [{ text: "A" }, { text: "B" }, { text: "C" }];
-    const el = render({
+    const el = render<HTMLElement>({
       tagName: "ul",
       children: () =>
         items.map((item) => ({
           tagName: "li",
           textContent: () => item.text,
         })),
-    }) as HTMLElement;
+    });
 
     equal(el.children.length, 3, "has 3 initial children");
 
@@ -468,18 +469,11 @@ suite("render", async () => {
       attributes: { "data-x": () => state.text },
       dataset: { id: () => state.id },
       on: {
-        updated(e: Event) {
-          const detail = (
-            e as CustomEvent<{
-              property: string;
-              oldValue?: unknown;
-              newValue?: unknown;
-            }>
-          ).detail;
-          updatedDetails.push(detail);
+        updated(e) {
+          updatedDetails.push(e.detail);
         },
       },
-    }) as HTMLElement;
+    });
 
     // Reactive changes emit updated events with old/new values
     state.value = 42;
@@ -529,10 +523,10 @@ suite("render", async () => {
   await test("refresh with reactive state re-patches all bindings", async () => {
     let text = "initial";
     let cls = "one";
-    const el = render({
+    const el = render<HTMLElement>({
       textContent: () => text,
       className: () => cls,
-    }) as HTMLElement;
+    });
 
     text = "changed";
     cls = "two";
@@ -553,13 +547,13 @@ suite("render", async () => {
       val: "1",
       color: "red",
     });
-    const el = render({
+    const el = render<HTMLInputElement>({
       tagName: "input",
       type: "text",
-      attributes: { placeholder: () => state.attr as unknown as string },
-      dataset: { key: () => state.val as unknown as string },
-      style: { color: () => state.color as unknown as string },
-    }) as HTMLInputElement;
+      attributes: { placeholder: () => state.attr },
+      dataset: { key: () => state.val },
+      style: { color: () => state.color },
+    });
 
     equal(el.getAttribute("placeholder"), "present", "has placeholder");
     equal(el.dataset.key, "1", "has data-key");
@@ -578,11 +572,11 @@ suite("render", async () => {
   await test("attaches shadow root with adopted stylesheets", () => {
     const sheet = new domWindow.CSSStyleSheet();
     sheet.insertRule("div { color: red; }");
-    const el = render({
+    const el = render<HTMLElement>({
       shadowRootMode: "open",
       adoptedStyleSheets: [sheet],
       children: [{ tagName: "span", textContent: "Shaded" }],
-    }) as HTMLElement;
+    });
 
     ok(el.shadowRoot, "has shadow root");
     equal(el.shadowRoot.mode, "open", "is in open mode");
@@ -595,12 +589,12 @@ suite("render", async () => {
   });
 
   await test("shadowRoot reactive children updates", async () => {
-    const state = signal({ showChild: true }) as { showChild: boolean };
-    const el = render({
+    const state = signal({ showChild: true });
+    const el = render<HTMLElement>({
       shadowRootMode: "open",
       children: () =>
         state.showChild ? [{ tagName: "span", textContent: "Inside" }] : [],
-    }) as HTMLElement;
+    });
 
     ok(el.shadowRoot, "has shadow root");
     equal(el.shadowRoot!.children.length, 1, "has one child in shadow DOM");
@@ -642,7 +636,7 @@ suite("render", async () => {
   await test("non-plain-object config creates default div", () => {
     const obj = Object.create(null);
     obj.tagName = "p";
-    const el = render(obj as unknown as Record<string, unknown>) as HTMLElement;
+    const el = render<HTMLElement>(obj);
     equal(el.tagName, "DIV", "creates default DIV");
   });
 });
