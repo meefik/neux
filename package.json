@@ -1,6 +1,6 @@
 {
   "name": "neux",
-  "version": "0.17.2",
+  "version": "0.17.3",
   "description": "A lightweight frontend library for building dynamic user interfaces using declarative element definitions and reactive signals to modify them.",
   "author": "Anton Skshidlevsky <anton@meefik.dev>",
   "homepage": "https://neux.dev",
@@ -44,10 +44,10 @@
     "docs": "typedoc && cp docs/README.md docs/llms.txt"
   },
   "devDependencies": {
-    "@types/jsdom": "^28.0.3",
-    "@types/node": "^26.1.2",
+    "@types/jsdom": "^30.0.0",
+    "@types/node": "^26.2.0",
     "jsdom": "^30.0.1",
-    "tsx": "^4.23.9",
+    "tsx": "^4.23.12",
     "typedoc": "^0.28.20",
     "typedoc-plugin-markdown": "^4.12.0",
     "typescript": "^6.0.3",

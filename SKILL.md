@@ -135,7 +135,7 @@ render(App(), document.body);
 render(App(), "#app");
 ```
 
-`render(config, target)` creates real DOM nodes from the config tree and appends them to `target`. A single config object returns a `Node`; passing an array of configs returns `Node[]`. Omit `target` to get unmounted nodes you can attach later.
+`render(config, target)` creates real DOM nodes from the config tree and appends them to `target`. A single config object returns a `Node`; passing an array of configs returns `Node[]`. Omit `target` to get unmounted nodes you can attach later. The function is generic — `render<T>()` returns `T`, so you can type the result as `render<HTMLElement>(...)`.
 
 On mount (append to parent), Neux dispatches a `mounted` custom event top-down through every created element:
 
@@ -158,8 +158,8 @@ render(
 
 ### 4. Bind reactive properties in configs
 
-- A **config** is a plain-object descriptor (`RenderConfig`) that tells `render()` which element to create, what properties to bind, and how children stay in sync.
-- Any property on a config that isn't a known key (`tagName`, `className`, `on`, etc.) becomes a reactively-bound element property. Provide a function value to subscribe it to signal changes so the DOM stays in sync:
+- A **config** is a plain-object descriptor (`ElementConfig`) that tells `render()` which element to create, what properties to bind, and how children stay in sync.
+- Any property on a config that isn't a known key (`tagName`, `className`, `on`, etc.) becomes a reactively-bound element property. Provide a function value to subscribe it to signal changes so the DOM stays in sync. Reactive functions receive `this` bound to the rendered Node, and event handlers have `this` bound to the element.
 
 ```js
 render(
@@ -187,11 +187,11 @@ Known config keys and what they do:
 
 - `tagName` (`string`) — Tag name (e.g., "div", "span"). Defaults to "div".
 - `use` (`string | Element`) — Selector string (`div#id.cls`), HTML snippet, or existing element to reuse. Overrides `tagName`. See [Tag selector syntax](#tag-selector-syntax-in-use).
-- `className` (`ReactiveValue<string | string[]>`) — Sets CSS classes. Array values are joined with spaces automatically; falsy entries are automatically filtered.
-- `style` (`ReactiveValue<Record<string, unknown>>`) — Inline styles applied as camelCase or kebab-case properties.
-- `attributes` (`ReactiveValue<Record<string, unknown>>`) — Arbitrary HTML attributes (`for`, `aria-label`, etc.). Use for non-property attributes.
-- `dataset` (`ReactiveValue<Record<string, unknown>>`) — Sets `element.dataset` entries (renders as `data-` attributes).
-- `children` (`ReactiveValue<(string | Node | RenderConfig)[]>`) — Child nodes or configs. Falsy entries are skipped automatically.
+- `className` (`ReactiveProperty<string | string[]>`) — Sets CSS classes. Array values are joined with spaces automatically; falsy entries are automatically filtered.
+- `style` (`ReactiveProperty<Record<string, unknown>>`) — Inline styles applied as camelCase or kebab-case properties.
+- `attributes` (`ReactiveProperty<Record<string, unknown>>`) — Arbitrary HTML attributes (`for`, `aria-label`, etc.). Use for non-property attributes.
+- `dataset` (`ReactiveProperty<Record<string, unknown>>`) — Sets `element.dataset` entries (renders as `data-` attributes).
+- `children` (`ReactiveProperty<(string | Node | ElementConfig)[]>`) — Child nodes or configs. Falsy entries are skipped automatically.
 - `on` (`Record<string, handler>`) — Event listeners. Keys are event names (`click`, `change`, `keydown`, etc.). Handlers receive the event; `this` is bound to the element. Also accepts lifecycle keys: `mounted`, `removed`, `updated`.
 - `shadowRootMode` (`"open" | "closed"`) — Attaches a Shadow DOM root. Children render inside the shadow tree.
 - `adoptedStyleSheets` (`CSSStyleSheet[]`) — Style sheets adopted by the shadow root.
@@ -306,7 +306,7 @@ effect(() => {
 Neux dispatches custom DOM events you can listen for in `on`:
 
 - `mounted` — Element appended to parent (top-down, no detail)
-- `removed` — Element removed from parent or reactive tree rebuilds (top-down, no detail)
+- `removed` — Element removed from parent or reactive tree rebuilds (top-down, no detail); dispatched to children inside shadow roots as well
 - `updated` — A bound property changed on the element. Detail: `{ property, oldValue, newValue }`
 
 Clean up effects and subscriptions in `removed`:
@@ -438,10 +438,10 @@ Useful when external code mutated DOM or signal state outside the normal sync pa
 
 ### Exported TypeScript types
 
-- `ReactiveValue<T>` — `T | (() => T)` — a static value or function that returns one
-- `RenderChild` — `string | Node | RenderConfig` — valid child config values
-- `RenderConfig` — full config interface with all known keys and reactive properties
-- `LifecycleEvents` — typed handlers for `mounted`, `removed`, `updated` events
+- `ReactiveProperty<T>` — `T | ((this: Node) => T)` — a static value or function that returns one with `this` bound to the element
+- `NodeConfig` — `ElementConfig | Node | string | null | undefined` — valid child config values
+- `ElementConfig` — full config interface with all known keys and reactive properties
+- `ElementLifecycle` — typed handlers for `mounted`, `removed`, `updated` events
 - `Translator` — function signature returned by `i18n()`
 
 Use these types to annotate component props, state shape, and translation functions in typed projects.

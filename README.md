@@ -92,15 +92,15 @@ The `render()` function accepts an optional second argument — a target element
 
 Neux provides a powerful way to declaratively define HTML elements using plain JavaScript objects. You can specify various properties such as tag name, attributes, styles, event listeners, children, and other native HTML properties. The `render()` function processes these definitions and creates the corresponding DOM elements.
 
-Use the `render()` function to create one or more DOM nodes from a declarative definition. A single config object returns a `Node`, while an array of configs returns `Node[]`. Below is an overview of the most common parameters available for element configuration:
+Use the `render()` function to create one or more DOM nodes from a declarative definition. A single config object returns a `Node`, while an array of configs returns `Node[]`. The function is generic — `render<T>()` can be used to type the returned element. Below is an overview of the most common parameters available for element configuration:
 
 - `tagName`: (String) Specifies the HTML tag name (e.g., "span", "button", "input"). Defaults to `div`.
-- `className`: (String, Array of Strings, or Function) Specifies one or more CSS classes to add to the element. It can be a static array or a function that returns an array based on dynamic context.
-- `attributes`: (Object or Function) Maps attribute names to their corresponding values. Use a static object for fixed attributes or a function for dynamic assignment. Uses `setAttribute`/`removeAttribute` internally.
-- `style`: (Object or Function) Sets inline CSS styles via an object where keys are CSS property names. This can also be defined as a function to handle dynamic styling.
-- `dataset`: (Object or Function) Assigns custom data attributes (`data-*`) through a static mapping or a function that returns the mapping.
-- `children`: (String, Array of Nodes, or Function) Defines the inner content of the element. This can be a direct string, an array of element definitions, or a function that returns child nodes for dynamic rendering. Falsy entries in arrays are skipped automatically.
-- `on`: (Object) Adds event listeners to the element. Each key represents an event name (e.g., "click", "change") with its corresponding handler function.
+- `className`: (String, Array of Strings, or Function) Specifies one or more CSS classes to add to the element. It can be a static array or a function that returns an array based on dynamic context. When provided as a function, `this` is bound to the element.
+- `attributes`: (Object or Function) Maps attribute names to their corresponding values. Use a static object for fixed attributes or a function for dynamic assignment. Uses `setAttribute`/`removeAttribute` internally. When provided as a function, `this` is bound to the element.
+- `style`: (Object or Function) Sets inline CSS styles via an object where keys are CSS property names. This can also be defined as a function to handle dynamic styling. When provided as a function, `this` is bound to the element.
+- `dataset`: (Object or Function) Assigns custom data attributes (`data-*`) through a static mapping or a function that returns the mapping. When provided as a function, `this` is bound to the element.
+- `children`: (String, Array of Nodes, or Function) Defines the inner content of the element. This can be a direct string, an array of element definitions, or a function that returns child nodes for dynamic rendering. Falsy entries in arrays are skipped automatically. When provided as a function, `this` is bound to the element.
+- `on`: (Object) Adds event listeners to the element. Each key represents an event name (e.g., "click", "change") with its corresponding handler function. Handlers and lifecycle callbacks receive `this` bound to the element.
 - `use`: (String or Element) Specifies a tag selector string (e.g., "div#id1.cls1"), an HTML markup to parse, or an existing Element to reuse directly.
 
 Extra configuration for edge cases:
@@ -144,7 +144,7 @@ List of lifecycle events:
 
 - `mounted` fires top-down when the element is added to the DOM.
 - `updated` fires when an element property is updated.
-- `removed` fires top-down when the element is removed from the DOM.
+- `removed` fires top-down when the element is removed from the DOM, including children inside a shadow root.
 
 Example of using lifecycle events:
 
