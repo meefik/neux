@@ -8,7 +8,7 @@
 - 🧩 [15 Puzzle](https://v49.livecodes.io/?x=id/d752rxemyk6)
 - 🎲 [Tic-Tac-Toe](https://v49.livecodes.io/?x=id/ryvyt24ixrn)
 - ⏰ [SVG Clock](https://v49.livecodes.io/?x=id/ufnp33xxxv4)
-- 🎨 [Sketch](https://v49.livecodes.io/?x=id/bjf7j8nk9pn)
+- 🎨 [Sketch](https://v49.livecodes.io/?x=id/ycy3uewd3ni)
 - 👑 [WebAwesome](https://v49.livecodes.io/?x=id/8jsi5xgduey)
 
 ## Features
@@ -86,20 +86,21 @@ render(
 );
 ```
 
-The `render()` function accepts an optional second argument — a target element, `DocumentFragment`, or CSS selector string. When provided, the created element is appended to the target and a `mounted` lifecycle event is dispatched.
+The `render()` function accepts an optional second argument — a target element, `DocumentFragment`, or CSS selector string. When provided, the created element is appended to the target and a `mounted` lifecycle event is dispatched. Without a target, or when the selector matches nothing, nothing is appended and the returned node receives no `mounted` (its children do), so attach it yourself.
 
 ## Rendering Elements
 
 Neux provides a powerful way to declaratively define HTML elements using plain JavaScript objects. You can specify various properties such as tag name, attributes, styles, event listeners, children, and other native HTML properties. The `render()` function processes these definitions and creates the corresponding DOM elements.
 
-Use the `render()` function to create one or more DOM nodes from a declarative definition. A single config object returns a `Node`, while an array of configs returns `Node[]`. The function is generic — `render<T>()` can be used to type the returned element. Below is an overview of the most common parameters available for element configuration:
+Use the `render()` function to create one or more DOM nodes from a declarative definition. A config that is not a plain object, array, string, number, or `Node` (a class instance, `Date`, or function, for example) renders nothing: `render()` returns `null` and `children` skips it. A single config object returns a `Node`, while an array of configs returns `Node[]`. The function is generic — `render<T>()` can be used to type the returned element. Below is an overview of the most common parameters available for element configuration:
 
 - `tagName`: (String) Specifies the HTML tag name (e.g., "span", "button", "input"). Defaults to `div`.
-- `className`: (String, Array of Strings, or Function) Specifies one or more CSS classes to add to the element. It can be a static array or a function that returns an array based on dynamic context. When provided as a function, `this` is bound to the element.
-- `attributes`: (Object or Function) Maps attribute names to their corresponding values. Use a static object for fixed attributes or a function for dynamic assignment. Uses `setAttribute`/`removeAttribute` internally. When provided as a function, `this` is bound to the element.
-- `style`: (Object or Function) Sets inline CSS styles via an object where keys are CSS property names. This can also be defined as a function to handle dynamic styling. When provided as a function, `this` is bound to the element.
+- `className`: (String, Array of Strings, or Function) Specifies the element's CSS classes, replacing any it already has, including those from a `use` selector such as `"div.card"`. Entries are split on whitespace; `null`, `undefined`, and booleans are skipped, so `cond && "active"` is safe. It can be a static array or a function that returns an array based on dynamic context. When provided as a function, `this` is bound to the element.
+- `classList`: (String, Array of Strings, or Function) An alias of `className`. Both set the same class list, so use only one of them.
+- `attributes`: (Object or Function) Maps attribute names to their corresponding values. Use a static object for fixed attributes or a function for dynamic assignment. Uses `setAttribute`/`removeAttribute` internally: values are converted to strings (`false` becomes `"false"`), and `null` or `undefined` removes the attribute. For boolean attributes such as `disabled` or `required`, set the element property instead (`disabled: false`). When provided as a function, `this` is bound to the element.
+- `style`: (Object or Function) Sets inline CSS styles via an object where keys are camelCase style property names (`backgroundColor`, not `background-color`). This can also be defined as a function to handle dynamic styling. When provided as a function, `this` is bound to the element.
 - `dataset`: (Object or Function) Assigns custom data attributes (`data-*`) through a static mapping or a function that returns the mapping. When provided as a function, `this` is bound to the element.
-- `children`: (String, Array of Nodes, or Function) Defines the inner content of the element. This can be a direct string, an array of element definitions, or a function that returns child nodes for dynamic rendering. Falsy entries in arrays are skipped automatically. When provided as a function, `this` is bound to the element.
+- `children`: (String, Array of Nodes, or Function) Defines the inner content of the element. This can be a direct string, an array of element definitions, or a function that returns child nodes for dynamic rendering. `null`, `undefined`, and booleans are skipped; strings and numbers render as text nodes (`0` is a value). When provided as a function, `this` is bound to the element.
 - `on`: (Object) Adds event listeners to the element. Each key represents an event name (e.g., "click", "change") with its corresponding handler function. Handlers and lifecycle callbacks receive `this` bound to the element.
 - `use`: (String or Element) Specifies a tag selector string (e.g., "div#id1.cls1"), an HTML markup to parse, or an existing Element to reuse directly.
 
@@ -109,7 +110,9 @@ Extra configuration for edge cases:
 - `adoptedStyleSheets`: (Array) Specifies one or more [CSSStyleSheet](https://developer.mozilla.org/docs/Web/API/CSSStyleSheet) objects that can be associated with the element's shadow DOM. This enables the use of constructable stylesheets for efficient, reusable styling.
 - `namespaceURI`: (String) Specifies the XML namespace URI when [creating namespaced elements](https://developer.mozilla.org/docs/Web/API/Document/createElementNS), such as SVG or MathML. Usually, this property is not required because it is automatically determined by the tag name.
 
-You can also include any other properties specific to particular DOM elements such as `id`, `textContent`, `innerHTML`, etc. This flexible approach supports both static configurations and dynamic, reactive user interfaces.
+You can also include any other properties specific to particular DOM elements such as `id`, `textContent`, `innerHTML`, etc. A function is bound reactively only as the value of a property itself (`textContent: () => …`) or of a key inside `attributes`, `style`, or `dataset`; a function nested inside another object value, such as `data: { label: () => … }`, is assigned as is.
+
+This flexible approach supports both static configurations and dynamic, reactive user interfaces.
 
 ```js
 import { render } from "neux";
@@ -142,9 +145,9 @@ To attach an HTML element to the DOM, pass a target as the second argument to `r
 
 List of lifecycle events:
 
-- `mounted` fires top-down when the element is added to the DOM.
-- `updated` fires when an element property is updated.
-- `removed` fires top-down when the element is removed from the DOM, including children inside a shadow root.
+- `mounted` fires when the element is appended to a parent — top-down (parent before children), the same order as `removed`, on both the initial mount and a re-mount. A previously removed element can be re-mounted: `mounted` fires again and its reactive bindings are rebuilt.
+- `updated` fires when an element property is updated to a different value; it does not fire for the first applied value, nor for a change from a cleared (`null` or `undefined`) binding. For `className`, the old and new values are arrays of the applied class names; for `children`, arrays of the child nodes in the DOM.
+- `removed` fires top-down when the element is removed from a parent, including children inside a shadow root, and releases its reactive bindings.
 
 Example of using lifecycle events:
 
@@ -259,6 +262,8 @@ HTML output:
 <p>Hello</p>
 ```
 
+Render a given Element only once: passing the same Element to `render()` again attaches its event listeners and reactive bindings a second time.
+
 Passing an array of configs to `render()` returns multiple nodes as a plain `Node[]`:
 
 ```js
@@ -312,13 +317,13 @@ el.children[0].dispatchEvent(
 );
 ```
 
-Note that when dispatching the `refresh` event, you can optionally provide a `detail` array that specifies which properties should be updated. If no detail is provided, all reactive functions will be re-evaluated on the target element. Only the changed elements are replaced when lists like `children` are updated.
+Note that when dispatching the `refresh` event, you can optionally provide a `detail` — a property name or an array of names, such as `"textContent"` or `"style.color"` — that specifies which properties should be updated. If no detail is provided, all reactive functions will be re-evaluated on the target element. Only the changed elements are replaced when lists like `children` are updated.
 
 Instead of using `refresh` events, you can also use reactive signals to manage state and automatically update the DOM when the state changes. This approach is more efficient and easier to maintain, as it eliminates the need for manual event dispatching.
 
 ## Reactive Signals
 
-Signals in Neux are reactive proxies for objects. They track changes automatically and update any linked views or computed fields. Use signals to create reactive state, derived values, and listeners for side effects or debugging. All nested objects are automatically tracked for changes.
+Signals in Neux are reactive proxies for objects. They track changes automatically and update any linked views or computed fields. Use signals to create reactive state, derived values, and listeners for side effects or debugging. Nested plain objects and arrays (created with `{}`, `[]`, or `new Object()`) are tracked automatically. Other values, such as class instances, `Map`, `Set`, `Date`, and objects with a null prototype (`Object.create(null)`), are returned as is and are not reactive: replace them instead of mutating them.
 
 For example:
 
@@ -352,7 +357,9 @@ When a tracked property changes, the computed getter is automatically re-evaluat
 **Note**
 
 - Replacing the entire signal object breaks all existing bindings.
-- Only properties accessed during the initial synchronous execution of a computed/effect function are tracked for changes.
+- Only properties accessed during the synchronous execution of a computed or effect function are tracked. Reads after an `await` are not tracked.
+- Shrinking an array by assigning `length` (`list.length = 0`) re-runs only effects that read `length` (such as `list.map()`), not those that read a dropped index (`list[0]`), enumerate the keys, or test one with `in`. Use `list.splice(0)`, `pop()`, or replace the array.
+- Reading a read-only, non-configurable property that holds a nested object, array, or method throws a `TypeError`. This happens with `Object.freeze()` data, such as `signal(Object.freeze({ cfg: {} })).cfg`, but not with primitives or sealed objects. Keep frozen data outside the signal, or leave it unfrozen.
 
 Here is an example of reactivity with nested objects:
 
@@ -377,7 +384,7 @@ render(
             // Use unique attribute to force rerendering when item is replaced
             id: () => item.id,
           },
-          // Track changes the specific field
+          // Track changes to the specific field
           textContent: () => item.text,
         };
       });
@@ -471,6 +478,27 @@ render(App(), document.body);
 
 You may encounter a problem when trying to replace an array item with a new object that contains the same values. Neux compares rendered values to detect DOM changes. In this case, the element won't be replaced, even if the object in the state is replaced. To solve this problem, add a unique identifier to each array item and use it as a data attribute key for each element.
 
+The comparison covers attributes and children, not element properties such as `checked` or `value`. A plain value inside a `children` function (`checked: state.on`) is set only on a new element, and an equal existing element is kept with its old value. Bind such a property with a function (`checked: () => state.on`) so the element updates itself.
+
+The same applies to event handlers. A re-rendered child that looks identical to an existing one reuses that existing element, together with its old handlers and the values they captured. For example, after removing the first of two identical `Delete` buttons, the remaining button still acts on the removed item:
+
+```js
+render(
+  {
+    children: () =>
+      list.map((item) => ({
+        tagName: "button",
+        textContent: "Delete",
+        // A unique attribute tells the buttons apart; without it, the
+        // remaining button would keep the handler of the removed item
+        dataset: { id: item.id },
+        on: { click: () => remove(item) },
+      })),
+  },
+  document.body,
+);
+```
+
 The `effect()` function creates a reactive effect that computes a derived value and triggers a side effect:
 
 ```js
@@ -478,12 +506,12 @@ import { signal, effect } from "neux";
 
 const state = signal({ count: 1 });
 
-// Track changes to `counter` and log the doubled value
+// Track changes to `count` and log the value
 const dispose = effect(() => {
   console.log(`Count: ${state.count}`);
 });
 
-// Change the counter value
+// Change the count value
 state.count++;
 
 // Stop tracking changes and clear all associated subscriptions
@@ -495,27 +523,24 @@ The effect function tracks all reactive dependencies accessed during its initial
 To ignore reactive reads inside an effect, use `untrack()`:
 
 ```js
-import { signal, effect } from "neux";
+import { signal, effect, untrack } from "neux";
 
-const state = signal({
-  count: 1,
-  get double() {
-    return this.count * 2;
-  },
-});
+const state = signal({ count: 1, label: "Count" });
 
-// Track changes to `counter` and log both values
-// Reading `double` inside untrack() won't subscribe the effect
+// Track changes to `count` only
+// Reading `label` inside untrack() won't subscribe the effect
 effect(() => {
-  console.log(`Double: ${state.double}`);
-  untrack(() => {
-    console.log(`Count: ${state.count}`);
-  });
+  const label = untrack(() => state.label);
+  console.log(`${label}: ${state.count}`);
 });
 
-// Change the counter value
+// Re-runs the effect
 state.count++;
+// Does not re-run the effect
+state.label = "Total";
 ```
+
+If a getter throws while re-running, the effect is unsubscribed and the error is reported through `reportError` (or `console.error` where it is unavailable), so it reaches `window.onerror`. An error thrown by the optional setter is reported the same way and does not stop the effect.
 
 The `effect()` function returns a `dispose()` function that clears all reactivity subscriptions, stopping further tracking and updates.
 
@@ -581,6 +606,8 @@ console.log(dateMsg); // date: Wednesday, January 15, 2025
 const msgRu = t("say.hello", { name: "Мир" }, "ru");
 console.log(msgRu); // Привет Мир!
 ```
+
+A missing key, or a key that names a nested group such as `say` in `say.hello`, returns the key itself and is reported once per language through `reportError` (or `console.error` where it is unavailable), so a gap in the translations shows up during development. Numbers and dates follow the language the result comes from: a language with translations formats with its own code, while a language that has no entry, or a key found only in the fallback, formats with the fallback language (`t(1234.5, "fr")` formats as `en` when there is no `fr` locale). A regional language code such as `ru-RU` uses the `ru` translations when it has no entry of its own, and the full code is kept for number and date formatting.
 
 ## Custom Context
 
@@ -868,9 +895,7 @@ const Input = ({ label, type, icon, required = true }) => {
     tagName: "wa-input",
     label,
     type,
-    attributes: {
-      required,
-    },
+    required,
     children: [
       {
         tagName: "wa-icon",
@@ -1091,7 +1116,7 @@ const MarkAll = (list) => {
   };
 };
 
-const TaskItem = (item, index) => {
+const TaskItem = (list, item, index) => {
   return {
     tagName: "li",
     style: { display: "flex", gap: "0.5rem" },
@@ -1133,7 +1158,7 @@ const TaskItem = (item, index) => {
 const TaskList = (list) => {
   return {
     tagName: "ul",
-    children: () => list.map(TaskItem),
+    children: () => list.map((item, index) => TaskItem(list, item, index)),
   };
 };
 

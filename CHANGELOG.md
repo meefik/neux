@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.18.0] - 2026-10-09
+
+### Added
+
+- `npm run format` (Prettier) and `npm run check` (verifies `dist/` against the `browserslist` targets via `es-check`).
+- `NodeConfigList` and `ClassName` types; `children` and `render()` accept nested arrays, and `className` entries may be numbers, booleans, `null`, or `undefined`. `classList` is typed as an alias of `className`.
+- `README.md` warns that children that look identical share the existing element, including its event handlers, and shows how to tell them apart.
+
+### Changed
+
+- `mounted` fires top-down on the initial mount and on re-mounts, matching `removed`.
+- `NodeConfig` includes `number` and `boolean`. `null`, `undefined`, and booleans are skipped in `children` and `className`; strings and numbers (including `0`) are used as is.
+- `render()` returns `null` for a config it cannot render (`boolean`, `null`, `undefined`, a class instance, `Date`, function, or symbol) instead of an empty `div`. Null-prototype objects render like plain objects.
+- `ReactiveProperty<T>` accepts functions returning `Promise<T>`. A binding that resolves to `null` or `undefined` restores the property's original value.
+- Effects re-run once per update, not once per written property, so `list.splice()` re-runs a `children` function once.
+- A `children` re-run matches reordered items by markup lookup, so the work grows linearly with the list size. Equal nodes whose attributes were set in a different order are rebuilt.
+- `updated` no longer fires when `className` or `children` re-run to the same result; its details are the applied class names and the child nodes in the DOM.
+- Errors thrown inside effects, rejected promises, and missing `i18n()` keys are reported through `reportError` (or `console.error`) instead of being swallowed or left unhandled. `i18n()` reports each missing key once per language and returns the key.
+- Signals allocate fewer `Proxy` objects and record each effect subscription once per run.
+- The package no longer ships `.d.ts.map` files.
+
+### Removed
+
+- The `require` export condition: the package is ESM-only. `require("neux")` works on Node 22.12+; the UMD build stays for browsers.
+
+### Fixed
+
+- Bindings are released correctly: removing an element releases all of its bindings, discarded nodes no longer leak effects, a reused node stays live, and a disposed effect no longer re-runs. A `Node` passed as a child is never released when an equal existing child is kept.
+- Re-mounting a removed element, including hosts with their own shadow root, rebuilds its bindings and children and fires `mounted`/`removed` exactly once per insertion.
+- `refresh` with a nested path or a key of a reactive `attributes`, `style`, or `dataset` function works, no longer overwrites config functions, and ignores properties the config does not bind and removed elements.
+- Reactive `attributes`, `style`, and `dataset` maps remove dropped keys and clear only what they applied. Clearing a camelCase `style` key reports `undefined` in `updated`.
+- `use` markup keeps elements such as `<tr>`, `<td>`, and `<option>` and tolerates leading whitespace; `#id` and `.class` selectors apply to custom elements.
+- `className` entries with spaces no longer throw, and a numeric `0` is applied as a class. Children of an SVG `foreignObject` are HTML elements.
+- Signals: effects re-run when keys are added to or removed from an object (`Object.keys()`, `in`, `for...in`); a computed getter that returns a function is evaluated on every read; writing `NaN` over `NaN` or deleting a missing key does not re-run effects; a throwing getter or setter no longer leaves the context stuck; an effect created inside another no longer stops its tracking; empty subscriber sets are released.
+- An `effect()` whose first run throws is disposed before the error propagates.
+- `signal()`, `effect()`, `untrack()`, and `render()` work through a module namespace (`import * as neux`, UMD global) using the global context.
+- `i18n()` falls back from a regional language to its base (`ru-RU` → `ru`), also for `fallback`; ignores inherited keys such as `toString`; treats a key naming a nested group as missing; leaves unknown `%{key}` placeholders as is; and no longer throws where `navigator` is undefined.
+- TypeScript consumers on `node16`/`nodenext` get types, and test coverage instruments `src/**/*.ts`.
+- Documentation (`README.md`, `SKILL.md`, TypeDoc) corrected and extended: `className` replaces existing classes, `style` keys are camelCase, `updated` semantics, detached `render()`, nested function properties, `i18n()` formatting, the `children` diff ignoring element properties, and the signal limits (only plain objects and arrays are reactive, `length` truncation, frozen data).
+
 ## [0.17.3] - 2026-08-16
 
 ### Changed
@@ -107,7 +149,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Legacy JavaScript source and test files.
 - Manually maintained `types/*.d.ts` declaration files.
 
-[unreleased]: https://github.com/meefik/neux/compare/v0.17.3...HEAD
+[unreleased]: https://github.com/meefik/neux/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/meefik/neux/compare/v0.17.3...v0.18.0
 [0.17.3]: https://github.com/meefik/neux/compare/v0.17.2...v0.17.3
 [0.17.2]: https://github.com/meefik/neux/compare/v0.17.1...v0.17.2
 [0.17.1]: https://github.com/meefik/neux/compare/v0.17.0...v0.17.1

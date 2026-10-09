@@ -5,7 +5,7 @@ description: Keeps real DOM in sync with reactive signals through plain config o
 
 # Neux — Developer Skill
 
-Neux keeps the real DOM **sync** with reactive signal state through plain config objects. Follow the steps to create, mount, and sync UI correctly.
+Neux keeps the real DOM **in sync** with reactive signal state through plain config objects. Follow the steps to create, mount, and sync UI correctly.
 
 ---
 
@@ -41,8 +41,10 @@ const state = signal({
 });
 ```
 
-- A **signal** is a reactive `Proxy` wrapping an object or array. Property reads inside an active effect are tracked; writes schedule a debounced re-run of subscriber effects that stay in sync.
-- Nested plain objects and arrays wrap automatically.
+- A **signal** is a reactive `Proxy` wrapping an object or array. Property reads inside an active effect are tracked; writes schedule one batched re-run per tick of subscriber effects that stay in sync.
+- Nested plain objects and arrays (`{}`, `[]`) wrap automatically. Class instances, `Map`, `Set`, `Date`, and null-prototype objects (`Object.create(null)`) do not: they are returned as is and are not reactive, so replace them instead of mutating them.
+- Assigning a smaller `length` to an array (`items.length = 0`) re-runs only effects that read `length` (such as `items.map()`), not those that read a dropped index (`items[0]`), enumerate keys, or test one with `in`. Use `items.splice(0)`, `pop()`, or replace the array.
+- Reading a read-only, non-configurable property that holds a nested object, array, or method throws a `TypeError`. This happens with `Object.freeze()` data, such as `signal(Object.freeze({ cfg: {} })).cfg`, but not with primitives or sealed objects. Keep frozen data outside the signal, or leave it unfrozen.
 - Methods bind automatically; access `this.foo` inside them to read reactive fields.
 - Getters become computed derived values that keep their callers in sync.
 - Replacing a nested property (`state.items = []`) keeps everything in sync — the new value is auto-wrapped reactively, and effects track the replacement on next run.
@@ -70,7 +72,7 @@ function Input({ name, type, placeholder, value, onChange }) {
   };
 }
 
-function Submit({ label, onClick }) {
+function Submit({ label }) {
   return {
     tagName: "button",
     type: "submit",
@@ -135,9 +137,9 @@ render(App(), document.body);
 render(App(), "#app");
 ```
 
-`render(config, target)` creates real DOM nodes from the config tree and appends them to `target`. A single config object returns a `Node`; passing an array of configs returns `Node[]`. Omit `target` to get unmounted nodes you can attach later. The function is generic — `render<T>()` returns `T`, so you can type the result as `render<HTMLElement>(...)`.
+`render(config, target)` creates real DOM nodes from the config tree and appends them to `target`. A config that is not a plain object, array, string, number, or `Node` (a class instance, `Date`, or function) renders nothing; `render()` returns `null` for it, and `children` skips it. A single config object returns a `Node`; passing an array of configs returns `Node[]`. Omit `target` to get detached nodes you can attach later; a selector that matches nothing behaves the same. A detached root receives no `mounted` (its children do). The function is generic — `render<T>()` returns `T`, so you can type the result as `render<HTMLElement>(...)`.
 
-On mount (append to parent), Neux dispatches a `mounted` custom event top-down through every created element:
+On mount (append to parent), Neux dispatches a `mounted` custom event on every created element — top-down (parent before children), the same order as `removed`, on both the initial mount and a re-mount:
 
 ```js
 render(
@@ -159,7 +161,7 @@ render(
 ### 4. Bind reactive properties in configs
 
 - A **config** is a plain-object descriptor (`ElementConfig`) that tells `render()` which element to create, what properties to bind, and how children stay in sync.
-- Any property on a config that isn't a known key (`tagName`, `className`, `on`, etc.) becomes a reactively-bound element property. Provide a function value to subscribe it to signal changes so the DOM stays in sync. Reactive functions receive `this` bound to the rendered Node, and event handlers have `this` bound to the element.
+- Any property on a config that isn't a known key (`tagName`, `className`, `on`, etc.) becomes a reactively-bound element property. Provide a function value to subscribe it to signal changes so the DOM stays in sync; a function nested inside an object value (`data: { label: () => … }`) is assigned as is, not bound. Reactive functions receive `this` bound to the rendered Node, and event handlers have `this` bound to the element.
 
 ```js
 render(
@@ -172,11 +174,11 @@ render(
     // reactive — syncs when state.count changes
     textContent: () => `Count: ${state.count}`,
     // derived className from multiple signal properties
-    // falsy values are automatically filtered by Neux
+    // null, undefined, and boolean entries are skipped
     className: () => [
       "counter",
-      state.count > 0 ? "active" : "",
-      !state.activeCount ? "empty" : "",
+      state.count > 0 ? "active" : null,
+      !state.activeCount ? "empty" : null,
     ],
   },
   document.body,
@@ -187,17 +189,18 @@ Known config keys and what they do:
 
 - `tagName` (`string`) — Tag name (e.g., "div", "span"). Defaults to "div".
 - `use` (`string | Element`) — Selector string (`div#id.cls`), HTML snippet, or existing element to reuse. Overrides `tagName`. See [Tag selector syntax](#tag-selector-syntax-in-use).
-- `className` (`ReactiveProperty<string | string[]>`) — Sets CSS classes. Array values are joined with spaces automatically; falsy entries are automatically filtered.
-- `style` (`ReactiveProperty<Record<string, unknown>>`) — Inline styles applied as camelCase or kebab-case properties.
-- `attributes` (`ReactiveProperty<Record<string, unknown>>`) — Arbitrary HTML attributes (`for`, `aria-label`, etc.). Use for non-property attributes.
+- `className` (`ReactiveProperty<ClassName | ClassName[]>`) — Sets CSS classes, replacing any the element already has (including those from a `use` selector). Array entries become separate classes (entries containing spaces are split); `null`, `undefined`, and booleans are skipped, strings and numbers are used as is.
+- `classList` (`ReactiveProperty<ClassName | ClassName[]>`) — An alias of `className`; both set the same class list, so use only one of them.
+- `style` (`ReactiveProperty<Record<string, unknown>>`) — Inline styles. Use camelCase keys (`backgroundColor`, not `background-color`); `null` or `undefined` clears the property.
+- `attributes` (`ReactiveProperty<Record<string, unknown>>`) — Arbitrary HTML attributes (`for`, `aria-label`, etc.). Use for non-property attributes. Values are converted to strings (`false` becomes `"false"`); `null` or `undefined` removes the attribute.
 - `dataset` (`ReactiveProperty<Record<string, unknown>>`) — Sets `element.dataset` entries (renders as `data-` attributes).
-- `children` (`ReactiveProperty<(string | Node | ElementConfig)[]>`) — Child nodes or configs. Falsy entries are skipped automatically.
+- `children` (`ReactiveProperty<NodeConfig | NodeConfigList>`) — Child nodes or configs; nested arrays are flattened in order. `null`, `undefined`, and booleans are skipped; strings and numbers render as text nodes (`0` is a value).
 - `on` (`Record<string, handler>`) — Event listeners. Keys are event names (`click`, `change`, `keydown`, etc.). Handlers receive the event; `this` is bound to the element. Also accepts lifecycle keys: `mounted`, `removed`, `updated`.
 - `shadowRootMode` (`"open" | "closed"`) — Attaches a Shadow DOM root. Children render inside the shadow tree.
 - `adoptedStyleSheets` (`CSSStyleSheet[]`) — Style sheets adopted by the shadow root.
 - `namespaceURI` (`string`) — Explicit namespace URI; auto-detected for SVG and MathML when omitted.
 
-Boolean element properties like `checked`, `disabled`, or `value` stay in sync directly on the config (not inside `attributes`). Provide a function to make them reactive:
+Boolean element properties like `checked`, `disabled`, `required`, or `value` stay in sync directly on the config (not inside `attributes`: `attributes: { disabled: false }` sets `disabled="false"`, which still disables the element). Provide a function to make them reactive:
 
 ```js
 render(
@@ -234,7 +237,8 @@ render(
 );
 ```
 
-- Returning `undefined` from a reactive function clears the binding (removes the attribute, style property, or dataset entry).
+- Returning `undefined` or `null` from a reactive function clears the binding: it removes the attribute, style property, or dataset entry, and restores the original value of a plain element property (for example `textContent` becomes empty).
+- A reactive function that returns a `Promise` applies only the latest result; a result that arrives after the function re-ran or the element was removed is ignored.
 
 **Done when:** all dynamic properties use reactive functions and static values are set directly.
 
@@ -262,6 +266,8 @@ render(
 
 - The `children` function tracks the array itself — every reactive mutation syncs by re-invoking it, but Neux updates only DOM nodes that actually changed.
 - Individual field accesses inside the callback track those specific properties.
+- An existing `Node` you return (a cached component, for example) is compared like any other child. If an equal child is already there, that child is kept and your node is left untouched: it stays live, but it is not shown. Give it a distinguishing attribute, as for configs, so it counts as a different node. Detached raw DOM nodes (from `document.createElement`) match equal children too, so an unchanged re-run keeps the existing nodes.
+- The diff compares attributes and children, not element properties. Inside a `children` function, bind properties such as `checked` or `value` with a function (`checked: () => item.done`); a plain value (`checked: item.done`) is ignored when an equal existing child is kept.
 - Each child must carry a **reactive** distinguishing attribute (`data-id`, `id`, etc.). If two siblings have the same structure and different values, Neux uses `isEqualNode` to diff — it sees them as equal and skips updates unless the distinguishing attribute syncs first.
 
 **Done when:** list renders correctly on push, splice, and individual item property changes. Every child carries a reactive distinguishing attribute for identity matching.
@@ -296,7 +302,7 @@ effect(() => {
 - The getter runs immediately; every signal property read inside is subscribed. Conditional branches subscribe only the active path — stale dependencies are pruned when conditions flip.
 - Returns value → setter receives the synchronous result.
 - Returns `Promise` → setter receives the resolved value in sync when ready.
-- Throwing effects unsubscribe permanently — handle errors inside the getter if recovery is needed.
+- A getter that throws on a re-run unsubscribes the effect permanently — handle errors inside the getter if recovery is needed. An error from a re-run getter or from the setter is reported through `reportError` (or `console.error` where unavailable), so it reaches `window.onerror`; the first run's getter error is thrown to the caller and leaves the effect disposed.
 - Always call the returned dispose function when the effect is no longer needed — wire it to `removed` in lifecycle handlers (step 7).
 
 **Done when:** side effects are created and wired for disposal on removal.
@@ -305,9 +311,9 @@ effect(() => {
 
 Neux dispatches custom DOM events you can listen for in `on`:
 
-- `mounted` — Element appended to parent (top-down, no detail)
-- `removed` — Element removed from parent or reactive tree rebuilds (top-down, no detail); dispatched to children inside shadow roots as well
-- `updated` — A bound property changed on the element. Detail: `{ property, oldValue, newValue }`
+- `mounted` — Element appended to parent (top-down, same order as `removed`, on both the initial mount and a re-mount; no detail). A previously removed node may be re-mounted; `mounted` fires again and its reactive bindings are rebuilt.
+- `removed` — Element removed from a parent (top-down, no detail); dispatched to children inside shadow roots as well. Its reactive bindings are released. Always paired with `mounted`: children replaced by identical nodes in a re-render are destroyed silently (no `mounted`/`removed` for them).
+- `updated` — A bound property changed to a different value on the element; a re-run that resolves to the same value, the first applied value, and a change from a cleared (`null` or `undefined`) binding do not fire it. Detail: `{ property, oldValue, newValue }`; for `className`, the values are arrays of the applied class names, and for `children`, arrays of the child nodes in the DOM
 
 Clean up effects and subscriptions in `removed`:
 
@@ -363,13 +369,16 @@ const t = i18n(
 // Flat and dot-separated keys both work
 t("greeting", { name: "Mundo" }); // Hello, Mundo!
 t("nav.home"); // Home
+t("nav"); // nav — a group of keys is not a translation, so the key is returned
+// a key found in no locale is also reported once per language through reportError (console.error as a fallback)
+// formatting follows the language the result comes from: t(1234.5, "fr") formats as the fallback ("en") when there is no `fr` locale
 
 // Intl formatting via placeholder arrays [value, options] or direct calls
 t("price", { amount: [12345.67, { style: "currency", currency: "EUR" }] }); // Price: €12,345.67
-t("birthday", { date: [new Date(), { dateStyle: "long" }] }); // Birthday: July 30, 2026
+t("birthday", { date: [new Date("2026-07-30"), { dateStyle: "long" }] }); // Birthday: July 30, 2026
 
 t(12345.67, { style: "currency", currency: "EUR" }); // €12,345.67
-t(new Date(), { dateStyle: "long" }); // Friday, July 30, 2026
+t(new Date("2026-07-30"), { dateStyle: "long" }); // July 30, 2026
 ```
 
 To support dynamic locale changes at runtime, pass the current language as the third argument:
@@ -411,7 +420,7 @@ render({ use: "div#my-id.primary.large" });
 // <div id="my-id" class="primary large">
 ```
 
-**HTML markup string** — parsed via `innerHTML` to create the element:
+**HTML markup string** — parsed through a `<template>` to create the element:
 
 ```js
 render({ use: "<span data-info='x'>content</span>", className: "highlight" });
@@ -425,12 +434,14 @@ const el = document.createElement("div");
 render({ use: el, className: "reused" }); // returns `el` with classes applied
 ```
 
+Render a given element only once: passing the same element to `render()` again attaches its event listeners and reactive bindings a second time.
+
 ### Refresh a binding manually
 
 Fire a `refresh` custom event to re-sync reactive bindings without state mutation:
 
 ```js
-element.dispatchEvent(new CustomEvent("refresh", { detail: ["textContent"] })); // refresh one or more properties
+element.dispatchEvent(new CustomEvent("refresh", { detail: ["textContent"] })); // refresh one or more properties, e.g. "style.color"
 element.dispatchEvent(new CustomEvent("refresh")); // refresh all bindings
 ```
 
@@ -438,8 +449,10 @@ Useful when external code mutated DOM or signal state outside the normal sync pa
 
 ### Exported TypeScript types
 
-- `ReactiveProperty<T>` — `T | ((this: Node) => T)` — a static value or function that returns one with `this` bound to the element
-- `NodeConfig` — `ElementConfig | Node | string | null | undefined` — valid child config values
+- `ReactiveProperty<T>` — `T | ((this: Node) => T | Promise<T>)` — a static value or a (possibly async) function that returns one, with `this` bound to the element
+- `NodeConfig` — `ElementConfig | Node | string | number | boolean | null | undefined` — valid child config values (`null`, `undefined`, and booleans are skipped; strings and numbers render as text nodes)
+- `NodeConfigList` — `(NodeConfig | NodeConfigList)[]` — a list of child configs, which may contain further lists (flattened in order)
+- `ClassName` — `string | number | boolean | null | undefined` — a single `className` entry; `null`, `undefined`, and booleans are skipped
 - `ElementConfig` — full config interface with all known keys and reactive properties
 - `ElementLifecycle` — typed handlers for `mounted`, `removed`, `updated` events
 - `Translator` — function signature returned by `i18n()`
