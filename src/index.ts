@@ -1,3 +1,3 @@
-export * from "./signal";
-export * from "./render";
-export * from "./i18n";
+export * from "./signal.js";
+export * from "./render.js";
+export * from "./i18n.js";
