@@ -9,6 +9,7 @@ Lightweight frontend JS library for dynamic UIs via declarative elements and rea
 - Type checking via `tsc`
 - Testing with `node:test` + `node:assert/strict` via `tsx` ES loader and JSDOM for DOM simulation
 - Vite (UMD + ESM)
+- Prettier (default config)
 - TypeDoc (HTML + markdown output)
 
 ## Conventions
@@ -24,21 +25,23 @@ Lightweight frontend JS library for dynamic UIs via declarative elements and rea
 dist/         # Build output
 docs/         # Generated TypeDoc
 src/          # Source + co-located unit tests
+AGENTS.md     # AI agent guidelines
 CHANGELOG.md  # Project changelog
 README.md     # Project README
-AGENTS.md     # AI agent guidelines
 SKILL.md      # AI agent skill guidelines
 ```
 
 ## Commands
 
-| Command             | Does                                |
-| ------------------- | ----------------------------------- |
-| `npm install`       | Install dev dependencies            |
-| `npm run build`     | Build (ESM + UMD) + TS declarations |
-| `npm test`          | Run unit tests                      |
-| `npm run docs`      | Generate docs → `docs/`             |
-| `npm run typecheck` | Type-check only                     |
+| Command             | Does                                 |
+| ------------------- | ------------------------------------ |
+| `npm install`       | Install dev dependencies             |
+| `npm run build`     | Build (ESM + UMD) + TS declarations  |
+| `npm test`          | Run unit tests                       |
+| `npm run docs`      | Generate docs → `docs/`              |
+| `npm run typecheck` | Type-check only                      |
+| `npm run format`    | Format sources and docs (Prettier)   |
+| `npm run check`     | Check `dist/` against `browserslist` |
 
 ## Testing
 
@@ -71,6 +74,6 @@ Run `npm run docs` to regenerate TypeDoc. Output includes HTML and Markdown docu
 2. Add/update tests alongside the source file
 3. Add/update TypeDoc for public API changes
 4. Run `npm test` — ensure all tests pass
-5. Review comments for grammar and spelling
+5. Run `npm run format`; review comments for grammar and spelling
 6. Run `npm run build` — clean compile
 7. Verify correctness: no oversights, regressions, or missed requirements

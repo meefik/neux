@@ -1,6 +1,6 @@
 {
   "name": "neux",
-  "version": "0.17.3",
+  "version": "0.18.0",
   "description": "A lightweight frontend library for building dynamic user interfaces using declarative element definitions and reactive signals to modify them.",
   "author": "Anton Skshidlevsky <anton@meefik.dev>",
   "homepage": "https://neux.dev",
@@ -24,33 +24,44 @@
   "main": "dist/neux.esm.js",
   "module": "dist/neux.esm.js",
   "unpkg": "dist/neux.umd.js",
+  "jsdelivr": "dist/neux.umd.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/neux.esm.js",
-      "require": "./dist/neux.umd.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/neux.esm.js"
     }
   },
   "files": [
     "dist",
+    "!dist/helpers.d.ts",
     "SKILL.md"
   ],
   "sideEffects": false,
+  "browserslist": [
+    "chrome >= 80",
+    "edge >= 80",
+    "firefox >= 75",
+    "safari >= 13.1"
+  ],
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "node --import tsx --test 'src/**/*.test.ts'",
-    "docs": "typedoc && cp docs/README.md docs/llms.txt"
+    "format": "prettier --write .",
+    "test": "node --import tsx --test --experimental-test-coverage --test-coverage-include='src/**/*.ts' --test-coverage-exclude='src/**/*.test.ts' --test-coverage-branches=90 'src/**/*.test.ts'",
+    "docs": "typedoc && cp docs/README.md docs/llms.txt",
+    "check": "es-check checkBrowser 'dist/*.js' --module --checkFeatures"
   },
   "devDependencies": {
     "@types/jsdom": "^30.0.0",
-    "@types/node": "^26.2.0",
-    "jsdom": "^30.0.1",
-    "tsx": "^4.23.12",
+    "@types/node": "^26.6.4",
+    "es-check": "^9.8.1",
+    "jsdom": "^30.1.2",
+    "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
     "typedoc": "^0.28.20",
-    "typedoc-plugin-markdown": "^4.12.0",
+    "typedoc-plugin-markdown": "^4.13.1",
     "typescript": "^6.0.3",
-    "vite": "^8.2.1"
+    "vite": "^8.3.4"
   }
 }
