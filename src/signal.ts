@@ -8,6 +8,8 @@
  * @module signal
  */
 
+import { getOrCreate, report } from "./helpers.js";
+
 /** Internal runtime state used for tracking active effects per context. */
 interface Runtime {
   active: Effect | null;
@@ -15,60 +17,96 @@ interface Runtime {
   inactive: boolean;
 }
 
-/** Context object that carries runtime metadata keyed by `runtimeKey`. */
+/** Context object that carries runtime metadata keyed by `RUNTIME_KEY`. */
 type Context = Record<PropertyKey, Runtime>;
 
 /** A reactive effect function that carries a subscription set. */
 type Effect = (() => void) & { subs: Set<[object, PropertyKey]> };
 
-const targetMap = new WeakMap<
+const TARGET_MAP = new WeakMap<
   object,
   { ctx: Context; deps: Map<PropertyKey, Set<Effect>> }
 >();
-const runtimeKey: unique symbol = Symbol();
+const RUNTIME_KEY: unique symbol = Symbol();
+/** Dependency key for the set of an object's own keys. */
+const ITERATE: unique symbol = Symbol();
 const GLOBAL: Context = {};
 
 /** Registers the current active effect as a subscriber of `target[key]`. */
 function track(target: object, key: PropertyKey): void {
-  const entry = targetMap.get(target);
-  const runtime = entry?.ctx?.[runtimeKey];
+  const entry = TARGET_MAP.get(target);
+  const runtime = entry?.ctx[RUNTIME_KEY];
   if (!entry || !runtime?.active || runtime.syncing || runtime.inactive) return;
-  let subs = entry.deps.get(key);
-  if (!subs) entry.deps.set(key, (subs = new Set()));
+  const subs = getOrCreate(entry.deps, key, () => new Set<Effect>());
+  // Record the subscription once per run; a repeated read adds nothing.
+  if (subs.has(runtime.active)) return;
   subs.add(runtime.active);
   runtime.active.subs.add([target, key]);
 }
 
-/** Schedules notified effects for `target[key]` to run. */
-function trigger(target: object, key: PropertyKey): void {
-  const entry = targetMap.get(target);
-  const subs = entry?.deps?.get(key);
-  const runtime = entry?.ctx?.[runtimeKey];
-  if (!subs || !runtime || runtime.syncing) return;
+/** Keys written since the last run, per context, awaiting one batched trigger. */
+const PENDING = new WeakMap<Context, Map<object, Set<PropertyKey>>>();
+
+/** Queues `target[key]` for the context's next trigger, one timer per context. */
+function schedule(ctx: Context, target: object, key: PropertyKey): void {
+  let batch = PENDING.get(ctx);
+  if (!batch) {
+    PENDING.set(ctx, (batch = new Map()));
+    setTimeout(trigger, 0, ctx, batch);
+  }
+  getOrCreate(batch, target, () => new Set<PropertyKey>()).add(key);
+}
+
+/** Runs each effect subscribed to a written key once, however many keys it reads. */
+function trigger(ctx: Context, batch: Map<object, Set<PropertyKey>>): void {
+  // Writes made while the effects run start the next batch.
+  PENDING.delete(ctx);
+  const runtime = ctx[RUNTIME_KEY];
+  if (!runtime) return;
+  const effects = new Set<Effect>();
+  for (const [target, keys] of batch) {
+    for (const key of keys) {
+      for (const eff of TARGET_MAP.get(target)?.deps.get(key) ?? []) {
+        effects.add(eff);
+      }
+    }
+  }
   runtime.syncing = true;
-  for (const eff of [...subs]) {
+  for (const eff of effects) {
     try {
       eff();
-    } catch {
+    } catch (e) {
       unsubscribe(eff);
+      report(e);
     }
   }
   runtime.syncing = false;
 }
 
-/** Lazily ensures a runtime exists on the given context. */
-function getRuntime(thisArg: Record<PropertyKey, any> | void): Runtime {
-  const ctx = thisArg || GLOBAL;
-  if (!ctx[runtimeKey]) {
-    ctx[runtimeKey] = { active: null, syncing: false, inactive: false };
-  }
-  return ctx[runtimeKey];
+/**
+ * Resolves the context for a `this` value. Module namespace objects (from
+ * `import * as neux` or the UMD global, called as `neux.signal()`) are not
+ * contexts and resolve to the global one.
+ */
+function getContext(thisArg: Record<PropertyKey, any> | void): Context {
+  return thisArg && thisArg[Symbol.toStringTag] !== "Module" ? thisArg : GLOBAL;
 }
 
-/** Unsubscribes an effect from all tracked properties. */
+/** Lazily ensures a runtime exists on the given context. */
+function getRuntime(thisArg: Record<PropertyKey, any> | void): Runtime {
+  const ctx = getContext(thisArg);
+  if (!ctx[RUNTIME_KEY]) {
+    ctx[RUNTIME_KEY] = { active: null, syncing: false, inactive: false };
+  }
+  return ctx[RUNTIME_KEY];
+}
+
+/** Unsubscribes an effect from all tracked properties, dropping keys left without subscribers. */
 function unsubscribe(eff: Effect): void {
   for (const [target, key] of eff.subs) {
-    targetMap.get(target)?.deps?.get(key)?.delete(eff);
+    const deps = TARGET_MAP.get(target)?.deps;
+    const subs = deps?.get(key);
+    if (subs?.delete(eff) && !subs.size) deps!.delete(key);
   }
   eff.subs.clear();
 }
@@ -82,62 +120,82 @@ function wrap(
   cache: WeakMap<object, Map<PropertyKey, unknown>>,
   ctx: Record<PropertyKey, any>,
 ): Record<PropertyKey, unknown> {
-  const timers = new Map<PropertyKey, ReturnType<typeof setTimeout>>();
-
-  if (!targetMap.has(data)) targetMap.set(data, { ctx, deps: new Map() });
+  if (!TARGET_MAP.has(data)) TARGET_MAP.set(data, { ctx, deps: new Map() });
 
   function flush(obj: object, prop: PropertyKey): void {
     cache.get(obj)?.delete(prop);
-    clearTimeout(timers.get(prop));
-    timers.set(
-      prop,
-      setTimeout(() => {
-        timers.delete(prop);
-        trigger(obj, prop);
-      }, 0),
-    );
+    schedule(TARGET_MAP.get(obj)!.ctx, obj, prop);
   }
 
   return new Proxy(data, {
     get(obj, prop, recv) {
       track(obj, prop);
       const val = Reflect.get(obj, prop, recv);
-      let wrapped: unknown;
-      if (typeof val === "function") {
-        wrapped = (val as (...args: unknown[]) => unknown).bind(recv);
-      } else if (
-        typeof val === "object" &&
-        val &&
-        (val.constructor === Object || val.constructor === Array) &&
+      const isFn = typeof val === "function";
+      // A getter computes its value on every read, so it is never cached or wrapped.
+      if (
+        (isFn ||
+          (typeof val === "object" &&
+            val &&
+            (val.constructor === Object || val.constructor === Array))) &&
         !Object.getOwnPropertyDescriptor(obj, prop)?.get
       ) {
-        wrapped = wrap(val as Record<PropertyKey, unknown>, cache, ctx);
-      }
-      if (wrapped !== undefined) {
-        let propCache = cache.get(obj);
-        if (!propCache) cache.set(obj, (propCache = new Map()));
-        if (!propCache.has(prop)) propCache.set(prop, wrapped);
-        return propCache.get(prop);
+        const propCache = getOrCreate(cache, obj, () => new Map());
+        let wrapped = propCache.get(prop);
+        if (wrapped === undefined) {
+          wrapped = isFn
+            ? (val as (...args: unknown[]) => unknown).bind(recv)
+            : wrap(val as Record<PropertyKey, unknown>, cache, ctx);
+          propCache.set(prop, wrapped);
+        }
+        return wrapped;
       }
       return val;
     },
 
+    has(obj, prop) {
+      track(obj, prop);
+      return Reflect.has(obj, prop);
+    },
+
+    ownKeys(obj) {
+      track(obj, ITERATE);
+      return Reflect.ownKeys(obj);
+    },
+
     set(obj, prop, val, recv) {
-      const runtime = targetMap.get(obj)?.ctx?.[runtimeKey];
+      const runtime = TARGET_MAP.get(obj)?.ctx[RUNTIME_KEY];
       const prev = runtime?.syncing;
       if (runtime) runtime.syncing = true;
-      const old = (obj as Record<PropertyKey, unknown>)[prop];
-      const ok = Reflect.set(obj, prop, val, recv);
-      if (runtime) runtime.syncing = prev!;
-      if (old !== val || (prop === "length" && Array.isArray(obj))) {
+      let had = false;
+      let old: unknown;
+      let ok = false;
+      // A throwing getter or setter must not leave the context stuck in syncing.
+      try {
+        had = Object.prototype.hasOwnProperty.call(obj, prop);
+        old = (obj as Record<PropertyKey, unknown>)[prop];
+        ok = Reflect.set(obj, prop, val, recv);
+      } finally {
+        if (runtime) runtime.syncing = prev!;
+      }
+      if (
+        !Object.is(old, val) ||
+        !had ||
+        (prop === "length" && Array.isArray(obj))
+      ) {
         flush(obj, prop);
       }
+      if (!had) flush(obj, ITERATE);
       return ok;
     },
 
     deleteProperty(obj, prop) {
+      const had = Object.prototype.hasOwnProperty.call(obj, prop);
       const ok = Reflect.deleteProperty(obj, prop);
-      if (ok) flush(obj, prop);
+      if (ok && had) {
+        flush(obj, prop);
+        flush(obj, ITERATE);
+      }
       return ok;
     },
   });
@@ -147,7 +205,17 @@ function wrap(
  * Creates a reactive proxy around the given data object.
  *
  * Property reads inside an active {@link effect} are automatically tracked.
- * Writes and deletions schedule a debounced re-run of dependent effects.
+ * Nested plain objects and arrays are wrapped too; class instances, `Map`,
+ * `Set`, `Date`, and objects with a null prototype are returned as is and are
+ * not reactive.
+ * Assigning a smaller `length` to an array re-runs only effects that read
+ * `length`, not those that read a dropped index (`list[0]`) or the keys; use
+ * `splice()`, `pop()`, or replace the array instead.
+ * Reading a read-only, non-configurable property (such as one of a frozen
+ * object) that holds a nested object, array, or method throws a `TypeError`;
+ * keep frozen data outside the signal.
+ * Writes and deletions schedule one batched re-run per tick of the dependent
+ * effects: an effect re-runs once, however many of its properties changed.
  *
  * @typeParam T The initial data type. Defaults to a plain object.
  * @this {object} Reactive context; defaults to the shared global context when
@@ -187,7 +255,7 @@ function wrap(
 export function signal<
   T extends Record<PropertyKey, any> = Record<PropertyKey, any>,
 >(this: object | void, data: T = {} as T): T {
-  return wrap(data, new WeakMap(), this || GLOBAL) as T;
+  return wrap(data, new WeakMap(), getContext(this)) as T;
 }
 
 /**
@@ -239,10 +307,20 @@ export function untrack<T = any>(this: object | void, fn: () => T): T {
  * The `getter` function is executed immediately. Any property read on a
  * signal during this execution is subscribed to the effect. When a
  * subscribed property is written, the effect is scheduled to re-run
- * (debounced via `setTimeout 0`).
+ * (batched via `setTimeout 0`: one re-run per effect, however many of its
+ * properties were written in the meantime).
  *
  * An optional `setter` receives the return value of `getter`. When the
- * getter returns a `Promise`, `setter` is called with its resolved value.
+ * getter returns a `Promise`, `setter` is called with its resolved value,
+ * unless the effect re-ran or was disposed in the meantime.
+ *
+ * An error thrown by `getter` on the first run propagates to the caller and
+ * leaves the effect disposed. On a later run it unsubscribes the effect
+ * permanently, and an error thrown by `setter` is kept from stopping the
+ * effect; both are reported through `reportError` (or `console.error` where it
+ * is unavailable) rather than thrown, so other effects of the same update still
+ * run. A promise that rejects is reported the same way, unless the effect re-ran
+ * or was disposed in the meantime, and the effect keeps running.
  *
  * The context is determined by `this`, following the same rules as
  * {@link signal}.
@@ -275,33 +353,55 @@ export function effect(
   setter?: (value: any) => void,
 ): () => void {
   const runtime = getRuntime(this);
+  let run = 0;
+  let disposed = false;
+
+  const set = (v: any) => {
+    try {
+      setter?.(v);
+    } catch (e) {
+      report(e);
+    }
+  };
 
   const eff: Effect = () => {
+    // A disposed effect can still be queued in a trigger's snapshot; it must not re-subscribe.
+    if (disposed) return;
     let value: unknown;
-    let threw = false;
+    const id = ++run;
+    // An effect created inside another effect's getter must not end its tracking.
+    const outer = runtime.active;
     unsubscribe(eff);
     runtime.active = eff;
     runtime.syncing = false;
     try {
       value = getter();
     } catch (e) {
-      threw = true;
-      runtime.active = null;
+      runtime.active = outer;
       throw e;
-    } finally {
-      if (!threw) runtime.active = null;
     }
-    if (setter) {
-      const set = (v: any) => {
-        try {
-          setter(v);
-        } catch {}
-      };
-      if (value instanceof Promise) value.then(set);
-      else set(value);
-    }
+    runtime.active = null;
+    // A pending promise is dropped once the effect re-runs or is disposed.
+    // A rejection is reported, and the effect keeps running.
+    if (value instanceof Promise)
+      value.then(
+        (v) => !disposed && id === run && set(v),
+        (e) => !disposed && id === run && report(e),
+      );
+    else if (setter) set(value);
+    runtime.active = outer;
   };
   eff.subs = new Set();
-  eff();
-  return () => unsubscribe(eff);
+  try {
+    eff();
+  } catch (e) {
+    // The caller gets no disposer, so a failed first run must not stay subscribed.
+    disposed = true;
+    unsubscribe(eff);
+    throw e;
+  }
+  return () => {
+    disposed = true;
+    unsubscribe(eff);
+  };
 }
