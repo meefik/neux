@@ -7,6 +7,8 @@
  * @module i18n
  */
 
+import { report } from "./helpers.js";
+
 /**
  * Signature of the translation function returned by {@link i18n}.
  */
@@ -28,25 +30,40 @@ export interface Translator {
 
 /** Returns the browser's preferred language from `navigator.language`, or "en" when unavailable. */
 function navigatorLanguage(): string {
-  return navigator?.language || "en";
+  return (typeof navigator !== "undefined" && navigator.language) || "en";
 }
 
-/** Looks up a translation value by dot-separated path or flat key from a locale map. */
+/** Reads an own property of an object; inherited keys such as `toString` are not translations. */
+function own(obj: any, key: string): any {
+  return obj &&
+    typeof obj === "object" &&
+    Object.prototype.hasOwnProperty.call(obj, key)
+    ? obj[key]
+    : undefined;
+}
+
+/** Finds the locale key for a language: an exact match, else its base language (`ru-RU` → `ru`). */
+function matchLanguage(
+  locales: Record<string, any>,
+  lang: string,
+): string | undefined {
+  if (own(locales, lang)) return lang;
+  const base = lang.split("-")[0];
+  return own(locales, base) ? base : undefined;
+}
+
+/** Looks up a translation by dot-separated path or flat key from a locale map; a key naming a nested group is not a translation. */
 function resolve(
   locales: Record<string, any>,
   key: string,
   lang: string,
-): unknown | undefined {
-  let value;
-  const map = locales[lang];
-  if (map) {
-    if (key in map) value = map[key];
-    else value = key.split(".").reduce((o, k) => o?.[k], map);
-  }
-  return value;
+): unknown {
+  const map = own(locales, lang);
+  const text = map && (own(map, key) ?? key.split(".").reduce(own, map));
+  return typeof text === "object" ? undefined : text;
 }
 
-/** Replaces `%{key}` placeholders with values from data; missing keys are left as-is. */
+/** Replaces `%{key}` placeholders with own values from data; missing keys, including inherited ones such as `toString`, are left as-is. */
 function fill(
   text: string,
   lang: string,
@@ -54,7 +71,7 @@ function fill(
 ): string {
   return data
     ? text.replace(/%\{([^}]+)\}/g, (_, k) => {
-        let v = data[k];
+        let v = own(data, k);
         if (Array.isArray(v)) {
           const [val, opts] = v;
           v =
@@ -75,6 +92,12 @@ function fill(
  * When called with a non-string first argument, it delegates to
  * `toLocaleString` for direct value formatting.
  *
+ * Formatting follows the language the result comes from. A language that has
+ * translations (an exact entry, or its base such as `ru` for `ru-RU`) formats
+ * with its full code. A language without any entry, and a key found only in
+ * the fallback, format with the fallback language instead, so a number never
+ * mixes one language's text with another's formatting.
+ *
  * Language-sensitive formatting:
  * - [Intl.DateTimeFormat](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat)
  * - [Intl.NumberFormat](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat)
@@ -83,9 +106,9 @@ function fill(
  *
  * @param locales A map of language codes to translation objects.
  * @param options Configuration options.
- * @param options.language Default language code; defaults to the browser language.
- * @param options.fallback Fallback language code when the default is unavailable; defaults to `"en"`.
- * @returns A translation function. Missing keys and fallback misses return the key itself.
+ * @param options.language Default language code; defaults to the browser language. A regional code such as `"ru-RU"` uses the `"ru"` translations when it has no entry of its own.
+ * @param options.fallback Fallback language code when the default is unavailable; defaults to `"en"`. A regional code such as `"en-US"` uses the `"en"` translations when it has no entry of its own.
+ * @returns A translation function. Missing keys, fallback misses, and keys naming a nested group instead of a string return the key itself. Each such key is also reported once per language through `reportError` (or `console.error` where it is unavailable).
  *
  * @example
  * ```ts
@@ -121,18 +144,35 @@ export function i18n(
   options?: { language?: string; fallback?: string },
 ): Translator {
   const { language = navigatorLanguage(), fallback = "en" } = options ?? {};
+  const missing = new Set<string>();
   return (keyOrValue, dataOrLang, lang) => {
     const curLang =
       lang ?? (typeof dataOrLang === "string" ? dataOrLang : language);
     const data = typeof dataOrLang === "object" ? dataOrLang : undefined;
-    const effectiveLang = locales[curLang] ? curLang : fallback;
+    const matched = matchLanguage(locales, curLang);
+    // A regional fallback uses its base translations too (`en-US` → `en`).
+    const base = matchLanguage(locales, fallback) ?? fallback;
+    // Translations come from the matched locale; formatting keeps the full tag.
+    const effectiveLang = matched ? curLang : fallback;
 
     if (typeof keyOrValue === "string") {
-      let text = resolve(locales, keyOrValue, effectiveLang);
+      let text = resolve(locales, keyOrValue, matched ?? base);
       let usedLang = effectiveLang;
-      if (effectiveLang !== fallback && text === undefined) {
-        text = resolve(locales, keyOrValue, fallback);
+      if (matched !== base && text === undefined) {
+        text = resolve(locales, keyOrValue, base);
         if (text !== undefined) usedLang = fallback;
+      }
+      if (text === undefined) {
+        // Report each missing key once per language, so a re-running effect does not repeat it.
+        const id = `${curLang}\0${keyOrValue}`;
+        if (!missing.has(id)) {
+          missing.add(id);
+          report(
+            new Error(
+              `i18n: no translation for "${keyOrValue}" in "${curLang}"`,
+            ),
+          );
+        }
       }
       return fill(String(text ?? keyOrValue), usedLang, data);
     }
