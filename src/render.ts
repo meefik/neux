@@ -8,7 +8,7 @@
  * @module render
  */
 
-import { getOrCreate } from "./helpers.js";
+import { getOrCreate, hasOwn } from "./helpers.js";
 import { effect } from "./signal.js";
 
 /** XML namespace URIs for auto-detection and explicit assignment. */
@@ -498,7 +498,7 @@ function createNode(
       }
       const key = keys[depth];
       // A property the config does not bind is left as is.
-      if (!parent || !Object.prototype.hasOwnProperty.call(parent, key)) {
+      if (!parent || !hasOwn(parent, key)) {
         continue;
       }
       patchNode({ [key]: parent[key] }, keys.slice(0, depth));

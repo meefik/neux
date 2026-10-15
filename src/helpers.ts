@@ -11,6 +11,16 @@ export function report(error: unknown): void {
 }
 
 /**
+ * Reports whether `obj` has `key` as an own property, safely for objects with
+ * a null prototype or an overridden `hasOwnProperty`.
+ *
+ * @internal
+ */
+export function hasOwn(obj: object, key: PropertyKey): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+/**
  * Returns the entry for `key`, creating and storing it with `create` when missing.
  *
  * @internal

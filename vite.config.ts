@@ -18,5 +18,7 @@ export default defineConfig({
     outDir: "dist",
     sourcemap: !IS_PROD,
     minify: IS_PROD,
+    // Vite skips whitespace minification for ESM lib builds; force it.
+    rolldownOptions: IS_PROD ? { output: { minify: true } } : {},
   },
 });

@@ -7,7 +7,7 @@
  * @module i18n
  */
 
-import { report } from "./helpers.js";
+import { hasOwn, report } from "./helpers.js";
 
 /**
  * Signature of the translation function returned by {@link i18n}.
@@ -30,9 +30,7 @@ export interface Translator {
 
 /** Reads an own property of an object; inherited keys such as `toString` are not translations. */
 function own(obj: any, key: string): any {
-  return obj &&
-    typeof obj === "object" &&
-    Object.prototype.hasOwnProperty.call(obj, key)
+  return obj && typeof obj === "object" && hasOwn(obj, key)
     ? obj[key]
     : undefined;
 }

@@ -8,7 +8,7 @@
  * @module signal
  */
 
-import { getOrCreate, report } from "./helpers.js";
+import { getOrCreate, hasOwn, report } from "./helpers.js";
 
 /** Internal runtime state used for tracking active effects per context. */
 interface Runtime {
@@ -172,7 +172,7 @@ function wrap(
       let ok = false;
       // A throwing getter or setter must not leave the context stuck in syncing.
       try {
-        had = Object.prototype.hasOwnProperty.call(obj, prop);
+        had = hasOwn(obj, prop);
         old = (obj as Record<PropertyKey, unknown>)[prop];
         ok = Reflect.set(obj, prop, val, recv);
       } finally {
@@ -190,7 +190,7 @@ function wrap(
     },
 
     deleteProperty(obj, prop) {
-      const had = Object.prototype.hasOwnProperty.call(obj, prop);
+      const had = hasOwn(obj, prop);
       const ok = Reflect.deleteProperty(obj, prop);
       if (ok && had) {
         flush(obj, prop);
