@@ -90,7 +90,7 @@ export type ElementConfig = {
   dataset?: ReactiveProperty<
     Record<string, ReactiveProperty<unknown>> & ThisType<Node>
   >;
-  /** Map of inline CSS styles to apply. Keys are camelCase style property names (`backgroundColor`, not `background-color`); `null` or `undefined` clears the property. */
+  /** Map of inline CSS styles to apply. Keys are style property names in camelCase (`backgroundColor`) or kebab-case (`background-color`); `null` or `undefined` clears the property. */
   style?: ReactiveProperty<
     Record<string, ReactiveProperty<unknown>> & ThisType<Node>
   >;
@@ -690,7 +690,7 @@ function keyOf(node: Node): string {
 }
 
 /**
- * Synchronizes a parent node children by diffing old and new node lists.
+ * Synchronizes a parent node's children by diffing old and new node lists.
  * Returns a tuple of newly inserted and removed nodes.
  */
 function syncDOM(

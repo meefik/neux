@@ -191,7 +191,7 @@ Known config keys and what they do:
 - `use` (`string | Element`) — Selector string (`div#id.cls`), HTML snippet, or existing element to reuse. Overrides `tagName`. See [Tag selector syntax](#tag-selector-syntax-in-use).
 - `className` (`ReactiveProperty<ClassName | ClassName[]>`) — Sets CSS classes, replacing any the element already has (including those from a `use` selector). Array entries become separate classes (entries containing spaces are split); `null`, `undefined`, and booleans are skipped, strings and numbers are used as is.
 - `classList` (`ReactiveProperty<ClassName | ClassName[]>`) — An alias of `className`; both set the same class list, so use only one of them.
-- `style` (`ReactiveProperty<Record<string, unknown>>`) — Inline styles. Use camelCase keys (`backgroundColor`, not `background-color`); `null` or `undefined` clears the property.
+- `style` (`ReactiveProperty<Record<string, unknown>>`) — Inline styles. Keys are camelCase (`backgroundColor`) or kebab-case (`background-color`); `null` or `undefined` clears the property.
 - `attributes` (`ReactiveProperty<Record<string, unknown>>`) — Arbitrary HTML attributes (`for`, `aria-label`, etc.). Use for non-property attributes. Values are converted to strings (`false` becomes `"false"`); `null` or `undefined` removes the attribute.
 - `dataset` (`ReactiveProperty<Record<string, unknown>>`) — Sets `element.dataset` entries (renders as `data-` attributes).
 - `children` (`ReactiveProperty<NodeConfig | NodeConfigList>`) — Child nodes or configs; nested arrays are flattened in order. `null`, `undefined`, and booleans are skipped; strings and numbers render as text nodes (`0` is a value).
