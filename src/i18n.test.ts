@@ -63,7 +63,7 @@ suite("i18n", async () => {
     equal(t(12345, money, "en"), "$12,345.00");
 
     const day = { dateStyle: "full" };
-    const d = new Date("2021-01-01");
+    const d = new Date(2021, 0, 1);
     equal(t("date", { val: [d, day] }, "en"), "Date: Friday, January 1, 2021");
     equal(t(d, day, "en"), "Friday, January 1, 2021");
   });

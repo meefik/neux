@@ -138,8 +138,8 @@ function fill(
  * t(1234, { style: "currency", currency: "USD" }); // $1,234.00
  *
  * // Intl.DateTimeFormat
- * t("birthday", { date: [new Date("2021-01-01"), { dateStyle: "short" }] }); // Birthday: 1/1/21
- * t(new Date("2021-01-01"), { dateStyle: "full" }); // Friday, January 1, 2021
+ * t("birthday", { date: [new Date(2021, 0, 1), { dateStyle: "short" }] }); // Birthday: 1/1/21
+ * t(new Date(2021, 0, 1), { dateStyle: "full" }); // Friday, January 1, 2021
  * ```
  */
 export function i18n(

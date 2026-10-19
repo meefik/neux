@@ -268,9 +268,9 @@ render(
 - Individual field accesses inside the callback track those specific properties.
 - An existing `Node` you return (a cached component, for example) is compared like any other child. If an equal child is already there, that child is kept and your node is left untouched: it stays live, but it is not shown. Give it a distinguishing attribute, as for configs, so it counts as a different node. Detached raw DOM nodes (from `document.createElement`) match equal children too, so an unchanged re-run keeps the existing nodes.
 - The diff compares attributes and children, not element properties. Inside a `children` function, bind properties such as `checked` or `value` with a function (`checked: () => item.done`); a plain value (`checked: item.done`) is ignored when an equal existing child is kept.
-- Each child must carry a **reactive** distinguishing attribute (`data-id`, `id`, etc.). If two siblings have the same structure and different values, Neux uses `isEqualNode` to diff — it sees them as equal and skips updates unless the distinguishing attribute syncs first.
+- Each child must carry a distinguishing attribute (`data-id`, `id`, etc.), static (`id: item.id`) or reactive (`id: () => item.id`). Neux diffs with `isEqualNode`, so siblings that render the same markup are interchangeable: an equal existing child is kept with its old bindings and handlers, even if it was built from a different item.
 
-**Done when:** list renders correctly on push, splice, and individual item property changes. Every child carries a reactive distinguishing attribute for identity matching.
+**Done when:** list renders correctly on push, splice, and individual item property changes. Every child carries a distinguishing attribute for identity matching.
 
 ### 6. Handle side effects with effect
 
@@ -375,10 +375,10 @@ t("nav"); // nav — a group of keys is not a translation, so the key is returne
 
 // Intl formatting via placeholder arrays [value, options] or direct calls
 t("price", { amount: [12345.67, { style: "currency", currency: "EUR" }] }); // Price: €12,345.67
-t("birthday", { date: [new Date("2026-07-30"), { dateStyle: "long" }] }); // Birthday: July 30, 2026
+t("birthday", { date: [new Date(2026, 6, 30), { dateStyle: "long" }] }); // Birthday: July 30, 2026
 
 t(12345.67, { style: "currency", currency: "EUR" }); // €12,345.67
-t(new Date("2026-07-30"), { dateStyle: "long" }); // July 30, 2026
+t(new Date(2026, 6, 30), { dateStyle: "long" }); // July 30, 2026
 ```
 
 To support dynamic locale changes at runtime, pass the current language as the third argument:

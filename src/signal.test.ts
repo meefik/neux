@@ -395,6 +395,58 @@ suite("signal", async () => {
     );
   });
 
+  await test("an effect created inside untrack tracks its own reads", async () => {
+    const s = signal({ a: 0, b: 0 });
+    let inner = { count: 0 };
+    const outer = track(() => {
+      untrack(() => {
+        inner = track(() => s.a);
+        s.b;
+      });
+    });
+    s.a = 1;
+    await tick();
+    equal(inner.count, 2, "the inner effect re-runs");
+    s.b = 1;
+    await tick();
+    equal(outer.count, 1, "reads after the inner effect stay untracked");
+  });
+
+  await test("an effect created inside a signal setter leaves the setter's reads untracked", async () => {
+    let inner = { count: 0 };
+    const s = signal({
+      a: 0,
+      b: 0,
+      set x(_: number) {
+        inner = track(() => this.a);
+        this.b;
+      },
+    });
+    const outer = track(() => {
+      s.x = 1;
+    });
+    s.a = 1;
+    await tick();
+    equal(inner.count, 2, "the inner effect re-runs");
+    s.b = 1;
+    await tick();
+    equal(outer.count, 1, "reads after the inner effect stay untracked");
+  });
+
+  await test("a rejected write does not re-run effects", async () => {
+    const s = signal({
+      get ro() {
+        return 1;
+      },
+    } as { ro: number });
+    const runs = track(() => s.ro);
+    throws(() => {
+      s.ro = 2;
+    }, TypeError);
+    await tick();
+    equal(runs.count, 1);
+  });
+
   await test("an effect created inside another effect keeps the outer tracking", async () => {
     const s = signal({ a: 0, b: 0, c: 0, d: 0 });
     const log: string[] = [];

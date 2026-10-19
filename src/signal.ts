@@ -178,14 +178,17 @@ function wrap(
       } finally {
         if (runtime) runtime.syncing = prev!;
       }
-      if (
-        !Object.is(old, val) ||
-        !had ||
-        (prop === "length" && Array.isArray(obj))
-      ) {
-        flush(obj, prop);
+      // A rejected write (e.g. to a getter-only property) changes nothing.
+      if (ok) {
+        if (
+          !Object.is(old, val) ||
+          !had ||
+          (prop === "length" && Array.isArray(obj))
+        ) {
+          flush(obj, prop);
+        }
+        if (!had) flush(obj, ITERATE);
       }
-      if (!had) flush(obj, ITERATE);
       return ok;
     },
 
@@ -277,13 +280,14 @@ export function signal<
  *
  * @example
  * ```ts
- * const state = signal({ count: 0 });
- * // reads without subscribing
+ * const state = signal({ count: 0, label: "Count" });
  * const dispose = effect(() => {
- *   untrack(() => {
- *     console.log(state.count);
- *   });
+ *   // reads `label` without subscribing
+ *   const label = untrack(() => state.label);
+ *   console.log(`${label}: ${state.count}`);
  * });
+ * // does not trigger the effect
+ * state.label = "Total";
  * // triggers the effect
  * state.count += 1;
  * // later …
@@ -371,14 +375,22 @@ export function effect(
     const id = ++run;
     // An effect created inside another effect's getter must not end its tracking.
     const outer = runtime.active;
+    // An effect created inside `untrack()` or a signal setter must still track
+    // its own reads, and must leave the caller's reads untracked afterwards.
+    const inactive = runtime.inactive;
+    const syncing = runtime.syncing;
     unsubscribe(eff);
     runtime.active = eff;
     runtime.syncing = false;
+    runtime.inactive = false;
     try {
       value = getter();
     } catch (e) {
       runtime.active = outer;
       throw e;
+    } finally {
+      runtime.inactive = inactive;
+      runtime.syncing = syncing;
     }
     runtime.active = null;
     // A pending promise is dropped once the effect re-runs or is disposed.

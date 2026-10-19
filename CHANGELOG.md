@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `i18n()` resolves a requested language to the closest locale — an exact key (case- and separator-insensitive, `ru_RU` ≡ `ru-RU`) or, when none, the longest key the language starts with at a subtag boundary (`de_DE` → `de`) — tolerates odd separators such as `ru_RU.UTF-8` (using the leading language subtag), no longer validates tags against a full locale-shape regex or throws on an unparseable language or `fallback`, and reports a missing key once per locale.
+- An `effect()` created inside `untrack()` tracks its own reads instead of never re-running.
+- An `effect()` created inside a signal setter no longer makes the setter's later reads subscribe the effect that wrote the property.
+- A rejected signal write (such as assigning to a getter-only property) no longer re-runs effects.
+- Documentation: the `untrack()` TypeDoc example no longer claims an untracked read triggers the effect, `SKILL.md` no longer requires list identity attributes to be reactive, and date examples and tests use local dates so the shown output holds in every time zone.
 
 ## [0.18.0] - 2026-10-09
 

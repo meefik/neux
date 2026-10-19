@@ -592,7 +592,7 @@ console.log(numberMsg); // number: $12,345.00
 
 const dateMsg = t("date", {
   val: [
-    new Date("2025-01-15"),
+    new Date(2025, 0, 15),
     {
       weekday: "long",
       year: "numeric",
