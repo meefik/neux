@@ -93,7 +93,7 @@ function fill(
  * A requested language is matched case- and separator-insensitively to an
  * exact locale key, or — when there is none — to the nearest one: the longest
  * key the language starts with at a subtag boundary (`ru-RU` matches `ru`,
- * and `aB3xgd-sa43t2w` matches `aB3`).
+ * and `zh-Hant-TW` matches `zh-Hant`, but `run-BI` does not match `ru`).
  *
  * Formatting follows the language the result comes from: a language with
  * translations (an exact entry, or its base such as `ru` for `ru-RU`) formats
@@ -158,13 +158,13 @@ export function i18n(
 
   // The locale for a tag: the longest key the tag starts with that ends at a
   // subtag boundary — the whole tag, or one followed by `-`. So `ru-RU` matches
-  // `ru` and `aB3xgd-sa43t2w` matches `aB3`, while `run` does not match `ru`.
+  // `ru` and `zh-Hant-TW` matches `zh-Hant`, while `run-BI` does not match `ru`.
   function find(tag: string): string | undefined {
     const t = norm(tag);
     for (const [key, orig] of keys) {
       if (
         t.startsWith(key) &&
-        (t.length === key.length || t.includes("-", key.length))
+        (t.length === key.length || t[key.length] === "-")
       ) {
         return orig;
       }

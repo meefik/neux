@@ -207,6 +207,7 @@ suite("i18n", async () => {
       "Hello",
       "a 3-letter code prefixing `ru` does not match it",
     );
+    equal(tr("hello", "run-BI"), "Hello", "nor does a regional variant of it");
 
     const regionalFallback = i18n(LOCALES, {
       language: "de",
@@ -276,21 +277,37 @@ suite("i18n", async () => {
 
   await test("matches a locale by its nearest key, not just its base", () => {
     const tr = i18n(
-      { aB3: { hello: "AB3" }, ru: { hello: "RU" } },
+      {
+        aB3: { hello: "AB3" },
+        ru: { hello: "RU" },
+        zh: { hello: "ZH" },
+        "zh-Hant": { hello: "ZH-HANT" },
+      },
       { language: "aB3", fallback: "en" },
     );
     equal(tr("hello", "aB3"), "AB3", "an exact key matches as-is");
     equal(tr("hello"), "AB3", "and the default language does");
     equal(
-      tr("hello", "aB3xgd-sa43t2w"),
+      tr("hello", "aB3-sa43t2w"),
       "AB3",
-      "a longer tag matches the nearest key",
+      "a longer tag matches the key at a subtag boundary",
     );
-    equal(tr("hello", "ab3xgd-sa43t2w"), "AB3", "and is case-insensitive");
+    equal(
+      tr("hello", "zh-Hant-TW"),
+      "ZH-HANT",
+      "the longest matching key wins",
+    );
+    equal(tr("hello", "ZH_hant_tw"), "ZH-HANT", "and is case-insensitive");
+    equal(tr("hello", "zh-Hans-CN"), "ZH", "another script uses the base");
     equal(
       tr("hello", "aB3xgd"),
       "hello",
-      "a single word that only prefixes the key does not match",
+      "a word that only prefixes the key does not match",
+    );
+    equal(
+      tr("hello", "aB3xgd-sa43t2w"),
+      "hello",
+      "nor does one followed by more subtags",
     );
     equal(
       tr("hello", "ru-kz"),
