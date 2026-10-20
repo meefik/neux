@@ -479,6 +479,24 @@ suite("render", async () => {
     }
   });
 
+  await test("mounts a list of nodes into a target, firing mounted on each root", () => {
+    const log: string[] = [];
+    const host = domWindow.document.createElement("div");
+
+    const nodes = render(
+      [
+        { tagName: "a", on: logger(log, "a") },
+        "text",
+        { tagName: "b", on: logger(log, "b") },
+      ],
+      host,
+    );
+
+    equal(nodes.length, 3);
+    deepEqual(Array.from(host.childNodes), nodes, "roots appended in order");
+    deepEqual(log, ["a", "b"], "each root mounted once, in order");
+  });
+
   await test("dispatches event handlers", () => {
     let value = 1;
     const el = render<HTMLInputElement>({
