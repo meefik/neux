@@ -11,7 +11,7 @@ export function report(error: unknown): void {
 }
 
 /**
- * Reports whether `obj` has `key` as an own property, safely for objects with
+ * Checks whether `obj` has `key` as an own property, safely for objects with
  * a null prototype or an overridden `hasOwnProperty`.
  *
  * @internal

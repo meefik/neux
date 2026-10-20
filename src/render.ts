@@ -1,9 +1,10 @@
 /**
  * Declarative DOM rendering with reactive bindings.
  *
- * Parses tag selectors, creates elements (including SVG/MathML), and syncs
- * the virtual tree to the real DOM. Property accesses inside callbacks are
- * tracked by signal so that updates flow automatically on change.
+ * Parses tag selectors, creates elements (including SVG/MathML), and diffs
+ * reactive children directly against the real DOM, with no virtual DOM.
+ * Property accesses inside callbacks are tracked by signal effects, so updates
+ * flow automatically on change.
  *
  * @module render
  */
@@ -19,7 +20,7 @@ const MATH_NS = "http://www.w3.org/1998/Math/MathML";
 /** Namespaces auto-detected from the tag name. */
 const NS_BY_TAG: Record<string, string> = { svg: SVG_NS, math: MATH_NS };
 
-/** Regular expressions for tag parsing and casing detection. */
+/** Patterns for detecting markup, parsing tag selectors, detecting camelCase style keys, and splitting class names. */
 const HTML_RE = /[^a-zA-Z0-9-_.#]/u;
 const PARSE_TAG_RE = /([.#]?[^\s#.]+)/gu;
 const UPPER_CASE_RE = /[A-Z]/u;
@@ -107,9 +108,9 @@ export type ElementConfig = {
   on?: Partial<ElementLifecycle> &
     Record<string, (this: Node, event: any) => void>;
   /** A tag string, optionally with id and class selectors
-   * (e.g., `"div#id1.cls1.cls2"`), an HTML markup, or existing element.
-   * Render a given element only once: rendering it again attaches its
-   * event listeners and bindings a second time. */
+   * (e.g., `"div#id1.cls1.cls2"`), HTML markup, or an existing element;
+   * takes precedence over `tagName`. Render a given element only once:
+   * rendering it again attaches its event listeners and bindings a second time. */
   use?: string | Element;
 } & Record<string, ReactiveProperty<unknown>> &
   ThisType<Node>;
@@ -122,7 +123,7 @@ export type ElementConfig = {
 export interface ElementLifecycle {
   /** Fired top-down (this element before its children), the same order as `removed`, when the element is appended to a parent — on both the initial mount and a re-mount. */
   mounted: (this: Node, event: CustomEvent) => void;
-  /** Fired top-down before cleanup when the element is removed from a parent. Always paired with `mounted`: nodes discarded by a reactive re-render are never inserted, so they are disposed internally without firing it. */
+  /** Fired top-down before cleanup when a `children` update removes the element from a parent; DOM removals such as `el.remove()` do not fire it. Always paired with `mounted`: nodes discarded by a reactive re-render are never inserted, so they are disposed internally without firing it. */
   removed: (this: Node, event: CustomEvent) => void;
   /** Fired on the bound element after its property value changes; not fired when a re-run resolves to the same value, for the first applied value, or for a change from a cleared (`null` or `undefined`) binding. For `className`, the values are the applied class names; for `children`, the child nodes in the DOM. */
   updated: (
@@ -139,7 +140,8 @@ export interface ElementLifecycle {
 }
 
 /**
- * Checks whether a value is a plain Object or an Array.
+ * Checks whether a value is a plain object (including one with a null
+ * prototype) or an array.
  */
 function isPlainObjectOrArray(value: unknown): boolean {
   return (
@@ -168,9 +170,9 @@ function dispatchEvent(
 }
 
 /**
- * Disposer for reactive bindings, registered by `createNode` for each
- * element it creates. This allows nodes that are discarded without any
- * lifecycle event to release their effects.
+ * Disposers for reactive bindings, registered by `createNode` for each
+ * element it creates, so that nodes discarded without any lifecycle event
+ * can release their effects.
  */
 const DISPOSERS = new WeakMap<Node, () => void>();
 
@@ -267,12 +269,11 @@ function fireMount(node: Node): void {
 }
 
 /**
- * Leaves the current {@link render} build and, at the outermost boundary,
- * fires the armed `mounted` requests top-down, in document order: an armed
- * node is reached by its ancestor's cascade, so by the time its own turn comes
- * it is already mounted and skipped. Armed nodes that were never inserted
- * (dropped by the diff) are released silently, preserving the
- * `mounted`/`removed` pairing.
+ * Leaves the current build and, at the outermost boundary, fires the armed
+ * `mounted` requests top-down, in document order: an armed node is reached by
+ * its ancestor's cascade, so by the time its own turn comes it is already
+ * mounted and skipped. Nodes the diff dropped were already disarmed by
+ * {@link destroyNode}, preserving the `mounted`/`removed` pairing.
  */
 function flushMounts(): void {
   MOUNT_DEPTH--;
@@ -296,7 +297,7 @@ function unmountNode(node: Node): void {
 
 /**
  * Updates the element's class list by removing all current classes and adding new ones.
- * null, undefined, and booleans are skipped; entries are split on whitespace.
+ * `null`, `undefined`, and booleans are skipped; entries are split on whitespace.
  * Returns the applied class names without duplicates.
  */
 function updateClassList(el: Element, classList: ClassName[]): string[] {
@@ -312,7 +313,9 @@ function updateClassList(el: Element, classList: ClassName[]): string[] {
 }
 
 /**
- * Creates a DOM element from a tag string that may contain optional id and class selectors.
+ * Creates an element from a tag string with optional id and class selectors,
+ * parses one from HTML markup, or returns a given element as is. Registered
+ * custom elements are constructed directly.
  */
 function createElement(use: unknown, ns?: string | null): Element {
   const { document, Element, customElements } = window;
@@ -363,7 +366,8 @@ function createElement(use: unknown, ns?: string | null): Element {
 }
 
 /**
- * Creates a DOM node from a configuration value.
+ * Creates a DOM node from a configuration value; an array yields a flat list
+ * of nodes, and a value that renders nothing yields `null`.
  */
 function createNode(
   context: object | void,
@@ -811,7 +815,7 @@ export function render(
  *
  * Lifecycle events are dispatched by the render layer (see {@link ElementLifecycle}):
  * - `mounted` — fires top-down (this element before its children), the same order as `removed`, when the element is appended to a parent, on both the initial mount and a re-mount.
- * - `removed` — fires top-down when the element is removed from a parent. Always paired with `mounted`; nodes never inserted (e.g., replaced by an equal node during re-render) are destroyed silently.
+ * - `removed` — fires top-down when a `children` update removes the element from a parent. Always paired with `mounted`; nodes never inserted (e.g., replaced by an equal node during re-render) are destroyed silently.
  * - `updated` — fires when a specific property is updated to a different value; not for its first applied value, nor for a change from a cleared (`null` or `undefined`) binding. For `className`, the old and new values are arrays of the applied class names; for `children`, arrays of the child nodes in the DOM.
  *
  * @category Render

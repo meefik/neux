@@ -12,8 +12,11 @@ import { getOrCreate, hasOwn, report } from "./helpers.js";
 
 /** Internal runtime state used for tracking active effects per context. */
 interface Runtime {
+  /** The effect whose getter is running. */
   active: Effect | null;
+  /** Set while a batch or a signal write runs, so reads made outside an effect getter (e.g. by setters) are not tracked. */
   syncing: boolean;
+  /** Set inside `untrack()`. */
   inactive: boolean;
 }
 
@@ -92,7 +95,7 @@ function getContext(thisArg: Record<PropertyKey, any> | void): Context {
   return thisArg && thisArg[Symbol.toStringTag] !== "Module" ? thisArg : GLOBAL;
 }
 
-/** Lazily ensures a runtime exists on the given context. */
+/** Returns the runtime of the context for `thisArg`, creating it on first use. */
 function getRuntime(thisArg: Record<PropertyKey, any> | void): Runtime {
   const ctx = getContext(thisArg);
   if (!ctx[RUNTIME_KEY]) {
@@ -113,7 +116,8 @@ function unsubscribe(eff: Effect): void {
 
 /**
  * Wraps `data` in a reactive Proxy. Nested plain objects and arrays are
- * wrapped recursively.
+ * wrapped, and methods bound to the proxy, on first read; both are cached
+ * until the property is written.
  */
 function wrap(
   data: Record<PropertyKey, unknown>,
@@ -311,7 +315,7 @@ export function untrack<T = any>(this: object | void, fn: () => T): T {
  * The `getter` function is executed immediately. Any property read on a
  * signal during this execution is subscribed to the effect. When a
  * subscribed property is written, the effect is scheduled to re-run
- * (batched via `setTimeout 0`: one re-run per effect, however many of its
+ * (batched via `setTimeout(…, 0)`: one re-run per effect, however many of its
  * properties were written in the meantime).
  *
  * An optional `setter` receives the return value of `getter`. When the

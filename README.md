@@ -136,8 +136,8 @@ The `el` variable will contain an HTML element with the following markup:
 
 ```html
 <ul class="list">
-  <li title="Item 1" data-index="0" style="color: red;">Item 1</li>
-  <li title="Item 2" data-index="1" style="color: red;">Item 2</li>
+  <li style="color: red;" title="Item 1" data-index="0">Item 1</li>
+  <li style="color: red;" title="Item 2" data-index="1">Item 2</li>
 </ul>
 ```
 
@@ -147,7 +147,7 @@ List of lifecycle events:
 
 - `mounted` fires when the element is appended to a parent — top-down (parent before children), the same order as `removed`, on both the initial mount and a re-mount. A previously removed element can be re-mounted: `mounted` fires again and its reactive bindings are rebuilt.
 - `updated` fires when an element property is updated to a different value; it does not fire for the first applied value, nor for a change from a cleared (`null` or `undefined`) binding. For `className`, the old and new values are arrays of the applied class names; for `children`, arrays of the child nodes in the DOM.
-- `removed` fires top-down when the element is removed from a parent, including children inside a shadow root, and releases its reactive bindings.
+- `removed` fires top-down when the element is removed from a parent, including children inside a shadow root, and releases its reactive bindings. Only removals made by Neux (a `children` re-render) fire it; removing an element with DOM APIs such as `el.remove()` does not.
 
 Example of using lifecycle events:
 
@@ -216,9 +216,9 @@ HTML output:
   viewBox="0 0 100 100"
   fill="currentColor"
   class="icon"
+  style="color: green;"
   width="64px"
   height="64px"
-  style="color: green;"
 >
   <circle cx="50" cy="50" r="50"></circle>
 </svg>
@@ -352,7 +352,7 @@ state.list.push({ text: "Item 3" });
 delete state.double;
 ```
 
-When a tracked property changes, the computed getter is automatically re-evaluated.
+A computed getter is re-evaluated on every read, so an effect that reads it re-runs whenever a property the getter reads changes.
 
 **Note**
 
@@ -518,7 +518,7 @@ state.count++;
 setTimeout(() => dispose(), 0);
 ```
 
-The effect function tracks all reactive dependencies accessed during its initial execution, then re-runs the callback whenever any of those dependencies change.
+The effect function tracks the reactive properties read during each run, starting with the initial one, and re-runs the callback whenever any of them change. Dependencies are collected again on every run, so a branch that is no longer taken stops triggering it. Re-runs are batched: an effect runs once per tick (`setTimeout`), however many of its properties changed in the meantime.
 
 To ignore reactive reads inside an effect, use `untrack()`:
 
@@ -540,7 +540,7 @@ state.count++;
 state.label = "Total";
 ```
 
-If a getter throws while re-running, the effect is unsubscribed and the error is reported through `reportError` (or `console.error` where it is unavailable), so it reaches `window.onerror`. An error thrown by the optional setter is reported the same way and does not stop the effect.
+If a getter throws on the first run, the error is thrown to the caller and the effect is not created. If it throws while re-running, the effect is unsubscribed and the error is reported through `reportError` (or `console.error` where it is unavailable), so it reaches `window.onerror`. An error thrown by the optional setter, or a rejected promise returned by the getter, is reported the same way and does not stop the effect.
 
 The `effect()` function returns a `dispose()` function that clears all reactivity subscriptions, stopping further tracking and updates.
 
@@ -611,7 +611,7 @@ A missing key, or a key that names a nested group such as `say` in `say.hello`, 
 
 ## Custom Context
 
-By default, Neux uses a global context for the `signal()` and `render()` functions. However, there are scenarios where you might need to use a custom context for signals and rendering. This allows you to separate multiple states, ensuring that reactivity works only within the same context. You can create an object and bind it to these functions.
+By default, Neux uses a global context for the `signal()`, `effect()`, `untrack()`, and `render()` functions. However, there are scenarios where you might need to use a custom context for signals and rendering. This allows you to separate multiple states, ensuring that reactivity works only within the same context. You can create an object and bind it to these functions.
 
 Here's an example of how to use a custom context:
 
@@ -642,6 +642,8 @@ In this example:
 - A custom context object is created.
 - The `signal` function is bound to the custom context using `signal.bind(context)`.
 - The `render` function is also bound to the same custom context using `render.bind(context)`. These bound functions use the custom context as their `this` value.
+
+An effect tracks only signals of its own context, so bind `effect()` and `untrack()` to the same context when you use them directly.
 
 This approach ensures that the reactivity and rendering logic are scoped to the custom context, providing better modularity and separation of concerns in your application or within Web Components.
 
@@ -843,11 +845,14 @@ render(
         tagName: "input",
         type: "number",
         className: ["input", "input-bordered", "w-full"],
-        attributes: { min: 0 },
+        attributes: { min: 0, max: 100 },
         value: () => state.count,
         on: {
           change: ({ target }) => {
-            state.count = parseInt(target.value);
+            const value = parseInt(target.value) || 0;
+            state.count = Math.min(100, Math.max(0, value));
+            // An unchanged count does not re-run the binding, so reset the input
+            target.value = state.count;
           },
         },
       },
@@ -1069,6 +1074,9 @@ const t = i18n({
   },
 });
 
+let nextId = 1;
+const createTask = (text, checked = false) => ({ id: nextId++, text, checked });
+
 const Header = () => {
   return {
     tagName: "h1",
@@ -1085,7 +1093,7 @@ const TaskInput = (list) => {
       keyup(e) {
         if (e.key === "Enter") {
           e.preventDefault();
-          list.push({ text: e.target.value });
+          list.push(createTask(e.target.value));
           e.target.value = "";
         }
       },
@@ -1116,12 +1124,12 @@ const MarkAll = (list) => {
   };
 };
 
-const TaskItem = (list, item, index) => {
+const TaskItem = (list, item) => {
   return {
     tagName: "li",
     style: { display: "flex", gap: "0.5rem" },
     dataset: {
-      index,
+      id: item.id,
     },
     children: [
       {
@@ -1158,7 +1166,7 @@ const TaskItem = (list, item, index) => {
 const TaskList = (list) => {
   return {
     tagName: "ul",
-    children: () => list.map((item, index) => TaskItem(list, item, index)),
+    children: () => list.map((item) => TaskItem(list, item)),
   };
 };
 
@@ -1174,9 +1182,9 @@ const Footer = (list) => {
 
 const App = () => {
   const list = signal([
-    { text: "Item 1" },
-    { text: "Item 2", checked: true },
-    { text: "Item 3" },
+    createTask("Item 1"),
+    createTask("Item 2", true),
+    createTask("Item 3"),
   ]);
 
   return {

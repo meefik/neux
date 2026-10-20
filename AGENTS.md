@@ -37,7 +37,7 @@ SKILL.md      # AI agent skill guidelines
 | ------------------- | ------------------------------------ |
 | `npm install`       | Install dev dependencies             |
 | `npm run build`     | Build (ESM + UMD) + TS declarations  |
-| `npm test`          | Run unit tests                       |
+| `npm test`          | Run unit tests with coverage         |
 | `npm run docs`      | Generate docs → `docs/`              |
 | `npm run typecheck` | Type-check only                      |
 | `npm run format`    | Format sources and docs (Prettier)   |
@@ -45,11 +45,11 @@ SKILL.md      # AI agent skill guidelines
 
 ## Testing
 
-Tests live alongside source (`src/**/*.test.ts`). Follow **Arrange → Act → Assert**. Node built-in imports use the `node:` prefix. JSDOM provides a simulated browser DOM for tests that interact with elements. No external test libraries — just `node:test`, `node:assert/strict`, and `jsdom`.
+Tests live alongside source (`src/**/*.test.ts`). `npm test` fails when branch coverage drops below 90%. Follow **Arrange → Act → Assert**. Node built-in imports use the `node:` prefix. JSDOM provides a simulated browser DOM for tests that interact with elements. No external test libraries — just `node:test`, `node:assert/strict`, and `jsdom`.
 
 ## Docs
 
-Run `npm run docs` to regenerate TypeDoc. Output includes HTML and Markdown documentation, plus `docs/llms.txt` (globals index).
+Run `npm run docs` to regenerate TypeDoc. Output includes HTML and Markdown documentation, plus `docs/llms.txt` (a copy of `docs/README.md`: the README merged with the module index).
 
 ## Releases
 

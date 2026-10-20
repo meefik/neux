@@ -17,7 +17,7 @@ export interface Translator {
    * A translation function that resolves and interpolates a translation string.
    *
    * @param keyOrValue Translation key, or a value to format directly.
-   * @param dataOrLang Object providing interpolation data, or a language code used when `lang` is omitted.
+   * @param dataOrLang Interpolation data for a key, or `Intl` formatting options for a number or date; or a language code used when `lang` is omitted.
    * @param lang Optional language code; takes precedence over `dataOrLang` and the default language.
    * @returns The resolved and interpolated translation string.
    */

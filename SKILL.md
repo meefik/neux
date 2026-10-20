@@ -29,7 +29,7 @@ import { render, signal, effect, untrack, i18n } from "neux";
 const state = signal({
   count: 0,
   items: [{ id: 1, text: "First", done: false }],
-  // computed — re-evaluated when dependencies change
+  // computed — re-evaluated on every read, tracked through the fields it reads
   get activeCount() {
     return this.items.filter((i) => !i.done).length;
   },
@@ -147,8 +147,8 @@ render(
     tagName: "input",
     on: {
       mounted() {
-        // wait for DOM to be ready before focusing
-        queueMicrotask(() => this.focus());
+        // already attached to the target when `mounted` fires
+        this.focus();
       },
     },
   },
@@ -200,7 +200,7 @@ Known config keys and what they do:
 - `adoptedStyleSheets` (`CSSStyleSheet[]`) — Style sheets adopted by the shadow root.
 - `namespaceURI` (`string`) — Explicit namespace URI; auto-detected for SVG and MathML when omitted.
 
-Boolean element properties like `checked`, `disabled`, `required`, or `value` stay in sync directly on the config (not inside `attributes`: `attributes: { disabled: false }` sets `disabled="false"`, which still disables the element). Provide a function to make them reactive:
+Element properties such as `checked`, `disabled`, `required`, or `value` stay in sync directly on the config (not inside `attributes`: `attributes: { disabled: false }` sets `disabled="false"`, which still disables the element). Provide a function to make them reactive:
 
 ```js
 render(
@@ -253,8 +253,8 @@ render(
     children() {
       return state.items.map((item) => ({
         tagName: "li",
-        // reactive identity so Neux can sync DOM nodes during diffing
-        dataset: { id: () => item.id },
+        // identity so Neux can match DOM nodes during diffing
+        dataset: { id: item.id },
         // syncs the property only, not the entire element
         textContent: () => item.text,
       }));
@@ -299,10 +299,10 @@ effect(() => {
 });
 ```
 
-- The getter runs immediately; every signal property read inside is subscribed. Conditional branches subscribe only the active path — stale dependencies are pruned when conditions flip.
+- The getter runs immediately; every signal property read inside is subscribed. Re-runs are batched: one per tick (`setTimeout`), however many subscribed properties changed. Conditional branches subscribe only the active path — stale dependencies are pruned when conditions flip.
 - Returns value → setter receives the synchronous result.
 - Returns `Promise` → setter receives the resolved value in sync when ready.
-- A getter that throws on a re-run unsubscribes the effect permanently — handle errors inside the getter if recovery is needed. An error from a re-run getter or from the setter is reported through `reportError` (or `console.error` where unavailable), so it reaches `window.onerror`; the first run's getter error is thrown to the caller and leaves the effect disposed.
+- A getter that throws on a re-run unsubscribes the effect permanently — handle errors inside the getter if recovery is needed. An error from a re-run getter, from the setter, or from a rejected promise of the latest run is reported through `reportError` (or `console.error` where unavailable), so it reaches `window.onerror`; the first run's getter error is thrown to the caller and leaves the effect disposed.
 - Always call the returned dispose function when the effect is no longer needed — wire it to `removed` in lifecycle handlers (step 7).
 
 **Done when:** side effects are created and wired for disposal on removal.
@@ -385,9 +385,12 @@ To support dynamic locale changes at runtime, pass the current language as the t
 
 ```js
 const state = signal({ lang: "en" });
-render({
-  textContent: () => t("greeting", { name: "Mundo" }, state.lang),
-});
+render(
+  {
+    textContent: () => t("greeting", { name: "Mundo" }, state.lang),
+  },
+  document.body,
+);
 ```
 
 **Done when:** all user-facing string literals are passed through `t()` with a key.
@@ -405,6 +408,8 @@ const ctx = {};
 const isolatedState = signal.call(ctx, { count: 0 });
 // Only effects also called with `ctx` will track this signal
 effect.call(ctx, () => console.log(isolatedState.count));
+// Bind render (and untrack) to the same context so bindings track it too
+render.call(ctx, { textContent: () => isolatedState.count }, document.body);
 ```
 
 Use when building plugins or libraries where signals must not interfere with the host app's reactivity.

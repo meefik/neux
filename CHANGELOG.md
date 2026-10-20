@@ -15,9 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A rejected signal write (such as assigning to a getter-only property) no longer re-runs effects.
 - A nested plain object with its own `constructor` key is reactive instead of being returned as is.
 - `i18n()` keeps a script subtag when formatting, so `sr-Latn` text gets Latin rather than Cyrillic dates and `zh-Hant` text gets Traditional Chinese formatting.
-- Documentation: the `README.md` To-Do example tells tasks apart by a unique id instead of their index, so deleting one of two tasks with the same text no longer deletes the wrong task.
-- Documentation: the `README.md` daisyUI example no longer sets the count to `NaN` when the input is cleared, and keeps typed values within its 0–100 range.
-- Documentation: the `untrack()` TypeDoc example no longer claims an untracked read triggers the effect, `SKILL.md` no longer requires list identity attributes to be reactive, and date examples and tests use local dates so the shown output holds in every time zone.
+- Documentation: `README.md`, `SKILL.md`, `AGENTS.md`, and TypeDoc comments corrected to match the current behavior, with fixed examples.
 
 ## [0.18.0] - 2026-10-09
 
