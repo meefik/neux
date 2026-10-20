@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An `effect()` created inside a signal setter no longer makes the setter's later reads subscribe the effect that wrote the property.
 - A rejected signal write (such as assigning to a getter-only property) no longer re-runs effects.
 - A nested plain object with its own `constructor` key is reactive instead of being returned as is.
+- `removed` cascades through elements Neux did not build (such as a supplied wrapper element), so the Neux elements inside release their bindings and receive `mounted` again on re-insertion.
 - `i18n()` keeps a script subtag when formatting, so `sr-Latn` text gets Latin rather than Cyrillic dates and `zh-Hant` text gets Traditional Chinese formatting.
 - Documentation: `README.md`, `SKILL.md`, `AGENTS.md`, and TypeDoc comments corrected to match the current behavior, with fixed examples.
 

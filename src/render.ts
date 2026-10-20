@@ -288,11 +288,18 @@ function flushMounts(): void {
   for (const node of armed) fireMount(node);
 }
 
-/** Dispatches `removed` on `node`, at most once per insertion. */
+/**
+ * Dispatches `removed` on `node`, at most once per insertion, and then, in tree
+ * order, on each of its child nodes (shadow-root children included) — the
+ * top-down mirror of {@link fireMount}. The cascade passes through nodes that
+ * Neux did not build, such as a supplied wrapper element, so the Neux elements
+ * inside them still release their bindings.
+ */
 function unmountNode(node: Node): void {
   if (!MOUNTED.has(node)) return;
   MOUNTED.delete(node);
   dispatchEvent(node, "removed");
+  for (const child of childNodesOf(node)) unmountNode(child);
 }
 
 /**
@@ -476,10 +483,10 @@ function createNode(
     }
   }
 
+  // The child cascade is handled by `unmountNode`, after this listener.
   el.addEventListener("removed", () => {
     alive = false;
     dispose();
-    for (const child of childElements(el)) unmountNode(child);
   });
 
   el.addEventListener("refresh", (e) => {

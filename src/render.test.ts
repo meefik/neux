@@ -1360,4 +1360,31 @@ suite("render", async () => {
     fire();
     equal((el as Host).data?.label, "c", "missing parent object is created");
   });
+
+  await test("lifecycle cascades through a supplied wrapper element", async () => {
+    const state = signal({ show: true, text: "a" });
+    const { count, on } = lifecycle();
+    const wrapper = domWindow.document.createElement("section");
+    const inner = render<HTMLElement>(
+      { textContent: () => state.text, on },
+      wrapper,
+    );
+    const host = render<HTMLElement>(
+      { children: () => (state.show ? [wrapper] : []) },
+      body,
+    );
+
+    state.show = false;
+    await tick();
+    equal(count.removed, 1, "inner element receives removed");
+    state.text = "b";
+    await tick();
+    equal(inner.textContent, "a", "inner bindings are released");
+
+    state.show = true;
+    await tick();
+    equal(count.mounted, 2, "inner element receives mounted again");
+    equal(inner.textContent, "b", "inner bindings are rebuilt");
+    host.remove();
+  });
 });
