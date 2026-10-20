@@ -44,15 +44,18 @@ function norm(tag: string): string {
 }
 
 /**
- * The `Intl` form of a tag: its leading 2-3 letter language, plus its region
- * when that is valid; `en` when there is no language. So `ru-12` and
- * `ru-RU.UTF-8` reduce to `ru`, and formatting never throws.
+ * The `Intl` form of a tag: its leading 2-3 letter language, plus its script
+ * and region when they are valid; `en` when there is no language. So
+ * `sr-Latn-RS` stays whole, `ru-12` and `ru-RU.UTF-8` reduce to `ru`, and
+ * formatting never throws.
  */
 function formatLang(tag: string): string {
-  const [lang, region] = norm(tag).split("-");
+  const [lang, ...rest] = norm(tag).split("-");
   const base = lang.match(/^[a-z]{2,3}/)?.[0];
   if (!base) return "en";
-  return /^[a-z]{2}$|^[0-9]{3}$/.test(region) ? `${base}-${region}` : base;
+  const script = /^[a-z]{4}$/.test(rest[0]) ? rest.shift() : undefined;
+  const region = /^[a-z]{2}$|^[0-9]{3}$/.test(rest[0]) ? rest[0] : undefined;
+  return [base, script, region].filter(Boolean).join("-");
 }
 
 /** Looks up a translation by dot-separated path or flat key from a locale map; a key naming a nested group is not a translation. */

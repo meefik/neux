@@ -136,6 +136,14 @@ suite("signal", async () => {
     equal(replaced, 999, "replaced object is auto-wrapped and reactive");
   });
 
+  await test("wraps a plain object with its own `constructor` key", async () => {
+    const s = signal({ item: { constructor: "x", n: 1 } });
+    const runs = track(() => s.item.n);
+    s.item.n = 2;
+    await tick();
+    equal(runs.count, 2, "a nested write re-runs the effect");
+  });
+
   await test("prunes stale dependencies on conditional reads", async () => {
     const s = signal({ flag: true, a: 0, b: 0 });
     const runs = track(() => (s.flag ? s.a : s.b));

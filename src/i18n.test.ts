@@ -177,6 +177,18 @@ suite("i18n", async () => {
       "a direct value uses a language that has a locale",
     );
     equal(tr(n, "fr"), n.toLocaleString("en"), "and the fallback otherwise");
+
+    const latin = i18n(
+      { "sr-Latn": { month: "%{d}" } },
+      { language: "sr-Latn-RS" },
+    );
+    const d = new Date(2026, 0, 5);
+    const opts = { month: "long" } as const;
+    equal(
+      latin("month", { d: [d, opts] }),
+      d.toLocaleString("sr-Latn-RS", opts),
+      "a script subtag is kept for formatting",
+    );
   });
 
   await test("matches a regional language to its base translations", () => {

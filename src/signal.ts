@@ -132,12 +132,12 @@ function wrap(
       track(obj, prop);
       const val = Reflect.get(obj, prop, recv);
       const isFn = typeof val === "function";
+      // Checked by prototype, so a plain object with its own `constructor` key is wrapped too.
+      const proto =
+        typeof val === "object" && val && Object.getPrototypeOf(val);
       // A getter computes its value on every read, so it is never cached or wrapped.
       if (
-        (isFn ||
-          (typeof val === "object" &&
-            val &&
-            (val.constructor === Object || val.constructor === Array))) &&
+        (isFn || proto === Object.prototype || proto === Array.prototype) &&
         !Object.getOwnPropertyDescriptor(obj, prop)?.get
       ) {
         const propCache = getOrCreate(cache, obj, () => new Map());
