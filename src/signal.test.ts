@@ -1,4 +1,4 @@
-import { suite, test } from "node:test";
+import { suite, test, mock } from "node:test";
 import { equal, deepEqual, throws } from "node:assert/strict";
 import { setTimeout as wait } from "node:timers/promises";
 import { setFlagsFromString } from "node:v8";
@@ -675,6 +675,33 @@ suite("signal", async () => {
     equal(runs, 1, "disposed effect did not re-subscribe");
   });
 
+  await test("runs an outer effect before the effects it created, so it can dispose them first", async () => {
+    const s = signal({
+      ids: [1, 2],
+      byId: { 1: "a", 2: "b" } as Record<number, string>,
+    });
+    const log: string[] = [];
+    const errors = await collectErrors(async () => {
+      let stops: Array<() => void> = [];
+      effect(() => {
+        stops.forEach((stop) => stop());
+        stops = s.ids.map((id) =>
+          effect(() => log.push(s.byId[id].toUpperCase())),
+        );
+      });
+      delete s.byId[2];
+      s.ids = [1];
+      await tick();
+    });
+
+    deepEqual(
+      errors,
+      [],
+      "a disposed child does not run against dropped state",
+    );
+    deepEqual(log, ["A", "B", "A"]);
+  });
+
   await test("treats a module namespace `this` as the global context", async () => {
     const s = ns.signal({ a: 1 });
     const runs = track(() => s.a);
@@ -726,5 +753,57 @@ suite("signal", async () => {
     await tick();
     equal(first.count, 3, "earlier effects keep tracking");
     equal(late.count, 2, "a later effect tracks the same key");
+  });
+
+  await test("a write that no effect reads schedules no trigger", async () => {
+    const s = signal({ a: 1, b: 1 });
+    const timers = mock.method(globalThis, "setTimeout");
+    try {
+      s.a = 2;
+      delete (s as Record<string, unknown>).b;
+      equal(timers.mock.callCount(), 0, "unwatched writes start no timer");
+      const runs = track(() => s.a);
+      s.a = 3;
+      s.a = 4;
+      equal(timers.mock.callCount(), 1, "watched writes share one timer");
+      await tick();
+      equal(runs.count, 2);
+    } finally {
+      timers.mock.restore();
+    }
+  });
+
+  await test("an object reads as one proxy and a proxy is stored as its object", async () => {
+    const item = { n: 1 };
+    const raw = { items: [item], other: item, selected: null as unknown };
+    const s = signal(raw);
+    equal(s.other, s.items[0], "a shared object reads as one proxy");
+    equal(signal(raw), s, "wrapping again returns the existing proxy");
+    equal(signal(s), s, "a signal is returned as is");
+
+    s.selected = s.items[0];
+    equal(s.selected, s.items[0], "an assigned proxy keeps its identity");
+    equal(raw.selected, item, "the data stores the plain object");
+
+    const runs = track(() => s.items[0]);
+    s.items[0] = s.items[0];
+    await tick();
+    equal(runs.count, 1, "assigning a proxy to its own object changes nothing");
+
+    const names = track(() => s.items[0].n);
+    s.selected.n = 2;
+    await tick();
+    equal(names.count, 2, "a write through either path triggers the other");
+
+    const acc = signal({
+      list: [{ done: false }],
+      set mark(v: { done: boolean }) {
+        v.done = true;
+      },
+    });
+    const done = track(() => acc.list[0].done);
+    acc.mark = acc.list[0];
+    await tick();
+    equal(done.count, 2, "a setter gets the proxy, so its writes are reactive");
   });
 });

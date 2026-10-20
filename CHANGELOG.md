@@ -7,13 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A write to a key that no effect reads no longer schedules a re-run, and internal state uses one `WeakMap` instead of nine module-level collections, making signal writes and list rendering about 10% faster.
+
 ### Fixed
 
+- Effects of one update now re-run in creation order, so an effect runs before the effects created during its run. A parent that disposes or replaces its children (such as a reactive `children` list) now does so before a child's binding re-runs against state that no longer fits it, which used to report a spurious error such as reading a property of `undefined`.
 - `i18n()` resolves a requested language to the closest locale — an exact key (case- and separator-insensitive, `ru_RU` ≡ `ru-RU`) or, when none, the longest key the language starts with at a subtag boundary (`de_DE` → `de`, while `run-BI` no longer matches `ru`) — tolerates odd separators such as `ru_RU.UTF-8` (using the leading language subtag), no longer validates tags against a full locale-shape regex or throws on an unparseable language or `fallback`, and reports a missing key once per locale.
 - An `effect()` created inside `untrack()` tracks its own reads instead of never re-running.
 - An `effect()` created inside a signal setter no longer makes the setter's later reads subscribe the effect that wrote the property.
 - A rejected signal write (such as assigning to a getter-only property) no longer re-runs effects.
 - A nested plain object with its own `constructor` key is reactive instead of being returned as is.
+- A signal object reads as one proxy wherever it is reached from: `state.selected = state.items[0]` keeps `state.selected === state.items[0]`, an assigned proxy is stored as its plain object instead of being wrapped again, and assigning a proxy back to its own object no longer re-runs effects.
 - `removed` cascades through elements Neux did not build (such as a supplied wrapper element), so the Neux elements inside release their bindings and receive `mounted` again on re-insertion.
 - `i18n()` keeps a script subtag when formatting, so `sr-Latn` text gets Latin rather than Cyrillic dates and `zh-Hant` text gets Traditional Chinese formatting.
 - Documentation: `README.md`, `SKILL.md`, `AGENTS.md`, and TypeDoc comments corrected to match the current behavior, with fixed examples.

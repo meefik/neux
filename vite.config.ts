@@ -16,6 +16,9 @@ export default defineConfig({
       fileName: (format) => FILE_NAMES[format],
     },
     outDir: "dist",
+    // ES2020 is what the `browserslist` targets support (checked by `npm run check`),
+    // so the minifier does not emit newer syntax such as `??=`.
+    target: "es2020",
     sourcemap: !IS_PROD,
     minify: IS_PROD,
     // Vite skips whitespace minification for ESM lib builds; force it.

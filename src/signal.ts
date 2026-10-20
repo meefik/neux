@@ -18,64 +18,82 @@ interface Runtime {
   syncing: boolean;
   /** Set inside `untrack()`. */
   inactive: boolean;
+  /** Keys written since the last trigger, per object; `null` when no trigger is scheduled. */
+  pending: Map<Meta, Set<PropertyKey>> | null;
 }
 
 /** Context object that carries runtime metadata keyed by `RUNTIME_KEY`. */
 type Context = Record<PropertyKey, Runtime>;
 
-/** A reactive effect function that carries a subscription set. */
-type Effect = (() => void) & { subs: Set<[object, PropertyKey]> };
+/** The effects subscribed to each key of an object. */
+type Deps = Map<PropertyKey, Set<Effect>>;
 
-const TARGET_MAP = new WeakMap<
-  object,
-  { ctx: Context; deps: Map<PropertyKey, Set<Effect>> }
->();
+/** A reactive effect function that carries its subscriptions. */
+type Effect = (() => void) & {
+  subs: Set<[Deps, PropertyKey]>;
+  /** Creation order; an effect is always created after the one whose run created it. */
+  id: number;
+};
+
+/** Reactive state of a wrapped object. */
+interface Meta {
+  /** The context whose effects track the object. */
+  ctx: Context;
+  deps: Deps;
+  /** The one proxy of the object. */
+  proxy: Record<PropertyKey, unknown>;
+  /** Methods bound to the proxy, per key, until the key is written. */
+  methods?: Map<PropertyKey, unknown>;
+}
+
+const META = new WeakMap<object, Meta>();
 const RUNTIME_KEY: unique symbol = Symbol();
+/** Key that a proxy answers with its object, so a proxy is stored and wrapped as its object. */
+const RAW_KEY: unique symbol = Symbol();
 /** Dependency key for the set of an object's own keys. */
 const ITERATE: unique symbol = Symbol();
 const GLOBAL: Context = {};
+let nextEffectId = 0;
 
-/** Registers the current active effect as a subscriber of `target[key]`. */
-function track(target: object, key: PropertyKey): void {
-  const entry = TARGET_MAP.get(target);
-  const runtime = entry?.ctx[RUNTIME_KEY];
-  if (!entry || !runtime?.active || runtime.syncing || runtime.inactive) return;
-  const subs = getOrCreate(entry.deps, key, () => new Set<Effect>());
+/** Registers the current active effect as a subscriber of `key` of the object. */
+function track(meta: Meta, key: PropertyKey): void {
+  const runtime = meta.ctx[RUNTIME_KEY];
+  if (!runtime?.active || runtime.syncing || runtime.inactive) return;
+  const subs = getOrCreate(meta.deps, key, () => new Set<Effect>());
   // Record the subscription once per run; a repeated read adds nothing.
   if (subs.has(runtime.active)) return;
   subs.add(runtime.active);
-  runtime.active.subs.add([target, key]);
+  runtime.active.subs.add([meta.deps, key]);
 }
 
-/** Keys written since the last run, per context, awaiting one batched trigger. */
-const PENDING = new WeakMap<Context, Map<object, Set<PropertyKey>>>();
-
-/** Queues `target[key]` for the context's next trigger, one timer per context. */
-function schedule(ctx: Context, target: object, key: PropertyKey): void {
-  let batch = PENDING.get(ctx);
-  if (!batch) {
-    PENDING.set(ctx, (batch = new Map()));
-    setTimeout(trigger, 0, ctx, batch);
+/** Queues `key` of the object for the context's next trigger, one timer per context. */
+function schedule(meta: Meta, key: PropertyKey): void {
+  const runtime = meta.ctx[RUNTIME_KEY];
+  // A key nothing subscribes to has no effect to re-run; one that subscribes
+  // later reads the written value.
+  if (!runtime || !meta.deps.has(key)) return;
+  if (!runtime.pending) {
+    runtime.pending = new Map();
+    setTimeout(trigger, 0, runtime);
   }
-  getOrCreate(batch, target, () => new Set<PropertyKey>()).add(key);
+  getOrCreate(runtime.pending, meta, () => new Set<PropertyKey>()).add(key);
 }
 
 /** Runs each effect subscribed to a written key once, however many keys it reads. */
-function trigger(ctx: Context, batch: Map<object, Set<PropertyKey>>): void {
+function trigger(runtime: Runtime): void {
+  const batch = runtime.pending!;
   // Writes made while the effects run start the next batch.
-  PENDING.delete(ctx);
-  const runtime = ctx[RUNTIME_KEY];
-  if (!runtime) return;
+  runtime.pending = null;
   const effects = new Set<Effect>();
-  for (const [target, keys] of batch) {
+  for (const [meta, keys] of batch) {
     for (const key of keys) {
-      for (const eff of TARGET_MAP.get(target)?.deps.get(key) ?? []) {
-        effects.add(eff);
-      }
+      for (const eff of meta.deps.get(key) ?? []) effects.add(eff);
     }
   }
   runtime.syncing = true;
-  for (const eff of effects) {
+  // Creation order runs an outer effect before the ones it created, so it can
+  // dispose them before they re-run against state they no longer fit.
+  for (const eff of [...effects].sort((a, b) => a.id - b.id)) {
     try {
       eff();
     } catch (e) {
@@ -99,41 +117,51 @@ function getContext(thisArg: Record<PropertyKey, any> | void): Context {
 function getRuntime(thisArg: Record<PropertyKey, any> | void): Runtime {
   const ctx = getContext(thisArg);
   if (!ctx[RUNTIME_KEY]) {
-    ctx[RUNTIME_KEY] = { active: null, syncing: false, inactive: false };
+    ctx[RUNTIME_KEY] = {
+      active: null,
+      syncing: false,
+      inactive: false,
+      pending: null,
+    };
   }
   return ctx[RUNTIME_KEY];
 }
 
 /** Unsubscribes an effect from all tracked properties, dropping keys left without subscribers. */
 function unsubscribe(eff: Effect): void {
-  for (const [target, key] of eff.subs) {
-    const deps = TARGET_MAP.get(target)?.deps;
-    const subs = deps?.get(key);
-    if (subs?.delete(eff) && !subs.size) deps!.delete(key);
+  for (const [deps, key] of eff.subs) {
+    // A key's set is only dropped once empty, so it still holds the effect.
+    const subs = deps.get(key)!;
+    subs.delete(eff);
+    if (!subs.size) deps.delete(key);
   }
   eff.subs.clear();
 }
 
 /**
- * Wraps `data` in a reactive Proxy. Nested plain objects and arrays are
- * wrapped, and methods bound to the proxy, on first read; both are cached
- * until the property is written.
+ * Wraps `data` in a reactive Proxy, or returns its existing proxy; a proxy is
+ * returned as is. Nested plain objects and arrays are wrapped on first read,
+ * and methods are bound to the proxy and cached until the property is written.
  */
 function wrap(
   data: Record<PropertyKey, unknown>,
-  cache: WeakMap<object, Map<PropertyKey, unknown>>,
   ctx: Record<PropertyKey, any>,
 ): Record<PropertyKey, unknown> {
-  if (!TARGET_MAP.has(data)) TARGET_MAP.set(data, { ctx, deps: new Map() });
+  if (data[RAW_KEY]) return data;
+  const known = META.get(data);
+  if (known) return known.proxy;
+  const meta = { ctx, deps: new Map() } as Meta;
+  META.set(data, meta);
 
-  function flush(obj: object, prop: PropertyKey): void {
-    cache.get(obj)?.delete(prop);
-    schedule(TARGET_MAP.get(obj)!.ctx, obj, prop);
+  function flush(prop: PropertyKey): void {
+    meta.methods?.delete(prop);
+    schedule(meta, prop);
   }
 
-  return new Proxy(data, {
+  meta.proxy = new Proxy(data, {
     get(obj, prop, recv) {
-      track(obj, prop);
+      if (prop === RAW_KEY) return obj;
+      track(meta, prop);
       const val = Reflect.get(obj, prop, recv);
       const isFn = typeof val === "function";
       // Checked by prototype, so a plain object with its own `constructor` key is wrapped too.
@@ -144,31 +172,33 @@ function wrap(
         (isFn || proto === Object.prototype || proto === Array.prototype) &&
         !Object.getOwnPropertyDescriptor(obj, prop)?.get
       ) {
-        const propCache = getOrCreate(cache, obj, () => new Map());
-        let wrapped = propCache.get(prop);
-        if (wrapped === undefined) {
-          wrapped = isFn
-            ? (val as (...args: unknown[]) => unknown).bind(recv)
-            : wrap(val as Record<PropertyKey, unknown>, cache, ctx);
-          propCache.set(prop, wrapped);
-        }
-        return wrapped;
+        if (!isFn) return wrap(val as Record<PropertyKey, unknown>, ctx);
+        return getOrCreate(
+          meta.methods ?? (meta.methods = new Map()),
+          prop,
+          () => (val as (...args: unknown[]) => unknown).bind(recv),
+        );
       }
       return val;
     },
 
     has(obj, prop) {
-      track(obj, prop);
+      track(meta, prop);
       return Reflect.has(obj, prop);
     },
 
     ownKeys(obj) {
-      track(obj, ITERATE);
+      track(meta, ITERATE);
       return Reflect.ownKeys(obj);
     },
 
-    set(obj, prop, val, recv) {
-      const runtime = TARGET_MAP.get(obj)?.ctx[RUNTIME_KEY];
+    set(obj, prop, value, recv) {
+      // A proxy is stored as its object, so the data stays plain and reads back
+      // as the same proxy; a setter still gets the proxy, so its writes are reactive.
+      const val = Object.getOwnPropertyDescriptor(obj, prop)?.set
+        ? value
+        : (value?.[RAW_KEY] ?? value);
+      const runtime = ctx[RUNTIME_KEY];
       const prev = runtime?.syncing;
       if (runtime) runtime.syncing = true;
       let had = false;
@@ -189,9 +219,9 @@ function wrap(
           !had ||
           (prop === "length" && Array.isArray(obj))
         ) {
-          flush(obj, prop);
+          flush(prop);
         }
-        if (!had) flush(obj, ITERATE);
+        if (!had) flush(ITERATE);
       }
       return ok;
     },
@@ -200,12 +230,13 @@ function wrap(
       const had = hasOwn(obj, prop);
       const ok = Reflect.deleteProperty(obj, prop);
       if (ok && had) {
-        flush(obj, prop);
-        flush(obj, ITERATE);
+        flush(prop);
+        flush(ITERATE);
       }
       return ok;
     },
   });
+  return meta.proxy;
 }
 
 /**
@@ -215,6 +246,10 @@ function wrap(
  * Nested plain objects and arrays are wrapped too; class instances, `Map`,
  * `Set`, `Date`, and objects with a null prototype are returned as is and are
  * not reactive.
+ * An object always reads as the same proxy, wherever it is reached from, so
+ * `state.selected = state.items[0]` keeps `state.selected === state.items[0]`;
+ * a proxy is stored as its plain object. Wrapping an object a second time, or
+ * passing a signal to `signal()`, returns the existing proxy and its context.
  * Assigning a smaller `length` to an array re-runs only effects that read
  * `length`, not those that read a dropped index (`list[0]`) or the keys; use
  * `splice()`, `pop()`, or replace the array instead.
@@ -262,7 +297,7 @@ function wrap(
 export function signal<
   T extends Record<PropertyKey, any> = Record<PropertyKey, any>,
 >(this: object | void, data: T = {} as T): T {
-  return wrap(data, new WeakMap(), getContext(this)) as T;
+  return wrap(data, getContext(this)) as T;
 }
 
 /**
@@ -408,6 +443,7 @@ export function effect(
     runtime.active = outer;
   };
   eff.subs = new Set();
+  eff.id = nextEffectId++;
   try {
     eff();
   } catch (e) {

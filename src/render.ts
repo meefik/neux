@@ -169,15 +169,50 @@ function dispatchEvent(
   target.dispatchEvent(new CustomEvent(event, { detail }));
 }
 
-/**
- * Disposers for reactive bindings, registered by `createNode` for each
- * element it creates, so that nodes discarded without any lifecycle event
- * can release their effects.
- */
-const DISPOSERS = new WeakMap<Node, () => void>();
+/** Neux state kept on a node, under the private {@link STATE} key. */
+interface NodeState {
+  /**
+   * Releases the reactive bindings of an element built by `createNode`, so a
+   * node discarded without any lifecycle event can release its effects.
+   */
+  dispose?: () => void;
+  /** The shadow root attached by `createNode`, including a closed one that `shadowRoot` hides. */
+  shadow?: ShadowRoot;
+  /**
+   * Set while the node is inserted into a parent and not yet removed. Keeps
+   * `mounted`/`removed` strictly paired: without it, rebuilding a re-mounted
+   * element re-fires `mounted` for a child the re-patch already inserted, and
+   * the re-patch diff re-fires `removed` for a child already detached with its
+   * parent.
+   */
+  mounted?: boolean;
+}
 
-/** Shadow roots attached by `createNode`, including closed ones that `shadowRoot` hides. */
-const SHADOWS = new WeakMap<Element, ShadowRoot>();
+/** Key of the {@link NodeState} on a node; it is collected with the node. */
+const STATE: unique symbol = Symbol();
+
+/** A node that may carry Neux state. */
+type StatefulNode = Node & { [STATE]?: NodeState };
+
+/** Returns the state of a node, creating it on first use. */
+function stateOf(node: Node): NodeState {
+  const stateful = node as StatefulNode;
+  return stateful[STATE] ?? (stateful[STATE] = {});
+}
+
+/**
+ * The synchronous build in progress: a {@link render} call, a `children`
+ * update, or a re-mount rebuild. A `mounted` request is only *armed*; the
+ * whole build flushes top-down once the outermost build finishes, so the event
+ * order matches the documented contract (parent before children) instead of
+ * the build order (children before parent).
+ */
+const BUILD = {
+  /** Depth of nested builds. */
+  depth: 0,
+  /** Nodes armed for `mounted`, flushed by {@link flushMounts}. */
+  armed: new Set<Node>(),
+};
 
 /**
  * Lists the child nodes of a node in tree order: those of its shadow root
@@ -185,65 +220,26 @@ const SHADOWS = new WeakMap<Element, ShadowRoot>();
  */
 function childNodesOf(node: Node): Node[] {
   const root =
-    node instanceof window.Element
-      ? (SHADOWS.get(node) ?? node.shadowRoot)
-      : null;
+    (node as StatefulNode)[STATE]?.shadow ?? (node as Element).shadowRoot;
   return [...(root?.childNodes ?? []), ...node.childNodes];
 }
 
-/** Lists the child elements of a node, in the order of {@link childNodesOf}. */
-function childElements(node: Node): Element[] {
-  return childNodesOf(node).filter(
-    (child): child is Element => child instanceof window.Element,
-  );
-}
-
 /**
- * Releases a node's own reactive bindings, and recursively the bindings
- * of all child elements, without firing any lifecycle events.
- * Used for a freshly created node that the diff did not keep: it was
- * never inserted into the DOM, so it never received `mounted` — and
- * must not fire `removed` either.
+ * Releases a node's own reactive bindings, and recursively those of its child
+ * nodes, without firing any lifecycle events. Used for a freshly created node
+ * that the diff did not keep: it was never inserted into the DOM, so it never
+ * received `mounted` — and must not fire `removed` either. Its descendants are
+ * disarmed, so none of them receives `mounted` either.
  */
 function destroyNode(root: Node): void {
-  ARMED.delete(root);
-  DISPOSERS.get(root)?.();
-  for (const child of childElements(root)) destroyNode(child);
+  BUILD.armed.delete(root);
+  (root as StatefulNode)[STATE]?.dispose?.();
+  for (const child of childNodesOf(root)) destroyNode(child);
 }
-
-/**
- * Nodes the caller supplied as a config (an existing `Node`) rather than ones
- * {@link createNode} built. Only built nodes are released when the diff drops
- * them in favor of an equal old child; a supplied node may be live elsewhere.
- */
-const SUPPLIED = new WeakSet<Node>();
-
-/**
- * Nodes with an active lifecycle: inserted into a parent and not yet removed.
- * Guards `mounted`/`removed` dispatch so that events stay strictly paired.
- * Without it, rebuilding a re-mounted element re-fires `mounted` for a child
- * the re-patch already inserted, and the re-patch diff re-fires `removed` for
- * a child that was already detached with its parent. Kept weak, so discarded
- * nodes are collected automatically.
- */
-const MOUNTED = new WeakSet<Node>();
-
-/**
- * Depth of the synchronous build in progress: a {@link render} call, a
- * `children` update, or a re-mount rebuild. A `mounted` request is only
- * *armed* (see {@link ARMED}); the whole build flushes top-down once the
- * outermost build finishes, so the event order matches the documented
- * contract (parent before children) instead of the build order (children
- * before parent).
- */
-let MOUNT_DEPTH = 0;
-
-/** Nodes armed for `mounted` during the current build, flushed by {@link flushMounts}. */
-const ARMED = new Set<Node>();
 
 /** Runs `fn` as a build: `mounted` requests armed inside it fire once the outermost build ends. */
 function build<T>(fn: () => T): T {
-  MOUNT_DEPTH++;
+  BUILD.depth++;
   try {
     return fn();
   } finally {
@@ -261,9 +257,10 @@ function build<T>(fn: () => T): T {
  * rebuilds are still reached, in order).
  */
 function fireMount(node: Node): void {
-  if (MOUNTED.has(node)) return;
-  ARMED.delete(node);
-  MOUNTED.add(node);
+  const state = stateOf(node);
+  if (state.mounted) return;
+  BUILD.armed.delete(node);
+  state.mounted = true;
   dispatchEvent(node, "mounted");
   for (const child of childNodesOf(node)) fireMount(child);
 }
@@ -276,15 +273,15 @@ function fireMount(node: Node): void {
  * {@link destroyNode}, preserving the `mounted`/`removed` pairing.
  */
 function flushMounts(): void {
-  MOUNT_DEPTH--;
-  if (MOUNT_DEPTH > 0 || ARMED.size === 0) return;
+  BUILD.depth--;
+  if (BUILD.depth > 0 || BUILD.armed.size === 0) return;
   // Document order puts an ancestor before its descendants, which `fireMount`
   // reaches through the ancestor's cascade; armed order is children first.
   const { DOCUMENT_POSITION_FOLLOWING } = window.Node;
-  const armed = [...ARMED].sort((a, b) =>
+  const armed = [...BUILD.armed].sort((a, b) =>
     a.compareDocumentPosition(b) & DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
   );
-  ARMED.clear();
+  BUILD.armed.clear();
   for (const node of armed) fireMount(node);
 }
 
@@ -296,8 +293,9 @@ function flushMounts(): void {
  * inside them still release their bindings.
  */
 function unmountNode(node: Node): void {
-  if (!MOUNTED.has(node)) return;
-  MOUNTED.delete(node);
+  const state = (node as StatefulNode)[STATE];
+  if (!state?.mounted) return;
+  state.mounted = false;
   dispatchEvent(node, "removed");
   for (const child of childNodesOf(node)) unmountNode(child);
 }
@@ -374,27 +372,29 @@ function createElement(use: unknown, ns?: string | null): Element {
 
 /**
  * Creates a DOM node from a configuration value; an array yields a flat list
- * of nodes, and a value that renders nothing yields `null`.
+ * of nodes, and a value that renders nothing yields `null`. Each element built
+ * with bindings is pushed to `created`, so the caller can release the ones it
+ * discards; a supplied `Node` is not, as it may be live elsewhere.
  */
 function createNode(
   context: object | void,
   config: unknown,
   ns: string | null = null,
+  created?: Node[],
 ): Node | Node[] | null {
   if (config == null || typeof config === "boolean") {
     return null;
   }
   const { document, Node } = window;
 
-  if (config instanceof Node) {
-    SUPPLIED.add(config);
-    return config;
-  }
+  if (config instanceof Node) return config;
   if (typeof config === "string" || typeof config === "number") {
     return document.createTextNode(String(config));
   }
   if (Array.isArray(config)) {
-    return config.flatMap((item) => createNode(context, item, ns) ?? []);
+    return config.flatMap(
+      (item) => createNode(context, item, ns, created) ?? [],
+    );
   }
 
   if (!isPlainObjectOrArray(config)) return null;
@@ -439,13 +439,14 @@ function createNode(
 
   // Register the disposer so `destroyNode` can release these bindings if
   // this node is discarded without ever being inserted.
-  DISPOSERS.set(el, dispose);
+  const state = stateOf(el);
+  state.dispose = dispose;
+  created?.push(el);
 
   // Attach shadow root.
   let shadowRoot: ShadowRoot | undefined;
   if (shadowRootMode) {
-    shadowRoot = el.attachShadow({ mode: shadowRootMode });
-    SHADOWS.set(el, shadowRoot);
+    shadowRoot = state.shadow = el.attachShadow({ mode: shadowRootMode });
     if (adoptedStyleSheets?.length)
       shadowRoot.adoptedStyleSheets = adoptedStyleSheets;
   }
@@ -466,11 +467,11 @@ function createNode(
     // The rebuild may create fresh children. Their `mounted` is only armed:
     // no flush happens here, because this runs inside `fireMount`, whose
     // cascade reaches them after this element's own handlers have run.
-    MOUNT_DEPTH++;
+    BUILD.depth++;
     try {
       patchNode(rest);
     } finally {
-      MOUNT_DEPTH--;
+      BUILD.depth--;
     }
   });
 
@@ -551,22 +552,26 @@ function createNode(
           // Fresh descendants arm their `mounted`; the build fires them top-down
           // at the outermost boundary instead of during creation (before their parent).
           build(() => {
-            const newNodes = createNode(context, [value], ns) as Node[];
+            const created: Node[] = [];
+            const newNodes = createNode(
+              context,
+              [value],
+              ns,
+              created,
+            ) as Node[];
             const [added, removed] = syncDOM(
               target,
               Array.from(target.childNodes),
               newNodes,
             );
             for (const node of removed) unmountNode(node);
-            for (const node of added) ARMED.add(node);
+            for (const node of added) BUILD.armed.add(node);
             // syncDOM may keep an old node and drop a fresh one (structural
             // match). A dropped node never entered the DOM, so it must not fire
             // `removed`; release its bindings silently. Supplied nodes may be
             // live elsewhere and are left alone.
-            for (const newNode of newNodes) {
-              if (newNode.parentNode !== target && !SUPPLIED.has(newNode)) {
-                destroyNode(newNode);
-              }
+            for (const node of created) {
+              if (node.parentNode !== target) destroyNode(node);
             }
           });
           // The nodes now in the DOM; the previous array is kept when they are unchanged.
@@ -865,7 +870,7 @@ export function render(
       // Arm the root(s); the build fires the whole tree top-down.
       for (const node of Array.isArray(el) ? el : [el]) {
         parent.appendChild(node);
-        ARMED.add(node);
+        BUILD.armed.add(node);
       }
     }
     return el;

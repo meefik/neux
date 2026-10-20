@@ -282,6 +282,42 @@ suite("render", async () => {
     }
   });
 
+  await test("a dropped child binding does not re-run against state it no longer fits", async () => {
+    const state = signal<{
+      ids: number[];
+      byId: Record<number, { name: string }>;
+    }>({
+      ids: [1, 2],
+      byId: { 1: { name: "a" }, 2: { name: "b" } },
+    });
+    const errors: unknown[] = [];
+    const g = globalThis as { reportError?: (e: unknown) => void };
+    const prev = g.reportError;
+    g.reportError = (e) => errors.push(e);
+    try {
+      const ul = render<HTMLElement>({
+        tagName: "ul",
+        children: () =>
+          state.ids.map((id) => ({
+            tagName: "li",
+            textContent: () => state.byId[id].name,
+          })),
+      });
+      delete state.byId[2];
+      state.ids = [1];
+      await tick();
+
+      deepEqual(
+        errors,
+        [],
+        "the dropped child did not read the deleted entity",
+      );
+      equal(ul.innerHTML, "<li>a</li>");
+    } finally {
+      g.reportError = prev;
+    }
+  });
+
   await test("a supplied node equal to an existing child is not released", async () => {
     const state = signal({ n: 0, useShared: false });
     // Distinguishable only through the reactive `n`, so at first it equals the child.
