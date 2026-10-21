@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-21
+
 ### Changed
 
 - **Breaking:** `refresh` re-runs the element's live reactive functions instead of re-patching config properties: static values are not re-applied, and `detail` must name a bound path (`"style"` for a reactive `style` map, `"style.color"` for a function inside a static one).
@@ -181,7 +183,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Legacy JavaScript source and test files.
 - Manually maintained `types/*.d.ts` declaration files.
 
-[unreleased]: https://github.com/meefik/neux/compare/v0.18.0...HEAD
+[unreleased]: https://github.com/meefik/neux/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/meefik/neux/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/meefik/neux/compare/v0.17.3...v0.18.0
 [0.17.3]: https://github.com/meefik/neux/compare/v0.17.2...v0.17.3
 [0.17.2]: https://github.com/meefik/neux/compare/v0.17.1...v0.17.2
