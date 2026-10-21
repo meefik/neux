@@ -323,6 +323,49 @@ suite("render", async () => {
     }
   });
 
+  await test("a children rebuild that throws releases the nodes it built", async () => {
+    const state = signal({ show: false, n: 0 });
+    const runs = { sibling: 0, failed: 0 };
+    const errors: unknown[] = [];
+    const g = globalThis as { reportError?: (e: unknown) => void };
+    const prev = g.reportError;
+    g.reportError = (e) => errors.push(e);
+    try {
+      const el = render<HTMLElement>({
+        children: () =>
+          state.show
+            ? [
+                {
+                  tagName: "b",
+                  textContent: () => (runs.sibling++, `${state.n}`),
+                },
+                {
+                  tagName: "i",
+                  title: () => (runs.failed++, `${state.n}`),
+                  textContent: () => {
+                    throw new Error("boom");
+                  },
+                },
+              ]
+            : [],
+      });
+      state.show = true;
+      await tick();
+      equal(errors.length, 1, "the error is reported");
+      equal(el.innerHTML, "", "the DOM is left as is");
+
+      state.n++;
+      await tick();
+      deepEqual(
+        runs,
+        { sibling: 1, failed: 1 },
+        "bindings built before the error do not re-run",
+      );
+    } finally {
+      g.reportError = prev;
+    }
+  });
+
   await test("a supplied node equal to an existing child is not released", async () => {
     const state = signal({ n: 0, useShared: false });
     // Distinguishable only through the reactive `n`, so at first it equals the child.

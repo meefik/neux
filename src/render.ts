@@ -539,25 +539,29 @@ function createNode(
           // at the outermost boundary instead of during creation (before their parent).
           build(() => {
             const created: Node[] = [];
-            const newNodes = createNode(
-              context,
-              [value],
-              ns,
-              created,
-            ) as Node[];
-            const [added, removed] = syncDOM(
-              target,
-              Array.from(target.childNodes),
-              newNodes,
-            );
-            for (const node of removed) unmountNode(node);
-            for (const node of added) armed.add(node);
-            // syncDOM may keep an old node and drop a fresh one (structural
-            // match). A dropped node never entered the DOM, so it must not fire
-            // `removed`; release its bindings silently. Supplied nodes may be
-            // live elsewhere and are left alone.
-            for (const node of created) {
-              if (node.parentNode !== target) destroyNode(node);
+            try {
+              const newNodes = createNode(
+                context,
+                [value],
+                ns,
+                created,
+              ) as Node[];
+              const [added, removed] = syncDOM(
+                target,
+                Array.from(target.childNodes),
+                newNodes,
+              );
+              for (const node of removed) unmountNode(node);
+              for (const node of added) armed.add(node);
+            } finally {
+              // syncDOM may keep an old node and drop a fresh one (structural
+              // match), and a binding that throws aborts the build. A node that
+              // never entered the DOM must not fire `removed`; release its
+              // bindings silently. Supplied nodes may be live elsewhere and are
+              // left alone.
+              for (const node of created) {
+                if (node.parentNode !== target) destroyNode(node);
+              }
             }
           });
           // The nodes now in the DOM; the previous array is kept when they are unchanged.
