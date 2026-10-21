@@ -41,9 +41,9 @@ const state = signal({
 });
 ```
 
-- A **signal** is a reactive `Proxy` wrapping an object or array. Property reads inside an active effect are tracked; writes schedule one batched re-run per tick of subscriber effects that stay in sync.
+- A **signal** is a reactive `Proxy` wrapping an object or array. Property reads inside an active effect are tracked; writes schedule a batched re-run per tick: each effect that read a changed property runs once, however many of its properties changed.
 - Nested plain objects and arrays (`{}`, `[]`) wrap automatically. Class instances, `Map`, `Set`, `Date`, and null-prototype objects (`Object.create(null)`) do not: they are returned as is and are not reactive, so replace them instead of mutating them.
-- A method stored in a signal reads as a bound copy: `state.fn === fn` is `false`, though `state.fn === state.fn` is `true`. A class is returned as is.
+- A method stored in a signal reads as a bound copy: `state.fn === fn` is `false`, though `state.fn === state.fn` is `true`. A class or built-in constructor (such as `Map`, or `state.list.constructor`) is returned as is.
 - Reading a read-only, non-configurable property that holds a nested object, array, or method throws a `TypeError`. This happens with `Object.freeze()` data, such as `signal(Object.freeze({ cfg: {} })).cfg`, but not with primitives or sealed objects. Keep frozen data outside the signal, or leave it unfrozen.
 - Defining a property with `Object.defineProperty()` (or `Reflect.defineProperty()`) on a signal does not re-run effects. Assign the property instead.
 - Methods bind automatically; access `this.foo` inside them to read reactive fields.
@@ -194,10 +194,10 @@ Known config keys and what they do:
 - `classList` (`ReactiveProperty<ClassName | ClassName[]>`) — An alias of `className`; both set the same class list, so use only one of them.
 - `style` (`ReactiveProperty<Record<string, unknown>>`) — Inline styles. Keys are camelCase (`backgroundColor`) or kebab-case (`background-color`); `null` or `undefined` clears the property.
 - `attributes` (`ReactiveProperty<Record<string, unknown>>`) — Arbitrary HTML attributes (`for`, `aria-label`, etc.). Use for non-property attributes. Values are converted to strings (`false` becomes `"false"`); `null` or `undefined` removes the attribute.
-- `dataset` (`ReactiveProperty<Record<string, unknown>>`) — Sets `element.dataset` entries (renders as `data-` attributes).
-- `children` (`ReactiveProperty<NodeConfig | NodeConfigList>`) — Child nodes or configs; nested arrays are flattened in order. `null`, `undefined`, and booleans are skipped; strings and numbers render as text nodes (`0` is a value).
+- `dataset` (`ReactiveProperty<Record<string, unknown>>`) — Sets `element.dataset` entries (renders as `data-` attributes). Keys are camelCase (`userId` → `data-user-id`); a kebab-case key (`user-id`) throws a `SyntaxError`.
+- `children` (`ReactiveProperty<NodeConfig | NodeConfigList>`) — Child nodes or configs; nested arrays are flattened in order. `null`, `undefined`, and booleans are skipped; strings and numbers render as text nodes (`0` is a value); a `DocumentFragment` contributes its child nodes.
 - `on` (`Record<string, handler>`) — Event listeners. Keys are event names (`click`, `change`, `keydown`, etc.). Handlers receive the event; `this` is bound to the element. Also accepts lifecycle keys: `mounted`, `removed`, `updated`.
-- `shadowRootMode` (`"open" | "closed"`) — Attaches a Shadow DOM root. Children render inside the shadow tree.
+- `shadowRootMode` (`"open" | "closed"`) — Attaches a Shadow DOM root. Children render inside the shadow tree. The `children` diff does not compare shadow content, so list items with a shadow root need a distinguishing attribute.
 - `adoptedStyleSheets` (`CSSStyleSheet[]`) — Style sheets adopted by the shadow root.
 - `namespaceURI` (`string`) — Explicit namespace URI; auto-detected for SVG and MathML when omitted.
 
@@ -270,6 +270,7 @@ render(
 - An existing `Node` you return (a cached component, for example) is compared like any other child. If an equal child is already there, that child is kept and your node is left untouched: it stays live, but it is not shown. Give it a distinguishing attribute, as for configs, so it counts as a different node. Detached raw DOM nodes (from `document.createElement`) match equal children too, so an unchanged re-run keeps the existing nodes.
 - The diff compares attributes and children, not element properties. Inside a `children` function, bind properties such as `checked` or `value` with a function (`checked: () => item.done`); a plain value (`checked: item.done`) is ignored when an equal existing child is kept.
 - Each child must carry a distinguishing attribute (`data-id`, `id`, etc.), static (`id: item.id`) or reactive (`id: () => item.id`). Neux diffs with `isEqualNode`, so siblings that render the same markup are interchangeable: an equal existing child is kept with its old bindings and handlers, even if it was built from a different item.
+- Shadow DOM content is not compared: children with a `shadowRootMode` that differ only inside their shadow roots count as equal, and the kept one shows its old shadow content. The distinguishing attribute is required for them; a reactive shadow `children` binding does not help, as the kept element's bindings still read the item it was built from.
 
 **Done when:** list renders correctly on push, splice, and individual item property changes. Every child carries a distinguishing attribute for identity matching.
 
@@ -300,7 +301,7 @@ effect(() => {
 });
 ```
 
-- The getter runs immediately; every signal property read inside is subscribed. Re-runs are batched: one per tick (`setTimeout`), however many subscribed properties changed. Conditional branches subscribe only the active path — stale dependencies are pruned when conditions flip.
+- The getter runs immediately; every signal property read inside is subscribed. Re-runs are batched: one per tick (`setTimeout`), however many subscribed properties changed. Its own writes in the getter do not re-run it (`list.push()` there does not loop); writes in the `setter` callback do. Conditional branches subscribe only the active path — stale dependencies are pruned when conditions flip.
 - Returns value → setter receives the synchronous result.
 - Returns `Promise` → setter receives the resolved value, unless the effect re-ran or was disposed before it resolved.
 - A getter that throws on a re-run unsubscribes the effect permanently — handle errors inside the getter if recovery is needed. An error from a re-run getter, from the setter, or from a rejected promise of the latest run is reported through `reportError` (or `console.error` where unavailable), so it reaches `window.onerror`; the first run's getter error is thrown to the caller and leaves the effect disposed.
@@ -344,7 +345,7 @@ render(
 
 `removed` fires only for elements removed by Neux's reactive tree. Wire direct-DOM removals (`el.remove()`, `parent.removeChild(el)`) to their own cleanup path instead.
 
-Lifecycle events follow only the elements Neux inserts (a `children` list or a `render()` target). A rendered element appended with DOM APIs, such as into a wrapper built with `document.createElement()`, never receives `mounted`; removing the wrapper later does not fire its `removed`, so its bindings stay live. Build the wrapper with Neux (`{ tagName: "section", children: [inner] }`) or render into it with `render(inner, wrapper)`.
+Lifecycle events follow only the elements Neux inserts (a `children` list or a `render()` target), together with everything already inside them. A rendered element appended with DOM APIs to a parent that is already mounted, such as into a wrapper built with `document.createElement()` after the wrapper was inserted, never receives `mounted`; removing the wrapper later does not fire its `removed`, so its bindings stay live. Build the wrapper with Neux (`{ tagName: "section", children: [inner] }`) or render into it with `render(inner, wrapper)`.
 
 **Done when:** effects are created on mount and disposed on removal, with every dispose path accounted for.
 
@@ -435,6 +436,8 @@ render({ use: "<span data-info='x'>content</span>", className: "highlight" });
 // <span data-info="x" class="highlight">content</span>
 ```
 
+Only the first element of the markup is used. Markup with no element (plain text such as `"hello world"`, or a comment) yields an empty `div`, ignoring `tagName`.
+
 **Existing Element instance** — reused directly instead of creating a new node:
 
 ```js
@@ -446,14 +449,14 @@ Render a given element only once: passing the same element to `render()` again a
 
 ### Refresh a binding manually
 
-Fire a `refresh` custom event to re-sync reactive bindings without state mutation:
+Fire a `refresh` custom event to re-run an element's reactive functions when they read plain (non-signal) data:
 
 ```js
-element.dispatchEvent(new CustomEvent("refresh", { detail: ["textContent"] })); // refresh one or more properties, e.g. "style.color"
-element.dispatchEvent(new CustomEvent("refresh")); // refresh all bindings
+element.dispatchEvent(new CustomEvent("refresh", { detail: ["textContent"] })); // re-run the given property paths, e.g. "style.color"
+element.dispatchEvent(new CustomEvent("refresh")); // re-run all functions
 ```
 
-Useful when external code mutated DOM or signal state outside the normal sync path.
+Static values are not re-applied, and child elements are not refreshed. Prefer signals: they re-run only what changed.
 
 ### Exported TypeScript types
 

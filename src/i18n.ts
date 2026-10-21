@@ -17,13 +17,13 @@ export interface Translator {
    * A translation function that resolves and interpolates a translation string.
    *
    * @param keyOrValue Translation key, or a value to format directly.
-   * @param dataOrLang Interpolation data for a key, or `Intl` formatting options for a number or date; or a language code used when `lang` is omitted.
+   * @param dataOrLang Interpolation data for a key, or `Intl` formatting options for a number or date; or a language code used when `lang` is omitted. `null` means no data.
    * @param lang Optional language code; takes precedence over `dataOrLang` and the default language.
    * @returns The resolved and interpolated translation string.
    */
   (
     keyOrValue: string | number | Date,
-    dataOrLang?: Record<string, unknown> | string,
+    dataOrLang?: Record<string, unknown> | string | null,
     lang?: string,
   ): string;
 }
@@ -172,7 +172,8 @@ export function i18n(
   return (keyOrValue, dataOrLang, lang) => {
     const curLang =
       lang ?? (typeof dataOrLang === "string" ? dataOrLang : language);
-    const data = typeof dataOrLang === "object" ? dataOrLang : undefined;
+    // `null` is an object too, but `Intl` rejects it as options.
+    const data = (typeof dataOrLang === "object" && dataOrLang) || undefined;
     const matched = find(curLang);
     // Translations come from the matched locale; formatting keeps the full code.
     const effectiveLang = matched ? formatLang(curLang) : fallbackLang;

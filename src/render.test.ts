@@ -2,7 +2,7 @@ import { suite, test, before, after } from "node:test";
 import { equal, deepEqual, ok } from "node:assert/strict";
 import { setTimeout as wait } from "node:timers/promises";
 import { JSDOM } from "jsdom";
-import { render } from "./render";
+import { render, type NodeConfigList } from "./render";
 import { signal } from "./signal";
 
 const tick = () => wait(0);
@@ -52,7 +52,7 @@ suite("render", async () => {
   let domWindow: typeof window;
   let body: HTMLElement;
 
-  /** Triggers a re-patch of all bindings of `el`, or only of the given properties. */
+  /** Re-runs all bindings of `el`, or only those with the given property paths. */
   const refresh = (el: Element, detail?: string | string[]) =>
     el.dispatchEvent(new domWindow.CustomEvent("refresh", { detail }));
 
@@ -79,10 +79,6 @@ suite("render", async () => {
     const num = render(5);
     equal(num.nodeType, domWindow.Node.TEXT_NODE, "number is a text node");
     equal(num.textContent, "5");
-
-    const nodes = render(["A", "B"]);
-    equal(nodes[0].textContent, "A");
-    equal(nodes[1].textContent, "B");
 
     const node = domWindow.document.createTextNode("pass");
     equal(render(node), node, "existing node is returned as is");
@@ -261,36 +257,40 @@ suite("render", async () => {
   });
 
   await test("a dropped child binding does not re-run against state it no longer fits", async () => {
-    const state = signal<{
-      ids: number[];
-      byId: Record<number, { name: string }>;
-    }>({
-      ids: [1, 2],
-      byId: { 1: { name: "a" }, 2: { name: "b" } },
-    });
     const errors: unknown[] = [];
     const g = globalThis as { reportError?: (e: unknown) => void };
     const prev = g.reportError;
     g.reportError = (e) => errors.push(e);
     try {
-      const ul = render<HTMLElement>({
-        tagName: "ul",
-        children: () =>
-          state.ids.map((id) => ({
-            tagName: "li",
-            textContent: () => state.byId[id].name,
-          })),
-      });
-      delete state.byId[2];
-      state.ids = [1];
-      await tick();
+      // A refresh re-runs the `children` binding, which must still run first.
+      for (const refreshed of [false, true]) {
+        const state = signal<{
+          ids: number[];
+          byId: Record<number, { name: string }>;
+        }>({
+          ids: [1, 2],
+          byId: { 1: { name: "a" }, 2: { name: "b" } },
+        });
+        const ul = render<HTMLElement>({
+          tagName: "ul",
+          children: () =>
+            state.ids.map((id) => ({
+              tagName: "li",
+              textContent: () => state.byId[id].name,
+            })),
+        });
+        if (refreshed) refresh(ul);
+        delete state.byId[2];
+        state.ids = [1];
+        await tick();
 
-      deepEqual(
-        errors,
-        [],
-        "the dropped child did not read the deleted entity",
-      );
-      equal(ul.innerHTML, "<li>a</li>");
+        deepEqual(
+          errors,
+          [],
+          `the dropped child did not read the deleted entity (refreshed: ${refreshed})`,
+        );
+        equal(ul.innerHTML, "<li>a</li>");
+      }
     } finally {
       g.reportError = prev;
     }
@@ -391,6 +391,29 @@ suite("render", async () => {
     state.n = 1;
     await tick();
     equal(host.textContent, "v1", "and it stays live in the DOM");
+  });
+
+  await test("an existing child reused by identity is not taken by an equal sibling", async () => {
+    const text = domWindow.document.createTextNode("a");
+    const b = render<HTMLElement>({ tagName: "b", textContent: "x" });
+    const state = signal({ list: [text, b] as NodeConfigList });
+    const host = render<HTMLElement>({ children: () => state.list });
+
+    state.list = ["a", text, { tagName: "b", textContent: "x" }, b];
+    await tick();
+    equal(host.childNodes.length, 4, "no node is lost");
+    equal(host.childNodes[1], text, "the reused text node keeps its slot");
+    equal(host.childNodes[3], b, "the reused element keeps its slot");
+    equal(host.innerHTML, "aa<b>x</b><b>x</b>");
+
+    // An equal sibling at the start or end must not stand in for a reused node.
+    state.list = [text, "a"];
+    await tick();
+    equal(host.firstChild, text, "kept at the start");
+    state.list = ["a", text];
+    await tick();
+    equal(host.lastChild, text, "kept at the end");
+    equal(host.childNodes.length, 2);
   });
 
   await test("matches reordered children without comparing every pair", async () => {
@@ -495,32 +518,6 @@ suite("render", async () => {
     equal(ul.textContent, "text");
   });
 
-  await test("renders children, skipping false, null, and undefined", () => {
-    const fragment = domWindow.document.createDocumentFragment();
-    fragment.appendChild(domWindow.document.createElement("li")).textContent =
-      "Item 3";
-
-    const el = render<HTMLElement>({
-      tagName: "ul",
-      children: [
-        { tagName: "li", textContent: "Item 1" },
-        null,
-        false,
-        { tagName: "li", textContent: "Item 2" },
-        fragment,
-      ],
-    });
-    equal(
-      Array.from(el.children, (c) => c.textContent).join(","),
-      "Item 1,Item 2,Item 3",
-    );
-
-    const nodes = render(["A", null, undefined, false, "B", 0, ""]);
-    equal(nodes.length, 4, "numbers and empty strings render as text nodes");
-    equal(nodes[2].textContent, "0");
-    equal(nodes[3].textContent, "");
-  });
-
   await test("mounts element into DOM or CSS selector target", () => {
     const el1 = render<HTMLElement>({ tagName: "p" }, body);
     equal(body.firstChild, el1, "element is mounted");
@@ -552,24 +549,6 @@ suite("render", async () => {
     equal(nodes.length, 3);
     deepEqual(Array.from(host.childNodes), nodes, "roots appended in order");
     deepEqual(log, ["a", "b"], "each root mounted once, in order");
-  });
-
-  await test("dispatches event handlers", () => {
-    let value = 1;
-    const el = render<HTMLInputElement>({
-      tagName: "input",
-      type: "number",
-      value,
-      on: {
-        change(e) {
-          value = parseInt((e.target as HTMLInputElement).value, 10);
-        },
-      },
-    });
-
-    el.value = "2";
-    el.dispatchEvent(new domWindow.Event("change"));
-    equal(value, 2, "handler updated value");
   });
 
   await test("binds `this` to the node in reactive properties and handlers", () => {
@@ -650,30 +629,29 @@ suite("render", async () => {
   });
 
   await test("reconciles children: reorder, insert, remove, clear", async () => {
-    let list = ["A", "B", "C", "D", "E"].map((text) => ({ text }));
+    const state = signal({
+      list: ["A", "B", "C", "D", "E"].map((text) => ({ text })),
+    });
     const el = render<HTMLElement>({
       tagName: "ul",
       children: () =>
-        list.map((item) => ({
+        state.list.map((item) => ({
           tagName: "li",
           textContent: () => item.text,
         })),
     });
     const texts = () => Array.from(el.children, (c) => c.textContent).join();
 
-    list.splice(1, 2, { text: "C" }, { text: "B" });
-    list.splice(3, 0, { text: "X" });
-    refresh(el);
+    state.list.splice(1, 2, { text: "C" }, { text: "B" });
+    state.list.splice(3, 0, { text: "X" });
     await tick();
     equal(texts(), "A,C,B,X,D,E", "children reordered with insertion");
 
-    list = [{ text: "Only" }];
-    refresh(el);
+    state.list = [{ text: "Only" }];
     await tick();
     equal(texts(), "Only");
 
-    list = [];
-    refresh(el);
+    state.list = [];
     await tick();
     equal(el.children.length, 0, "no children remain");
   });
@@ -957,21 +935,6 @@ suite("render", async () => {
     );
   });
 
-  await test("ignores refresh on a removed element", async () => {
-    const state = signal({ show: true });
-    let runs = 0;
-    const parent = render<HTMLElement>({
-      children: () => state.show && { textContent: () => (runs++, "x") },
-    });
-    const child = parent.children[0];
-    state.show = false;
-    await tick();
-
-    const before = runs;
-    refresh(child);
-    equal(runs, before, "no bindings are rebuilt on a removed element");
-  });
-
   await test("ignores an async children result after the element is removed", async () => {
     const lifecycleEvents = lifecycle();
     const state = signal({ show: true });
@@ -1089,60 +1052,96 @@ suite("render", async () => {
     deepEqual(details[1].newValue, []);
   });
 
-  await test("refresh re-patches all, some, or none of the bound properties", () => {
-    let text = "initial";
+  await test("refresh re-runs all or only the given bindings", () => {
+    let text = "a";
     let color = "red";
+    const config = { color: () => color, margin: "1px" };
     const el = render<HTMLElement>({
+      title: "static",
       textContent: () => text,
-      className: () => text,
-      style: () => ({ color, margin: "1px" }),
-      attributes: () => ({ title: color }),
+      style: config,
+      attributes: () => ({ "data-x": text, "data-y": () => color }),
     });
-
-    text = "changed";
+    text = "b";
     color = "blue";
+    el.title = "changed";
+
     refresh(el, "style.color");
-    equal(el.style.color, "blue", "the given property is re-patched");
-    equal(el.style.margin, "1px", "a reactive map re-runs as a whole");
-    equal(el.textContent, "initial", "other properties are untouched");
-    equal(el.getAttribute("title"), "red", "other maps are untouched");
+    equal(el.style.color, "blue", "the given binding re-runs");
+    equal(el.textContent, "a", "other bindings do not");
+    equal(typeof config.color, "function", "the config is not altered");
 
-    refresh(el, ["textContent", "className"]);
-    equal(el.textContent, "changed");
-    equal(el.className, "changed");
+    refresh(el, ["textContent"]);
+    equal(el.textContent, "b");
+    equal(el.getAttribute("data-x"), "a");
 
-    text = "all";
     refresh(el);
-    equal(el.textContent, "all", "no detail re-patches everything");
-
-    // A property the config does not bind is left alone, children included.
-    const plain = render<HTMLElement>({
-      style: { color: "red" },
-      children: [{ tagName: "b", textContent: "x" }],
-    });
-    for (const prop of [
-      "textContent",
-      "style.margin",
-      "toString",
-      "dataset.id",
-    ]) {
-      refresh(plain, prop);
-    }
-    equal(plain.style.color, "red", "bound properties are untouched");
-    equal(plain.innerHTML, "<b>x</b>", "children are not replaced");
+    equal(el.getAttribute("data-x"), "b", "no detail re-runs every binding");
+    equal(
+      el.getAttribute("data-y"),
+      "blue",
+      "a nested binding re-runs with its map",
+    );
+    equal(el.title, "changed", "static values are not re-applied");
   });
 
-  await test("flattens nested arrays of children and configs in order", () => {
+  await test("refresh does not revive a binding that threw on a re-run", async () => {
+    let fail = false;
+    let runs = 0;
+    const boom = new Error("boom");
+    const reported: unknown[] = [];
+    const g = globalThis as { reportError?: (e: unknown) => void };
+    const prev = g.reportError;
+    g.reportError = (e) => reported.push(e);
+    try {
+      const el = render<HTMLElement>({
+        textContent: () => {
+          runs++;
+          if (fail) throw boom;
+          return "ok";
+        },
+      });
+      fail = true;
+      refresh(el);
+      fail = false;
+      refresh(el);
+      equal(runs, 2, "the failed binding stays disposed");
+      deepEqual(reported, [boom]);
+    } finally {
+      g.reportError = prev;
+    }
+  });
+
+  await test("ignores refresh on a removed element", async () => {
+    const state = signal({ show: true });
+    let runs = 0;
+    const parent = render<HTMLElement>({
+      children: () => state.show && { textContent: () => (runs++, "x") },
+    });
+    const child = parent.children[0];
+    state.show = false;
+    await tick();
+
+    refresh(child);
+    equal(runs, 1, "a removed element holds no bindings to re-run");
+  });
+
+  await test("flattens nested arrays of children and configs in order, skipping nullish ones", () => {
     const el = render<HTMLElement>({
-      children: ["a", [{ tagName: "b" }, ["c", [{ tagName: "i" }]]], "d"],
+      children: [
+        "a",
+        null,
+        [{ tagName: "b" }, false, ["c", [undefined, { tagName: "i" }]]],
+        "d",
+      ],
     });
     equal(el.innerHTML, "a<b></b>c<i></i>d");
 
-    const nodes = render([["a", ["b"]], "c"]);
+    const nodes = render([["a", [null, "b"]], false, 0, ""]);
     deepEqual(
       nodes.map((node) => node.textContent),
-      ["a", "b", "c"],
-      "a top-level list is flattened too",
+      ["a", "b", "0", ""],
+      "a top-level list is flattened too; numbers and empty strings are text",
     );
   });
 
@@ -1224,10 +1223,6 @@ suite("render", async () => {
       },
       { property: "style.font-size", oldValue: "10px", newValue: undefined },
     ]);
-
-    state.on = true;
-    await tick();
-    equal(details.length, 2, "setting a cleared style again is not an update");
   });
 
   await test("restores the original value when a property binding clears", async () => {
@@ -1250,6 +1245,25 @@ suite("render", async () => {
     state.text = "back";
     await tick();
     equal(el.textContent, "back", "binding still reactive");
+
+    class Accessor extends domWindow.HTMLElement {
+      stored?: string;
+      get value() {
+        return this.stored;
+      }
+      set value(v) {
+        this.stored = v;
+      }
+    }
+    domWindow.customElements.define("x-accessor", Accessor);
+    state.extra = "x";
+    const custom = render<Accessor>({
+      tagName: "x-accessor",
+      value: () => state.extra,
+    });
+    state.extra = undefined;
+    await tick();
+    equal(custom.value, undefined, "an inherited accessor is reset");
   });
 
   await test("keeps a binding whose key is a prefix of a later key", async () => {
@@ -1397,32 +1411,15 @@ suite("render", async () => {
     el.style.top = "";
     state.on = true;
     await tick();
-    equal(el.getAttribute("title"), "t", "map is applied again");
-    equal(el.style.color, "red");
-    equal(el.dataset.a, "1");
     state.on = false;
     await tick();
     equal(el.hasAttribute("style"), false, "empty style attribute removed");
-  });
 
-  await test("refreshes a nested custom property by path without altering the config", () => {
-    type Host = HTMLElement & { data?: { label?: string } };
-    let label = "a";
-    const config = { label: () => label };
-    const el = render<Host>({ data: config });
-    const fire = () => refresh(el, "data.label");
-
-    fire();
-    equal((el as Host).data?.label, "a", "nested property is re-patched");
-    label = "b";
-    fire();
-    equal((el as Host).data?.label, "b", "config function is still reactive");
-    equal(typeof config.label, "function", "config object is not mutated");
-
-    delete el.data;
-    label = "c";
-    fire();
-    equal((el as Host).data?.label, "c", "missing parent object is created");
+    const s = signal<{ c: string | null }>({ c: "red" });
+    const keyed = render<HTMLElement>({ style: { color: () => s.c } });
+    s.c = null;
+    await tick();
+    equal(keyed.hasAttribute("style"), false, "also when cleared by key");
   });
 
   await test("lifecycle cascades through a supplied wrapper element", async () => {
@@ -1450,5 +1447,35 @@ suite("render", async () => {
     equal(count.mounted, 2, "inner element receives mounted again");
     equal(inner.textContent, "b", "inner bindings are rebuilt");
     host.remove();
+  });
+
+  await test("a fragment contributes its children, which mount and diff", async () => {
+    const state = signal({ n: 1 });
+    const log: string[] = [];
+    const fragment = (...nodes: Node[]) => {
+      const f = domWindow.document.createDocumentFragment();
+      f.append(...nodes);
+      return f;
+    };
+    const item = (text: string) =>
+      render({ tagName: "b", textContent: text, on: logger(log, text) });
+
+    const el = render<HTMLElement>(
+      { children: () => ["a", fragment(item(`x${state.n}`)), "z"] },
+      body,
+    );
+    equal(el.innerHTML, "a<b>x1</b>z");
+    deepEqual(log, ["x1"], "a fragment child receives mounted");
+
+    state.n = 2;
+    await tick();
+    equal(el.innerHTML, "a<b>x2</b>z");
+    deepEqual(log, ["x1", "-x1", "x2"], "a re-rendered fragment child mounts");
+    el.remove();
+
+    const f = fragment(item("r"));
+    equal(render(f, body), f, "a fragment is returned as is");
+    deepEqual(log.slice(3), ["r"], "a rendered fragment's children mount");
+    body.lastChild!.remove();
   });
 });

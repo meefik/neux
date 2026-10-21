@@ -1,3 +1,14 @@
+// Internal utilities shared by the signal, render, and i18n modules.
+
+/**
+ * Key of the function that re-runs an effect, set on the disposer that
+ * `effect()` returns. Re-running keeps the effect's creation order, which a
+ * replacement effect would lose.
+ *
+ * @internal
+ */
+export const RUN: unique symbol = Symbol();
+
 /**
  * Reports an error without throwing, so the caller keeps running: through
  * `reportError` where available (so it reaches `window.onerror`), otherwise to

@@ -9,7 +9,7 @@
  * @module render
  */
 
-import { getOrCreate, hasOwn } from "./helpers.js";
+import { getOrCreate, hasOwn, RUN } from "./helpers.js";
 import { effect } from "./signal.js";
 
 /** XML namespace URIs for auto-detection and explicit assignment. */
@@ -86,7 +86,7 @@ export type ElementConfig = {
   attributes?: ReactiveProperty<
     Record<string, ReactiveProperty<unknown>> & ThisType<Node>
   >;
-  /** Map of `data-*` attributes to set on the element. */
+  /** Map of `data-*` attributes to set on the element. Keys are camelCase, as in `element.dataset` (`userId` sets `data-user-id`); a kebab-case key such as `user-id` throws a `SyntaxError`. `null` or `undefined` removes the entry. */
   dataset?: ReactiveProperty<
     Record<string, ReactiveProperty<unknown>> & ThisType<Node>
   >;
@@ -94,9 +94,9 @@ export type ElementConfig = {
   style?: ReactiveProperty<
     Record<string, ReactiveProperty<unknown>> & ThisType<Node>
   >;
-  /** Child nodes or config objects rendered inside the element. `null`, `undefined`, and booleans are skipped; strings and numbers render as text nodes (`0` is a value). An existing `Node` is inserted as is, unless an equal child is already there: that child is kept instead, and the supplied node is left untouched. */
+  /** Child nodes or config objects rendered inside the element. `null`, `undefined`, and booleans are skipped; strings and numbers render as text nodes (`0` is a value). An existing `Node` is inserted as is, unless an equal child is already there: that child is kept instead, and the supplied node is left untouched. A `DocumentFragment` contributes its child nodes. */
   children?: ReactiveProperty<NodeConfig | NodeConfigList>;
-  /** Shadow DOM mode for attaching a shadow root to the element. */
+  /** Shadow DOM mode for attaching a shadow root to the element. A `children` diff compares only the light DOM, so elements that differ only in shadow content are interchangeable; give them a distinguishing attribute. */
   shadowRootMode?: "open" | "closed";
   /** Style sheets adopted by the shadow root. */
   adoptedStyleSheets?: CSSStyleSheet[];
@@ -108,7 +108,9 @@ export type ElementConfig = {
     Record<string, (this: Node, event: any) => void>;
   /** A tag string, optionally with id and class selectors
    * (e.g., `"div#id1.cls1.cls2"`), HTML markup, or an existing element;
-   * takes precedence over `tagName`. Render a given element only once:
+   * takes precedence over `tagName`. Markup yields its first element; markup
+   * with no element (such as plain text or a comment) yields an empty `div`,
+   * ignoring `tagName`. Render a given element only once:
    * rendering it again attaches its event listeners and bindings a second time. */
   use?: string | Element;
 } & Record<string, ReactiveProperty<unknown>> &
@@ -122,7 +124,7 @@ export type ElementConfig = {
 export interface ElementLifecycle {
   /** Fired top-down (this element before its children), the same order as `removed`, when the element is appended to a parent — on both the initial mount and a re-mount. */
   mounted: (this: Node, event: CustomEvent) => void;
-  /** Fired top-down before cleanup when a `children` update removes the element from a parent; DOM removals such as `el.remove()` do not fire it, nor does removing an element that was inserted with DOM APIs (such as into a wrapper built with `document.createElement()`), which never received `mounted`. Always paired with `mounted`: nodes discarded by a reactive re-render are never inserted, so they are disposed internally without firing it. */
+  /** Fired top-down before cleanup when a `children` update removes the element from a parent; DOM removals such as `el.remove()` do not fire it, nor does removing an element that was inserted with DOM APIs into an already mounted parent (such as into a wrapper built with `document.createElement()` after the wrapper was inserted), which never received `mounted`. Always paired with `mounted`: nodes discarded by a reactive re-render are never inserted, so they are disposed internally without firing it. */
   removed: (this: Node, event: CustomEvent) => void;
   /** Fired on the bound element after its property value changes; not fired when a re-run resolves to the same value, for the first applied value, or for a change from a cleared (`null` or `undefined`) binding. For `className`, the values are the applied class names; for `children`, the child nodes in the DOM. */
   updated: (
@@ -165,10 +167,13 @@ function dispatchEvent(
 /** Neux state kept on a node, under the private {@link STATE} key. */
 interface NodeState {
   /**
-   * Releases the reactive bindings of an element built by `createNode`, so a
-   * node discarded without any lifecycle event can release its effects.
+   * Releases the reactive bindings of an element built by `createNode`, on
+   * removal or when the node is discarded without being inserted; a later
+   * mount rebuilds them.
    */
   dispose?: () => void;
+  /** Rebuilds the bindings of a re-mounted element; runs before its `mounted` event. */
+  remount?: () => void;
   /** The shadow root attached by `createNode`, including a closed one that `shadowRoot` hides. */
   shadow?: ShadowRoot;
   /**
@@ -194,8 +199,8 @@ function stateOf(node: Node): NodeState {
 }
 
 /**
- * The synchronous build in progress: a {@link render} call, a `children`
- * update, or a re-mount rebuild. A `mounted` request is only *armed*; the
+ * Nesting depth of the synchronous builds in progress: {@link render} calls,
+ * `children` updates, and re-mount rebuilds. A `mounted` request is only *armed*; the
  * whole build flushes top-down once the outermost build finishes, so the event
  * order matches the documented contract (parent before children) instead of
  * the build order (children before parent).
@@ -251,6 +256,7 @@ function fireMount(node: Node): void {
   if (state.mounted) return;
   armed.delete(node);
   state.mounted = true;
+  state.remount?.();
   dispatchEvent(node, "mounted");
   for (const child of childNodesOf(node)) fireMount(child);
 }
@@ -264,12 +270,20 @@ function fireMount(node: Node): void {
  */
 function flushMounts(): void {
   if (--depth) return;
-  // Document order puts an ancestor before its descendants, which `fireMount`
-  // reaches through the ancestor's cascade; armed order is children first.
-  // 4 is `Node.DOCUMENT_POSITION_FOLLOWING`.
-  const nodes = [...armed].sort((a, b) =>
-    a.compareDocumentPosition(b) & 4 ? -1 : 1,
-  );
+  // Armed order is children first, as a node is built before its parent. A
+  // node below another armed, unmounted node is reached by that ancestor's
+  // cascade, so only the roots fire, in build order (document order).
+  const nodes = [...armed].filter((node) => {
+    let p: Node | null = node;
+    // Only a shadow root leads to its host; `<a>` and `<area>` have a string `host`.
+    while (
+      (p = p.parentNode ?? (p instanceof window.ShadowRoot ? p.host : null))
+    ) {
+      if ((p as StatefulNode)[STATE]?.mounted) break;
+      if (armed.has(p)) return false;
+    }
+    return true;
+  });
   armed.clear();
   for (const node of nodes) fireMount(node);
 }
@@ -286,6 +300,7 @@ function unmountNode(node: Node): void {
   if (!state?.mounted) return;
   state.mounted = false;
   dispatchEvent(node, "removed");
+  state.dispose?.();
   for (const child of childNodesOf(node)) unmountNode(child);
 }
 
@@ -307,6 +322,18 @@ function updateClassList(el: Element, classList: ClassName[]): string[] {
 }
 
 /**
+ * Returns `prev` when it holds the same items as `next`, so an unchanged list
+ * (the child nodes, or the class names) fires no `updated`.
+ */
+function keepSame(prev: unknown, next: unknown[]): unknown {
+  return Array.isArray(prev) &&
+    prev.length === next.length &&
+    prev.every((item, i) => item === next[i])
+    ? prev
+    : next;
+}
+
+/**
  * Creates an element from a tag string with optional id and class selectors,
  * parses one from HTML markup, or returns a given element as is. Registered
  * custom elements are constructed directly.
@@ -322,14 +349,13 @@ function createElement(use: unknown, ns?: string | null): Element {
     // Surrounding whitespace is not part of a tag or markup.
     const source = use.trim();
     if (HTML_RE.test(source)) {
-      // Parse HTML markup string. A template accepts any element, such as `<tr>`.
+      // A template accepts any element, such as `<tr>`.
       const template = document.createElement("template");
       template.innerHTML = source;
       const content = document.importNode(template.content, true);
       el = content.firstElementChild ?? undefined;
       el?.remove();
     } else {
-      // Parse tag string with optional id and class selectors.
       for (const item of source.match(PARSE_TAG_RE) ?? []) {
         if (item[0] === ".") classList.push(item.slice(1));
         else if (item[0] === "#") id = item.slice(1);
@@ -337,7 +363,6 @@ function createElement(use: unknown, ns?: string | null): Element {
       }
     }
   } else if (use instanceof Element) {
-    // Return existing element.
     el = use;
   }
 
@@ -354,7 +379,6 @@ function createElement(use: unknown, ns?: string | null): Element {
     }
   }
 
-  // Apply id and class names.
   if (id) el.id = id;
   if (classList.length) updateClassList(el, classList);
 
@@ -383,8 +407,11 @@ function createNode(
     return document.createTextNode(String(config));
   }
   if (Array.isArray(config)) {
-    return config.flatMap(
-      (item) => createNode(context, item, ns, created) ?? [],
+    // A fragment empties into its parent, so its children are diffed and mounted.
+    return config.flatMap((item) =>
+      item instanceof window.DocumentFragment
+        ? [...item.childNodes]
+        : (createNode(context, item, ns, created) ?? []),
     );
   }
 
@@ -400,12 +427,10 @@ function createNode(
     ...rest
   } = config as Record<string, any>;
 
-  // Create or parse the element.
   const el = createElement(use || tagName, namespaceURI);
   // Children of `foreignObject` are HTML again.
   ns = el.localName === "foreignObject" ? XHTML_NS : el.namespaceURI;
 
-  // Binding lifecycle management.
   const bindings = new Map<string, Array<() => void>>();
   const prevValues = new Map<string, unknown>();
   // Keys applied by each reactive map (`attributes`, `style`, `dataset`), so keys it drops are cleared.
@@ -413,24 +438,19 @@ function createNode(
   // Property values from before the first binding, restored when a binding is cleared.
   const originals = new Map<string, unknown>();
 
-  // Releases all bindings; with `key`, only that binding and its nested ones
-  // (`key.*`); with `nested`, only the nested ones.
-  const dispose = (key?: string, nested = false) => {
+  // Releases all bindings; with `key`, only that binding and its nested ones (`key.*`).
+  const dispose = (key?: string) => {
     for (const [k, fns] of bindings) {
-      if (!key || (!nested && k === key) || k.startsWith(`${key}.`)) {
+      if (!key || k === key || k.startsWith(`${key}.`)) {
         for (const fn of fns) fn();
         bindings.delete(k);
       }
     }
   };
 
-  // Register the disposer so `destroyNode` can release these bindings if
-  // this node is discarded without ever being inserted.
   const state = stateOf(el);
-  state.dispose = dispose;
   created?.push(el);
 
-  // Attach shadow root.
   let shadowRoot: ShadowRoot | undefined;
   if (shadowRootMode) {
     shadowRoot = state.shadow = el.attachShadow({ mode: shadowRootMode });
@@ -438,17 +458,16 @@ function createNode(
       shadowRoot.adoptedStyleSheets = adoptedStyleSheets;
   }
 
-  // Tracks whether this element currently holds live reactive bindings.
   let alive = true;
 
   // A node removed from the tree may be inserted again later (e.g. a reused
   // instance toggled in and out of a child list). Removal releases its
   // bindings, so a genuine re-mount must rebuild them; otherwise the node
   // would be inert. Skipped on the first mount, where bindings are already live.
-  // Registered before the user's listeners so their `mounted` handlers see the
+  // Runs before the user's listeners so their `mounted` handlers see the
   // rebuilt state. The child cascade is handled by `fireMount`, which walks
-  // down after this listener has rebuilt the fresh children.
-  el.addEventListener("mounted", () => {
+  // down after this hook has rebuilt the fresh children.
+  state.remount = () => {
     if (alive) return;
     alive = true;
     // The rebuild may create fresh children. Their `mounted` is only armed:
@@ -460,9 +479,8 @@ function createNode(
     } finally {
       depth--;
     }
-  });
+  };
 
-  // Bind event listeners.
   if (on) {
     for (const ev in on) {
       if (typeof on[ev] === "function") {
@@ -471,35 +489,23 @@ function createNode(
     }
   }
 
-  // The child cascade is handled by `unmountNode`, after this listener.
-  el.addEventListener("removed", () => {
+  // Runs after the user's `removed` listeners, or silently for a node that is
+  // discarded without being inserted. The child cascade is handled by
+  // `unmountNode` and `destroyNode`, after this hook.
+  state.dispose = () => {
     alive = false;
     dispose();
-  });
+  };
 
+  // Re-runs the live bindings, optionally only those with the given property
+  // paths (e.g. `"style.color"`). Re-running keeps their creation order, which
+  // replacing them would break once signals trigger updates. A removed element
+  // holds no bindings, so it ignores the event.
   el.addEventListener("refresh", (e) => {
-    // A removed element holds no bindings; a re-mount rebuilds them.
-    if (!alive) return;
-    const { detail } = e as CustomEvent<unknown>;
-    if (!detail) return patchNode(rest);
-    for (const prop of Array.isArray(detail) ? detail : [detail]) {
-      // Re-patch a single property, e.g. "style.color" from `rest.style`.
-      // A function on the way is a reactive map, which re-runs as a whole.
-      const keys = String(prop).split(".");
-      let parent: any = rest;
-      let i = 0;
-      while (
-        i < keys.length - 1 &&
-        parent &&
-        typeof parent[keys[i]] !== "function"
-      ) {
-        parent = parent[keys[i++]];
-      }
-      const key = keys[i];
-      // A property the config does not bind is left as is.
-      if (parent && hasOwn(parent, key)) {
-        patchNode({ [key]: parent[key] }, keys.slice(0, i));
-      }
+    const keys = (e as CustomEvent).detail;
+    for (const [key, fns] of [...bindings]) {
+      if (!keys || [keys].flat().includes(key))
+        for (const fn of fns) (fn as typeof fn & { [RUN]: () => void })[RUN]();
     }
   });
 
@@ -517,7 +523,6 @@ function createNode(
     patchNode(map, subpath);
   };
 
-  // Apply reactive bindings.
   const patchNode = (
     params: Record<PropertyKey, unknown> | undefined,
     path: string[] = [],
@@ -532,7 +537,6 @@ function createNode(
 
       const setter = (value: unknown) => {
         let newValue: unknown;
-        // Children.
         if (root === "children") {
           const target = shadowRoot ?? el;
           // Fresh descendants arm their `mounted`; the build fires them top-down
@@ -564,26 +568,16 @@ function createNode(
               }
             }
           });
-          // The nodes now in the DOM; the previous array is kept when they are unchanged.
-          const nodes = Array.from(target.childNodes);
-          const prev = prevValues.get(pathKey) as Node[] | undefined;
-          const same =
-            prev?.length === nodes.length &&
-            prev.every((node, i) => node === nodes[i]);
-          newValue = same ? prev : nodes;
-        }
-        // Class name.
-        else if (root === "className" || root === "classList") {
-          const names = updateClassList(
-            el,
-            Array.isArray(value) ? value : [value],
+          newValue = keepSame(
+            prevValues.get(pathKey),
+            Array.from(target.childNodes),
           );
-          // Keep the previous array for an unchanged class set, so no `updated` fires.
-          const prev = prevValues.get(pathKey) as string[] | undefined;
-          newValue = prev?.join(" ") === names.join(" ") ? prev : names;
-        }
-        // Attributes, inline style, and data attributes.
-        else if (
+        } else if (root === "className" || root === "classList") {
+          newValue = keepSame(
+            prevValues.get(pathKey),
+            updateClassList(el, Array.isArray(value) ? value : [value]),
+          );
+        } else if (
           root === "attributes" ||
           root === "style" ||
           root === "dataset"
@@ -607,34 +601,24 @@ function createNode(
             }
           } else {
             patchMap(value, subpath, pathKey);
-            if (root === "style" && !style?.length) el.removeAttribute("style");
           }
-        }
-        // Custom properties.
-        else {
-          let current = el as unknown as Record<PropertyKey, unknown>;
-          for (const segment of path) {
-            // Copy plain objects, so the user's config keeps its functions.
-            const next = current[segment];
-            current[segment] = isPlainObjectOrArray(next)
-              ? Object.assign(Array.isArray(next) ? [] : {}, next)
-              : (next ?? {});
-            current = current[segment] as Record<PropertyKey, unknown>;
-          }
-          if (!originals.has(pathKey)) originals.set(pathKey, current[key]);
+          // Clearing the last style property, by key or by map, drops `style=""`.
+          if (root === "style" && !style?.length) el.removeAttribute("style");
+        } else {
+          const props = el as unknown as Record<PropertyKey, unknown>;
+          if (!originals.has(key)) originals.set(key, props[key]);
           if (value == null) {
-            // Own properties are deleted; accessors (e.g. `textContent`) are reset.
-            const original = originals.get(pathKey);
-            if (original === undefined) delete current[key];
-            else current[key] = original;
-            dispose(pathKey, true);
+            // Own properties are deleted; accessors (e.g. `textContent`, or a
+            // custom element's whose getter returned `undefined`) are reset.
+            const original = originals.get(key);
+            if (original === undefined && hasOwn(props, key)) delete props[key];
+            else props[key] = original;
           } else {
-            current[key] = value;
+            props[key] = value;
             newValue = value;
           }
         }
 
-        // Dispatch "updated" on value change.
         const oldValue = prevValues.get(pathKey);
         if (oldValue !== undefined && newValue !== oldValue) {
           dispatchEvent(el, "updated", {
@@ -657,7 +641,6 @@ function createNode(
     }
   };
 
-  // Initial render.
   patchNode(rest);
 
   return el;
@@ -665,11 +648,25 @@ function createNode(
 
 /**
  * Checks whether an old child can stand in for a desired node: the same node,
- * or a structurally equal one. Equal-looking siblings are interchangeable, so a
- * node that must stay distinct needs a distinguishing attribute.
+ * or a structurally equal one, provided the new list does not itself contain
+ * the old child (so it is not taken from the entry that reuses it) and the
+ * desired node is not already a child (so it keeps its own place). Equal-looking
+ * siblings are interchangeable, so a node that must stay distinct needs a
+ * distinguishing attribute; `isEqualNode` ignores shadow roots, so shadow
+ * content does not tell nodes apart.
  */
-function isSame(oldNode: Node, newNode: Node): boolean {
-  return oldNode === newNode || oldNode.isEqualNode(newNode);
+function isSame(
+  parent: Node,
+  oldNode: Node,
+  newNode: Node,
+  reused: Set<Node>,
+): boolean {
+  return (
+    oldNode === newNode ||
+    (!reused.has(oldNode) &&
+      newNode.parentNode !== parent &&
+      oldNode.isEqualNode(newNode))
+  );
 }
 
 /**
@@ -678,9 +675,8 @@ function isSame(oldNode: Node, newNode: Node): boolean {
  * Nodes with the same key are still checked with {@link isSame}.
  */
 function keyOf(node: Node): string {
-  return node instanceof window.Element
-    ? node.outerHTML
-    : `${node.nodeType}:${node.nodeValue}`;
+  // Only elements have `outerHTML`; markup never starts like a text key.
+  return (node as Element).outerHTML ?? `${node.nodeType}:${node.nodeValue}`;
 }
 
 /**
@@ -696,33 +692,38 @@ function syncDOM(
   let newStart = 0;
   let oldEnd = oldList.length - 1;
   let newEnd = newList.length - 1;
+  const reused = new Set(newList);
 
-  // Skip matching prefix.
   while (
     oldStart <= oldEnd &&
     newStart <= newEnd &&
-    isSame(oldList[oldStart]!, newList[newStart])
+    isSame(parent, oldList[oldStart]!, newList[newStart], reused)
   ) {
     oldStart++;
     newStart++;
   }
 
-  // Skip matching suffix.
   while (
     oldStart <= oldEnd &&
     newStart <= newEnd &&
-    isSame(oldList[oldEnd]!, newList[newEnd])
+    isSame(parent, oldList[oldEnd]!, newList[newEnd], reused)
   ) {
     oldEnd--;
     newEnd--;
   }
 
-  // Diff remaining nodes. Old nodes are indexed by key, in list order; a
-  // matched one is cleared from `oldList`, so what is left is removed.
+  // Diff remaining nodes. Old nodes that the new list reuses are indexed by
+  // identity, the others by key, in list order; a matched one is cleared from
+  // `oldList`, so what is left is removed. Keys are serialized markup, so none
+  // are computed when one side is empty, as on a first render, an append, or
+  // a clear.
   const added: Node[] = [];
   const index = new Map<string, number[]>();
-  for (let j = oldStart; j <= oldEnd; j++) {
-    getOrCreate(index, keyOf(oldList[j]!), () => []).push(j);
+  const positions = new Map<Node, number>();
+  for (let j = oldStart; newStart <= newEnd && j <= oldEnd; j++) {
+    const node = oldList[j]!;
+    if (reused.has(node)) positions.set(node, j);
+    else getOrCreate(index, keyOf(node), () => []).push(j);
   }
   let prev = oldStart > 0 ? oldList[oldStart - 1] : null;
 
@@ -730,25 +731,29 @@ function syncDOM(
     const newNode = newList[i];
     let existing: Node | null = null;
 
-    // Take the first unused old node with the same key that is the same.
-    const candidates = index.get(keyOf(newNode));
+    const j = positions.get(newNode);
+    if (j !== undefined) {
+      existing = newNode;
+      oldList[j] = null;
+    }
+    // Otherwise take the first unused old node with the same key that is equal.
+    const candidates =
+      existing || !index.size ? undefined : index.get(keyOf(newNode));
     while (candidates?.length && !existing) {
-      const j = candidates.shift()!;
-      if (isSame(oldList[j]!, newNode)) {
-        existing = oldList[j];
-        oldList[j] = null;
+      const k = candidates.shift()!;
+      if (oldList[k]!.isEqualNode(newNode)) {
+        existing = oldList[k];
+        oldList[k] = null;
       }
     }
     if (!existing) added.push((existing = newNode));
 
-    // Insert if not already in the correct position.
     const target = prev ? prev.nextSibling : parent.firstChild;
     if (existing !== target) parent.insertBefore(existing, target);
 
     prev = existing;
   }
 
-  // Remove unmatched old nodes.
   const removed: Node[] = [];
   for (let i = oldEnd; i >= oldStart; i--) {
     const node = oldList[i];
@@ -765,7 +770,7 @@ function syncDOM(
  *
  * @this {object} Reactive context for signal tracking; defaults to the global context when omitted.
  * @param config An array of node configurations; nested arrays are flattened in order.
- * @param target A parent element or CSS selector string to append the results into. Without a target, or when the selector matches nothing, nothing is appended and the roots do not receive `mounted`; their children do.
+ * @param target A parent element, `DocumentFragment`, or CSS selector string to append the results into. Without a target, or when the selector matches nothing, nothing is appended and the roots do not receive `mounted`; their children do.
  * @returns The created DOM nodes, in order.
  */
 export function render<T extends Node[] = Node[]>(
@@ -810,7 +815,7 @@ export function render(
  *
  * @this {object} Reactive context for signal tracking; defaults to the global context when omitted.
  * @param config A node configuration — string, number, Node, or object.
- * @param target A parent element or CSS selector string to append the result into. Without a target, or when the selector matches nothing, nothing is appended and the root does not receive `mounted`; its children do.
+ * @param target A parent element, `DocumentFragment`, or CSS selector string to append the result into. Without a target, or when the selector matches nothing, nothing is appended and the root does not receive `mounted`; its children do.
  * @returns The created DOM `Node`, appended to the target when one is given. At runtime a `boolean`, `null`, `undefined`, or unsupported config yields `null`; the type is `null` only when that is known statically (see the previous overload).
  *
  * @example
@@ -843,8 +848,14 @@ export function render(
         ? window.document.querySelector(target)
         : target;
     if (el && parent) {
-      // Arm the root(s); the build fires the whole tree top-down.
-      for (const node of Array.isArray(el) ? el : [el]) {
+      // Arm the root(s); the build fires the whole tree top-down. A fragment
+      // empties into the parent, so its children are the roots.
+      const nodes = Array.isArray(el)
+        ? el
+        : el instanceof window.DocumentFragment
+          ? [...el.childNodes]
+          : [el];
+      for (const node of nodes) {
         parent.appendChild(node);
         armed.add(node);
       }

@@ -14,10 +14,10 @@ Lightweight frontend JS library for dynamic UIs via declarative elements and rea
 
 ## Conventions
 
-- **Simple & minimal** — least code that works. No unnecessary abstractions.
-- **TypeDoc on all exports** — include `@param`, `@returns`, `@throws` as needed. Concise prose, not inline notes.
+- **Simple & minimal**: every byte ships to the browser, so choose the smallest correct solution and avoid speculative abstractions.
+- **TypeDoc on all exports**: include `@param`, `@returns`, `@throws` as needed. Concise prose, not inline notes.
 - **Naming**: `camelCase` (vars/functions), `PascalCase` (classes/types), `UPPER_SNAKE_CASE` (constants).
-- **Fix grammar** in existing comments when touching nearby code. No typos.
+- **Comments**: one module summary at the top (a TypeDoc `@module` block in public modules, a `//` line in internal ones); all others explain _why_ (quirks, pin reasons, fail-closed rules, non-obvious ordering), never _what_. No banners or change history. If code needs a comment to explain what it does, simplify the code.
 
 ## Structure
 
@@ -44,7 +44,11 @@ SKILL.md      # AI agent skill guidelines
 
 ## Testing
 
-Tests live alongside source (`src/**/*.test.ts`). `npm test` fails when branch coverage drops below 95%. Follow **Arrange → Act → Assert**. Node built-in imports use the `node:` prefix. JSDOM provides a simulated browser DOM for tests that interact with elements. No external test libraries — just `node:test`, `node:assert/strict`, and `jsdom`.
+- **Location**: tests live alongside source (`src/**/*.test.ts`).
+- **Coverage**: `npm test` fails when branch coverage drops below 95%.
+- **Structure**: follow **Arrange → Act → Assert**.
+- **No redundancy**: each test covers a distinct behavior or branch; don't duplicate assertions already covered elsewhere or test the same path with trivially different inputs.
+- **Tooling**: only `node:test`, `node:assert/strict`, and `jsdom` (for tests that touch the DOM); no external test libraries. Import Node built-ins with the `node:` prefix.
 
 ## Docs
 

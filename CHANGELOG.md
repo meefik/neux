@@ -9,28 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- A write to a key that no effect reads no longer schedules a re-run, signals keep each object's reactive state in one `WeakMap` entry, and the renderer keeps each node's state on the node under a private symbol instead of in separate `WeakMap` and `WeakSet` collections, making signal writes and list rendering about 10% faster.
-- `npm run build` now checks `dist/` against the `browserslist` targets in a `postbuild` step, replacing the separate `npm run check` script.
+- **Breaking:** `refresh` re-runs the element's live reactive functions instead of re-patching config properties: static values are not re-applied, and `detail` must name a bound path (`"style"` for a reactive `style` map, `"style.color"` for a function inside a static one).
+- Long lists render 2.7–5× faster (10,000 items): `mounted` no longer sorts new nodes by document position, and the `children` diff skips serializing nodes when one side is empty.
+- Signal writes are about 10% faster: a write to a key no effect reads schedules nothing.
+- `npm run build` checks `dist/` against `browserslist` in a `postbuild` step, replacing `npm run check`.
 
 ### Fixed
 
-- A `children` re-render whose new child binding throws on its first run releases the bindings of the nodes it already built, instead of leaving them re-running outside the DOM.
-- Writing an array index past the end (such as `list[list.length] = x` or `Object.assign(list, [...])`) now re-runs effects that read `length`, including `map()`, spread, and `for...of`, so a `children` list renders the new item.
-- Assigning a smaller `length` to an array now re-runs effects that read a dropped index, enumerate the keys, or test an index with `in`, not only those that read `length`.
-- A class stored in a signal is returned as is, keeping its identity and static members, instead of as a bound copy.
-- `i18n()` leaves a `%{key}` placeholder as is for a `null` value, as it does for `undefined`, instead of printing `null`.
-- A `use` tag string or markup with surrounding whitespace (such as `"span "`) is trimmed, instead of rendering a `div`.
-- A `style` key for a CSS custom property with uppercase letters (such as `--myColor`) is now applied through the CSS API instead of being set as a plain JS property on the style object.
-- Effects of one update now re-run in creation order, so an effect runs before the effects created during its run. A parent that disposes or replaces its children (such as a reactive `children` list) now does so before a child's binding re-runs against state that no longer fits it, which used to report a spurious error such as reading a property of `undefined`.
-- `i18n()` resolves a requested language to the closest locale — an exact key (case- and separator-insensitive, `ru_RU` ≡ `ru-RU`) or, when none, the longest key the language starts with at a subtag boundary (`de_DE` → `de`, while `run-BI` no longer matches `ru`) — tolerates odd separators such as `ru_RU.UTF-8` (using the leading language subtag), no longer validates tags against a full locale-shape regex or throws on an unparseable language or `fallback`, and reports a missing key once per locale.
-- An `effect()` created inside `untrack()` tracks its own reads instead of never re-running.
-- An `effect()` created inside a signal setter no longer makes the setter's later reads subscribe the effect that wrote the property.
-- A rejected signal write (such as assigning to a getter-only property) no longer re-runs effects.
-- A nested plain object with its own `constructor` key is reactive instead of being returned as is.
-- A signal object reads as one proxy wherever it is reached from: `state.selected = state.items[0]` keeps `state.selected === state.items[0]`, an assigned proxy is stored as its plain object instead of being wrapped again, and assigning a proxy back to its own object no longer re-runs effects.
-- `removed` cascades through elements Neux did not build (such as a supplied wrapper element), so the Neux elements inside release their bindings and receive `mounted` again on re-insertion.
-- `i18n()` keeps a script subtag when formatting, so `sr-Latn` text gets Latin rather than Cyrillic dates and `zh-Hant` text gets Traditional Chinese formatting.
-- Documentation: `README.md`, `SKILL.md`, `AGENTS.md`, and TypeDoc comments corrected to match the current behavior, with fixed examples. They also note that `Object.defineProperty()` on a signal does not re-run effects, and that an element inserted with DOM APIs (such as into a wrapper built with `document.createElement()`) never receives `mounted` or `removed`, so its bindings stay live.
+- The UMD build runs in strict mode, so functions destructured from the `neux` global (`const { signal } = neux`) use the global context, as `neux.effect()` does, instead of a separate `window` context that left their signals and effects disconnected.
+- An effect is not re-run by its own writes made in its getter (including through a signal property setter or inside `untrack()`), so `list.push()` or `state.count++` inside it no longer loops; a write to the same key from elsewhere still re-runs it.
+- An effect created inside `untrack()` or a setter tracks its own reads and owns its writes, from its getter and setter alike, without changing the enclosing effect's tracking.
+- Effects of one update re-run in creation order, so a parent `children` list replaces its children before their bindings re-run against stale state.
+- An effect whose getter threw on a re-run stays disposed, as documented; a `refresh` event no longer revives it.
+- An effect that disposes itself mid-run no longer stays subscribed, which leaked it.
+- Arrays: writing past the end re-runs `length` readers; assigning a smaller `length` re-runs readers of dropped indices, keys, and `in`.
+- An object reads as one proxy wherever reached (`state.selected === state.items[0]`); an assigned proxy is stored as its plain object.
+- Classes and built-in constructors stored in a signal are returned as is (`state.list.constructor === Array`); a plain object with its own `constructor` key is reactive.
+- A rejected signal write (such as to a getter-only property) does not re-run effects.
+- A `DocumentFragment` in `children` or `render()` contributes its child nodes, which now mount, release their bindings on removal, and are diffed individually.
+- A reactive `children` list holding an existing `Node` and an equal new sibling no longer drops one of them.
+- A `children` re-render whose new child binding throws releases the nodes it already built.
+- `removed` cascades through elements Neux did not build (such as a supplied wrapper), so Neux elements inside release their bindings and re-mount on re-insertion.
+- Clearing a property binding resets an inherited accessor (such as a custom element's `value` that started `undefined`) instead of keeping the last value.
+- Clearing the last style through a single `style` key removes the empty `style` attribute.
+- A `style` key for a custom property with uppercase letters (`--myColor`) is applied.
+- A `use` string with surrounding whitespace (`"span "`) is trimmed instead of rendering a `div`.
+- `i18n()` resolves a language to the closest locale: an exact key (case- and separator-insensitive, `ru_RU` ≡ `ru-RU`) or the longest key the language starts with at a subtag boundary (`de_DE` → `de`, but not `run-BI` → `ru`). Odd tags such as `ru_RU.UTF-8` and an unparseable language or `fallback` no longer throw.
+- `i18n()` formatting keeps a script subtag (`sr-Latn`, `zh-Hant`).
+- `i18n()` reports a missing key once per locale (the matched one, or the requested language when none matches); a `null` placeholder value is left as is; `null` data (`t(5, null, "de")`) no longer throws.
+- Documentation: `README.md`, `SKILL.md`, `AGENTS.md`, and TypeDoc corrected to match behavior, with fixed examples. New notes: `Object.defineProperty()` on a signal does not re-run effects; elements inserted with DOM APIs into a mounted parent never get `mounted`/`removed`; the `children` diff ignores Shadow DOM content; `use` markup with no element renders an empty `div`; `dataset` keys must be camelCase.
 
 ## [0.18.0] - 2026-10-09
 

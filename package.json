@@ -48,7 +48,7 @@
     "build": "vite build && tsc -p tsconfig.build.json",
     "postbuild": "es-check checkBrowser 'dist/*.js' --module --checkFeatures",
     "typecheck": "tsc -p tsconfig.json",
-    "format": "prettier --write .",
+    "format": "prettier --write src/ *.md *.config.ts",
     "test": "node --import tsx --test --experimental-test-coverage --test-coverage-include='src/**/*.ts' --test-coverage-exclude='src/**/*.test.ts' --test-coverage-branches=95 'src/**/*.test.ts'",
     "docs": "typedoc && cp docs/README.md docs/llms.txt"
   },

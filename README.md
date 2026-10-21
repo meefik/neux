@@ -99,14 +99,14 @@ Use the `render()` function to create one or more DOM nodes from a declarative d
 - `classList`: (String, Array of Strings, or Function) An alias of `className`. Both set the same class list, so use only one of them.
 - `attributes`: (Object or Function) Maps attribute names to their corresponding values. Use a static object for fixed attributes or a function for dynamic assignment. Uses `setAttribute`/`removeAttribute` internally: values are converted to strings (`false` becomes `"false"`), and `null` or `undefined` removes the attribute. For boolean attributes such as `disabled` or `required`, set the element property instead (`disabled: false`). When provided as a function, `this` is bound to the element.
 - `style`: (Object or Function) Sets inline CSS styles via an object where keys are style property names in camelCase (`backgroundColor`) or kebab-case (`background-color`). This can also be defined as a function to handle dynamic styling. When provided as a function, `this` is bound to the element.
-- `dataset`: (Object or Function) Assigns custom data attributes (`data-*`) through a static mapping or a function that returns the mapping. When provided as a function, `this` is bound to the element.
-- `children`: (String, Number, Node, Object, Array, or Function) Defines the inner content of the element. This can be a direct string, a single element definition or `Node`, an array of them (nested arrays are flattened), or a function that returns them for dynamic rendering. `null`, `undefined`, and booleans are skipped; strings and numbers render as text nodes (`0` is a value). When provided as a function, `this` is bound to the element.
+- `dataset`: (Object or Function) Assigns custom data attributes (`data-*`) through a static mapping or a function that returns the mapping. Keys are camelCase, as in `element.dataset` (`userId` sets `data-user-id`); a kebab-case key such as `user-id` throws a `SyntaxError`. When provided as a function, `this` is bound to the element.
+- `children`: (String, Number, Node, Object, Array, or Function) Defines the inner content of the element. This can be a direct string, a single element definition or `Node`, an array of them (nested arrays are flattened), or a function that returns them for dynamic rendering. `null`, `undefined`, and booleans are skipped; strings and numbers render as text nodes (`0` is a value); a `DocumentFragment` contributes its child nodes. When provided as a function, `this` is bound to the element.
 - `on`: (Object) Adds event listeners to the element. Each key represents an event name (e.g., "click", "change") with its corresponding handler function. Handlers and lifecycle callbacks receive `this` bound to the element.
-- `use`: (String or Element) Specifies a tag selector string (e.g., "div#id1.cls1"), an HTML markup to parse, or an existing Element to reuse directly.
+- `use`: (String or Element) Specifies a tag selector string (e.g., "div#id1.cls1"), an HTML markup to parse, or an existing Element to reuse directly. Markup yields its first element; markup with no element, such as plain text or a comment, yields an empty `div`, ignoring `tagName`.
 
 Extra configuration for edge cases:
 
-- `shadowRootMode`: (String) Defines the mode of the element's [shadow DOM](https://developer.mozilla.org/docs/Web/API/Web_components/Using_shadow_DOM), determining its accessibility and encapsulation. Options include "open" (the shadow root is accessible via the element's shadowRoot property) and "closed" (the shadow root is hidden, preventing external access).
+- `shadowRootMode`: (String) Defines the mode of the element's [shadow DOM](https://developer.mozilla.org/docs/Web/API/Web_components/Using_shadow_DOM), determining its accessibility and encapsulation. Options include "open" (the shadow root is accessible via the element's shadowRoot property) and "closed" (the shadow root is hidden, preventing external access). A reactive `children` list does not compare shadow content, so give such elements a distinguishing attribute (see below).
 - `adoptedStyleSheets`: (Array) Specifies one or more [CSSStyleSheet](https://developer.mozilla.org/docs/Web/API/CSSStyleSheet) objects that can be associated with the element's shadow DOM. This enables the use of constructable stylesheets for efficient, reusable styling.
 - `namespaceURI`: (String) Specifies the XML namespace URI when [creating namespaced elements](https://developer.mozilla.org/docs/Web/API/Document/createElementNS), such as SVG or MathML. Usually, this property is not required because it is automatically determined by the tag name.
 
@@ -149,7 +149,7 @@ List of lifecycle events:
 - `updated` fires when an element property is updated to a different value; it does not fire for the first applied value, nor for a change from a cleared (`null` or `undefined`) binding. For `className`, the old and new values are arrays of the applied class names; for `children`, arrays of the child nodes in the DOM.
 - `removed` fires top-down when the element is removed from a parent, including children inside a shadow root, and releases its reactive bindings. Only removals made by Neux (a `children` re-render) fire it; removing an element with DOM APIs such as `el.remove()` does not.
 
-Lifecycle events follow only the elements Neux inserts: through a `children` list or a `render()` target. An element added with DOM APIs, such as a rendered element appended to a wrapper built with `document.createElement()`, never receives `mounted`. Removing the wrapper later, even through a `children` re-render, does not fire `removed` on that element, so its reactive bindings stay live. Build the wrapper with Neux too (`{ tagName: "section", children: [inner] }`), or render into it with `render(inner, wrapper)`.
+Lifecycle events follow only the elements Neux inserts: through a `children` list or a `render()` target, together with everything already inside them. An element added with DOM APIs to a parent that is already mounted, such as a rendered element appended to a wrapper built with `document.createElement()` after the wrapper was inserted, never receives `mounted`. Removing the wrapper later, even through a `children` re-render, does not fire `removed` on that element, so its reactive bindings stay live. Build the wrapper with Neux too (`{ tagName: "section", children: [inner] }`), or render into it with `render(inner, wrapper)`.
 
 Example of using lifecycle events:
 
@@ -285,10 +285,10 @@ You probably want to change the element properties dynamically. Neux allows you 
 See the example below:
 
 ```js
-import { render } from "neux";
+import { render, signal } from "neux";
 
-const list = [{ text: "Item 1" }, { text: "Item 2" }];
-const el = render(
+const list = signal([{ text: "Item 1" }, { text: "Item 2" }]);
+render(
   {
     tagName: "ul",
     children() {
@@ -302,26 +302,25 @@ const el = render(
   },
   document.body,
 );
-```
 
-In this example, the `children` parameter is defined as a function that returns an array of list items. To trigger a re-evaluation of the functions and update the DOM accordingly, you can dispatch a custom `refresh` event to the target element:
-
-```js
 // Add a new item to the list
 list.push({ text: "Item 3" });
-// Re-render the entire element
-el.dispatchEvent(new CustomEvent("refresh"));
 // Update the text of the first item
 list[0].text = "Updated Item 1";
-// Update only specific properties
-el.children[0].dispatchEvent(
-  new CustomEvent("refresh", { detail: ["textContent"] }),
-);
 ```
 
-Note that when dispatching the `refresh` event, you can optionally provide a `detail` — a property name or an array of names, such as `"textContent"` or `"style.color"` — that specifies which properties should be updated. If no detail is provided, all reactive functions will be re-evaluated on the target element. Only the changed elements are replaced when lists like `children` are updated.
+In this example, the `children` parameter is defined as a function that returns an array of list items. When the signal changes, only the affected functions are re-evaluated: adding an item re-runs `children`, which inserts just the new element, and changing an item's text re-runs only its `textContent`. See [Reactive Signals](#reactive-signals) for details.
 
-Instead of using `refresh` events, you can also use reactive signals to manage state and automatically update the DOM when the state changes. This approach is more efficient and easier to maintain, as it eliminates the need for manual event dispatching.
+When the functions read plain (non-signal) data, dispatch a custom `refresh` event to re-run them on an element:
+
+```js
+// Re-run every function of the element
+el.dispatchEvent(new CustomEvent("refresh"));
+// Re-run only the given ones
+el.dispatchEvent(new CustomEvent("refresh", { detail: ["textContent"] }));
+```
+
+The optional `detail` is a property path or a list of them, such as `"textContent"` or `"style.color"` (when `color` is a function in a `style` object; for a `style` function, use `"style"`). Static values are not re-applied, and the event does not reach child elements: refreshing `children` re-creates the list and replaces only the elements that changed.
 
 ## Reactive Signals
 
@@ -360,7 +359,7 @@ A computed getter is re-evaluated on every read, so an effect that reads it re-r
 
 - Replacing the entire signal object breaks all existing bindings.
 - Only properties accessed during the synchronous execution of a computed or effect function are tracked. Reads after an `await` are not tracked.
-- A method stored in a signal reads as a bound copy: `state.fn === fn` is `false`, though `state.fn === state.fn` is `true`. A class is returned as is.
+- A method stored in a signal reads as a bound copy: `state.fn === fn` is `false`, though `state.fn === state.fn` is `true`. A class or built-in constructor (such as `Map`, or `state.list.constructor`) is returned as is.
 - Reading a read-only, non-configurable property that holds a nested object, array, or method throws a `TypeError`. This happens with `Object.freeze()` data, such as `signal(Object.freeze({ cfg: {} })).cfg`, but not with primitives or sealed objects. Keep frozen data outside the signal, or leave it unfrozen.
 - Defining a property with `Object.defineProperty()` (or `Reflect.defineProperty()`) on a signal does not re-run effects. Assign the property instead.
 
@@ -401,7 +400,9 @@ list.push({ id: 3, text: "Item 3" });
 // Replace an existing item with a new one; its unique `id`
 // makes the new item render as a new element
 list.splice(1, 1, { id: 4, text: "Item 4" });
-// Change the text content of the `li` element without replacing the element
+// Change the text content of the `li` element. On its own, this keeps the
+// element; here it lands in the same batch as the list changes above, so the
+// re-rendered list builds a fresh `li` with the new text
 list[0].text = "Item 1 was changed";
 ```
 
@@ -483,6 +484,8 @@ You may encounter a problem when trying to replace an array item with a new obje
 
 The comparison covers attributes and children, not element properties such as `checked` or `value`. A plain value inside a `children` function (`checked: state.on`) is set only on a new element, and an equal existing element is kept with its old value. Bind such a property with a function (`checked: () => state.on`) so the element updates itself.
 
+Shadow DOM content is not compared either: only the light DOM counts. Elements with a `shadowRootMode` that differ only inside their shadow roots look equal, so an existing one is kept, showing its old shadow content. Give each one a distinguishing attribute (`dataset: { id: item.id }`): a reactive binding does not help here, as the kept element's bindings still read the item it was built from.
+
 The same applies to event handlers. A re-rendered child that looks identical to an existing one reuses that existing element, together with its old handlers and the values they captured. For example, after removing the first of two identical `Delete` buttons, the remaining button still acts on the removed item:
 
 ```js
@@ -521,7 +524,7 @@ state.count++;
 setTimeout(() => dispose(), 0);
 ```
 
-The effect function tracks the reactive properties read during each run, starting with the initial one, and re-runs the callback whenever any of them change. Dependencies are collected again on every run, so a branch that is no longer taken stops triggering it. Re-runs are batched: an effect runs once per tick (`setTimeout`), however many of its properties changed in the meantime.
+The effect function tracks the reactive properties read during each run, starting with the initial one, and re-runs the callback whenever any of them change. Dependencies are collected again on every run, so a branch that is no longer taken stops triggering it. Re-runs are batched: an effect runs once per tick (`setTimeout`), however many of its properties changed in the meantime. An effect is not re-run by its own writes made in its getter, so calling `list.push()` or `state.count++` there does not loop. Writes made in the optional `effect()` setter callback are not exempt, and re-run the effect if the getter reads them.
 
 To ignore reactive reads inside an effect, use `untrack()`:
 
@@ -1039,6 +1042,8 @@ class Counter extends HTMLElement {
 // Define custom element
 customElements.define("ne-counter", Counter);
 ```
+
+When `tagName` (or a `use` selector) names a registered custom element, `render()` creates it by calling its constructor directly, so the constructor runs before any config properties, attributes, or children are applied. Do not rely on them inside the constructor.
 
 Use this custom element:
 

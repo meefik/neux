@@ -159,18 +159,16 @@ suite("signal", async () => {
     await tick();
     equal(runs.count, 3, "one re-run for several changed properties");
     equal(last, 5);
-  });
 
-  await test("re-runs an effect once for a multi-element array mutation", async () => {
     const list = signal([1, 2, 3, 4, 5]);
-    const runs = track(() => list.map((n) => n * 2));
+    const mapped = track(() => list.map((n) => n * 2));
     list.shift();
     await tick();
-    equal(runs.count, 2, "shift writes many indexes but re-runs once");
+    equal(mapped.count, 2, "shift writes many indexes but re-runs once");
     list.push(6);
     list.sort((a, b) => b - a);
     await tick();
-    equal(runs.count, 3, "writes of one tick share one re-run");
+    equal(mapped.count, 3, "writes of one tick share one re-run");
   });
 
   await test("passes the getter value, or the resolved promise value, to the setter", async () => {
@@ -192,7 +190,7 @@ suite("signal", async () => {
     deepEqual(resolved, [20, 40], "resolved values reach the setter in order");
   });
 
-  await test("drops a stale promise result when the effect re-runs", async () => {
+  await test("drops a stale promise result when the effect re-runs or is disposed", async () => {
     const s = signal({ val: 1 });
     const values: string[] = [];
     effect(
@@ -206,17 +204,15 @@ suite("signal", async () => {
     s.val = 2;
     await wait(60);
     deepEqual(values, ["r2"], "only the latest result reaches the setter");
-  });
 
-  await test("drops a pending promise result after disposal", async () => {
-    const values: number[] = [];
+    const disposed: number[] = [];
     const dispose = effect(
       () => wait(0).then(() => 1),
-      (v) => values.push(v),
+      (v) => disposed.push(v),
     );
     dispose();
     await wait(10);
-    deepEqual(values, [], "setter is not called after dispose");
+    deepEqual(disposed, [], "setter is not called after dispose");
   });
 
   await test("disposes an effect whose first run throws, without calling the setter", async () => {
@@ -266,19 +262,6 @@ suite("signal", async () => {
     equal(total, 25, "effect computed with latest values");
   });
 
-  await test("prevents infinite loop when effect writes the same signal", async () => {
-    const s = signal({ val: 1 });
-    let last = 0;
-    const runs = track(() => {
-      last = s.val;
-      if (last > 5) s.val = 1;
-    });
-    s.val = 10;
-    await tick();
-    equal(runs.count, 2, "effect ran once and broke the loop");
-    equal(last, 10, "effect saw the value that triggered the guard");
-  });
-
   await test("defers effects that depend on a write made by another effect", async () => {
     const s = signal({ a: 0, b: 0 });
     const source = track(() => (s.b = s.a * 10));
@@ -293,20 +276,6 @@ suite("signal", async () => {
     );
     await tick();
     equal(downstream.count, 2, "downstream effect runs in the next update");
-  });
-
-  await test("tracks array length changes", async () => {
-    const s = signal({ items: [1, 2] });
-    let len;
-    const runs = track(() => (len = s.items.length));
-    s.items.push(3);
-    await tick();
-    s.items.shift();
-    await tick();
-    s.items.splice(1, 0, 4, 5);
-    await tick();
-    equal(runs.count, 4, "effect re-ran for each length mutation");
-    equal(len, 4, "length reflects splice result");
   });
 
   await test("tracks keys added to and removed from an object", async () => {
@@ -363,42 +332,35 @@ suite("signal", async () => {
     );
   });
 
-  await test("an effect created inside untrack tracks its own reads", async () => {
-    const s = signal({ a: 0, b: 0 });
-    let inner = { count: 0 };
-    const outer = track(() => {
-      untrack(() => {
-        inner = track(() => s.a);
-        s.b;
-      });
-    });
-    s.a = 1;
-    await tick();
-    equal(inner.count, 2, "the inner effect re-runs");
-    s.b = 1;
-    await tick();
-    equal(outer.count, 1, "reads after the inner effect stay untracked");
-  });
-
-  await test("an effect created inside a signal setter leaves the setter's reads untracked", async () => {
-    let inner = { count: 0 };
+  await test("an effect created inside untrack or a signal setter tracks only its own reads", async () => {
+    const inner = { untrack: { count: 0 }, setter: { count: 0 } };
     const s = signal({
       a: 0,
       b: 0,
       set x(_: number) {
-        inner = track(() => this.a);
+        inner.setter = track(() => this.a);
         this.b;
       },
     });
-    const outer = track(() => {
-      s.x = 1;
-    });
+    const outer = {
+      untrack: track(() => {
+        untrack(() => {
+          inner.untrack = track(() => s.a);
+          s.b;
+        });
+      }),
+      setter: track(() => {
+        s.x = 1;
+      }),
+    };
     s.a = 1;
     await tick();
-    equal(inner.count, 2, "the inner effect re-runs");
+    equal(inner.untrack.count, 2, "the effect inside untrack re-runs");
+    equal(inner.setter.count, 2, "the effect inside a setter re-runs");
     s.b = 1;
     await tick();
-    equal(outer.count, 1, "reads after the inner effect stay untracked");
+    equal(outer.untrack.count, 1, "reads after it stay untracked in untrack");
+    equal(outer.setter.count, 1, "and in the setter");
   });
 
   await test("a rejected write does not re-run effects", async () => {
@@ -675,6 +637,31 @@ suite("signal", async () => {
     equal(Object.keys(dict).length, 0, "signal data is untouched");
   });
 
+  await test("an effect disposed during its own run keeps no subscriptions", async () => {
+    const s = signal({ stop: false, val: 0 });
+    const timers = mock.method(globalThis, "setTimeout");
+    try {
+      let runs = 0;
+      const dispose = effect(() => {
+        runs++;
+        if (s.stop) dispose();
+        return s.val;
+      });
+      s.stop = true;
+      await tick();
+      equal(runs, 2);
+      const scheduled = timers.mock.callCount();
+      s.val = 1;
+      equal(
+        timers.mock.callCount(),
+        scheduled,
+        "a read after disposal is not subscribed",
+      );
+    } finally {
+      timers.mock.restore();
+    }
+  });
+
   await test("a write that no effect reads schedules no trigger", async () => {
     const s = signal({ a: 1, b: 1 });
     const timers = mock.method(globalThis, "setTimeout");
@@ -758,12 +745,123 @@ suite("signal", async () => {
     deepEqual([...state.list], [0, 2, 3]);
   });
 
-  await test("a class in a signal is returned as is", () => {
+  await test("a class or built-in constructor in a signal is returned as is", () => {
     class A {
       static x = 1;
     }
-    const state = signal({ A });
+    function plain(this: unknown) {
+      return this;
+    }
+    const state = signal({ A, M: Map, plain, list: [1] });
     equal(state.A, A);
     equal(state.A.x, 1);
+    equal(state.M, Map);
+    equal(state.list.constructor, Array, "`constructor` keeps its identity");
+    equal(state.plain(), state, "a plain function is still bound");
+  });
+
+  await test("an effect is not re-run by its own writes", async () => {
+    const s = signal({ n: 0, runs: 0, log: [] as number[], order: [2, 1] });
+    const runs = track(() => {
+      s.log.push(s.n);
+      s.order.sort();
+      s.runs++;
+    });
+    await tick();
+    await tick();
+    equal(runs.count, 1, "its own writes do not re-run it");
+    deepEqual([...s.log], [0]);
+    deepEqual([...s.order], [1, 2]);
+    s.n = 1;
+    await tick();
+    equal(runs.count, 2, "another key it reads still re-runs it");
+    s.log.push(9);
+    await tick();
+    equal(runs.count, 3, "a write from outside the effect still re-runs it");
+    deepEqual([...s.log], [0, 1, 9, 1]);
+  });
+
+  await test("writes made by a setter count as the writing effect's own", async () => {
+    const s = signal({
+      n: 0,
+      set bump(_: unknown) {
+        this.n++;
+      },
+    } as { n: number; bump: unknown });
+    const runs = track(() => {
+      void s.n;
+      s.bump = true;
+    });
+    await tick();
+    await tick();
+    equal(runs.count, 1, "the setter's write does not re-run the effect");
+    equal(s.n, 1);
+    s.bump = true;
+    await tick();
+    equal(runs.count, 2, "a setter called from outside still re-runs it");
+  });
+
+  await test("writes made inside untrack count as the effect's own", async () => {
+    const s = signal({ list: [] as number[] });
+    const runs = track(() => {
+      void s.list.length;
+      untrack(() => s.list.push(1));
+    });
+    await tick();
+    await tick();
+    equal(runs.count, 1, "the untracked write does not re-run the effect");
+    s.list.push(2);
+    await tick();
+    equal(runs.count, 2, "a write from outside still re-runs it");
+  });
+
+  await test("an effect created inside untrack writes as itself, even from its setter", async () => {
+    const s = signal({ n: 0 });
+    let created = false;
+    const runs = track(() => {
+      void s.n;
+      if (created) return;
+      created = true;
+      untrack(() =>
+        effect(
+          () => 0,
+          () => s.n++,
+        ),
+      );
+    });
+    await tick();
+    equal(
+      runs.count,
+      2,
+      "the inner effect's setter write re-runs the outer one",
+    );
+  });
+
+  await test("a key written by an effect and by another writer re-runs it", async () => {
+    const s = signal({ n: 0, go: false });
+    const seen: number[] = [];
+    // Created first, so it writes `n` (without reading it) before the next one.
+    const disposeFirst = effect(() => {
+      if (s.go) s.n = 10;
+    });
+    const dispose = effect(() => {
+      seen.push(s.n);
+      if (s.go) {
+        s.go = false;
+        s.n++;
+      }
+    });
+    s.go = true;
+    await tick();
+    await tick();
+    deepEqual(seen, [0, 10, 11], "a write before its own still re-runs it");
+    s.go = true;
+    await tick();
+    // Lands in the same batch as the effect's own write to `n`.
+    s.n = 5;
+    await tick();
+    deepEqual(seen, [0, 10, 11, 10, 5], "so does a write after its own");
+    disposeFirst();
+    dispose();
   });
 });

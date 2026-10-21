@@ -8,14 +8,20 @@
  * @module signal
  */
 
-import { getOrCreate, hasOwn, report } from "./helpers.js";
+import { getOrCreate, hasOwn, report, RUN } from "./helpers.js";
 
 /** Internal runtime state used for tracking active effects per context. */
 interface Runtime {
   /** The effect whose getter is running; unset inside `untrack()`, a signal write, or an effect setter, so reads there are not tracked. */
   active?: Effect | null;
-  /** Keys written since the last trigger, per object; unset when no trigger is scheduled. */
-  pending?: Map<Meta, Set<PropertyKey>> | null;
+  /** The effect whose getter is running a signal setter or `untrack()`, so writes made there count as that effect's own. */
+  writer?: Effect | null;
+  /**
+   * Keys written since the last trigger, per object, each with the effect that
+   * wrote it (`null` for a write outside an effect getter, or by several
+   * writers); unset when no trigger is scheduled.
+   */
+  pending?: Map<Meta, Map<PropertyKey, Effect | null>> | null;
 }
 
 /** Context object that carries runtime metadata keyed by `RUNTIME_KEY`. */
@@ -29,6 +35,8 @@ type Effect = (() => void) & {
   subs: Set<[Deps, PropertyKey]>;
   /** Creation order; an effect is always created after the one whose run created it. */
   id: number;
+  /** Disposes the effect for good, so a re-run request no longer revives it. */
+  dispose: () => void;
 };
 
 /** Reactive state of a wrapped object. */
@@ -51,9 +59,14 @@ const ITERATE: unique symbol = Symbol();
 const GLOBAL: Context = {};
 let nextEffectId = 0;
 
-/** Checks whether a function is a class, which is stored as is: binding would lose its identity and statics. */
-function isClass(fn: unknown): boolean {
-  return /^class[\s{]/.test(Function.prototype.toString.call(fn));
+/**
+ * Checks whether a function is a class or a built-in constructor (such as
+ * `Array` or `Map`), which is stored as is: binding would lose its identity and
+ * statics. Only these have a read-only `prototype`; a plain function's is
+ * writable, and methods, arrow functions, and bound functions have none.
+ */
+function isClass(fn: Function): boolean {
+  return Object.getOwnPropertyDescriptor(fn, "prototype")?.writable === false;
 }
 
 /** Registers the current active effect as a subscriber of `key` of the object. */
@@ -77,7 +90,10 @@ function schedule(meta: Meta, key: PropertyKey): void {
     runtime.pending = new Map();
     setTimeout(trigger, 0, runtime);
   }
-  getOrCreate(runtime.pending, meta, () => new Set<PropertyKey>()).add(key);
+  const keys = getOrCreate(runtime.pending, meta, () => new Map());
+  // The writing effect is kept only while it is the key's sole writer.
+  const writer = runtime.active ?? runtime.writer ?? null;
+  keys.set(key, keys.has(key) && keys.get(key) !== writer ? null : writer);
 }
 
 /** Runs each effect subscribed to a written key once, however many keys it reads. */
@@ -87,19 +103,26 @@ function trigger(runtime: Runtime): void {
   runtime.pending = null;
   const effects = new Set<Effect>();
   for (const [meta, keys] of batch) {
-    for (const key of keys) {
-      for (const eff of meta.deps.get(key) ?? []) effects.add(eff);
+    for (const [key, writer] of keys) {
+      // An effect is not re-run by its own writes, such as the `length` that
+      // `push()` reads and then writes.
+      for (const eff of meta.deps.get(key) ?? []) {
+        if (eff !== writer) effects.add(eff);
+      }
     }
   }
   // Creation order runs an outer effect before the ones it created, so it can
   // dispose them before they re-run against state they no longer fit.
-  for (const eff of [...effects].sort((a, b) => a.id - b.id)) {
-    try {
-      eff();
-    } catch (e) {
-      unsubscribe(eff);
-      report(e);
-    }
+  for (const eff of [...effects].sort((a, b) => a.id - b.id)) rerun(eff);
+}
+
+/** Re-runs an effect; an error disposes it and is reported, so the caller keeps running. */
+function rerun(eff: Effect): void {
+  try {
+    eff();
+  } catch (e) {
+    eff.dispose();
+    report(e);
   }
 }
 
@@ -164,7 +187,7 @@ function wrap(
       ) {
         if (!isFn) return wrap(val as Record<PropertyKey, unknown>, ctx);
         return getOrCreate((meta.methods ||= new Map()), prop, () =>
-          isClass(val)
+          isClass(val as Function)
             ? val
             : (val as (...args: unknown[]) => unknown).bind(recv),
         );
@@ -188,10 +211,15 @@ function wrap(
       const val = Object.getOwnPropertyDescriptor(obj, prop)?.set
         ? value
         : (value?.[RAW_KEY] ?? value);
-      // Reads made by a getter or setter do not subscribe the writing effect.
+      // Reads made by a getter or setter do not subscribe the writing effect,
+      // but writes made by a setter still count as its own.
       const runtime = ctx[RUNTIME_KEY];
       const active = runtime?.active;
-      if (active) runtime.active = null;
+      const writer = runtime?.writer;
+      if (active) {
+        runtime.active = null;
+        runtime.writer = active;
+      }
       const isArray = Array.isArray(obj);
       const oldLength = isArray ? obj.length : 0;
       let had: boolean;
@@ -202,17 +230,19 @@ function wrap(
         old = (obj as Record<PropertyKey, unknown>)[prop];
         ok = Reflect.set(obj, prop, val, recv);
       } finally {
-        if (active) runtime.active = active;
+        if (active) {
+          runtime.active = active;
+          runtime.writer = writer;
+        }
       }
       // A rejected write (e.g. to a getter-only property) changes nothing.
       if (ok) {
-        const length = prop === "length" && isArray;
-        if (length || !had || !Object.is(old, val)) flush(prop);
+        if (!had || !Object.is(old, val)) flush(prop);
         if (!had) flush(ITERATE);
         // An index written past the end grows the array without a `length` write.
-        if (isArray && !length && obj.length !== oldLength) flush("length");
+        if (isArray && obj.length !== oldLength) flush("length");
         // A shorter array drops its tail: notify readers of the dropped indices and of the keys.
-        if (length && (val as number) < (old as number)) {
+        if (isArray && prop === "length" && (val as number) < oldLength) {
           for (const k of meta.deps.keys()) {
             if (
               typeof k === "string" &&
@@ -255,7 +285,8 @@ function wrap(
  * `length`; assigning a smaller `length` re-runs the effects that read
  * `length`, a dropped index, or the keys.
  * Methods are returned bound to the proxy (cached, so a method reads as the
- * same function each time, but not as the original); classes are returned as is.
+ * same function each time, but not as the original); classes and built-in
+ * constructors (so `state.items.constructor === Array`) are returned as is.
  * Reading a read-only, non-configurable property (such as one of a frozen
  * object) that holds a nested object, array, or method throws a `TypeError`;
  * keep frozen data outside the signal.
@@ -310,7 +341,8 @@ export function signal<
  *
  * Reads performed inside the callback will not subscribe the current
  * {@link effect} to the accessed properties. Useful for breaking cycles
- * or performing intentional non-reactive reads.
+ * or performing intentional non-reactive reads. Writes made inside still
+ * count as the effect's own, so they do not re-run it.
  *
  * The context is determined by `this`, following the same rules as
  * {@link signal}.
@@ -340,12 +372,15 @@ export function signal<
  */
 export function untrack<T = any>(this: object | void, fn: () => T): T {
   const runtime = getRuntime(this);
-  const prev = runtime.active;
+  const { active, writer } = runtime;
   runtime.active = null;
+  // Writes made inside still count as the running effect's own.
+  if (active) runtime.writer = active;
   try {
     return fn();
   } finally {
-    runtime.active = prev;
+    runtime.active = active;
+    runtime.writer = writer;
   }
 }
 
@@ -356,7 +391,10 @@ export function untrack<T = any>(this: object | void, fn: () => T): T {
  * signal during this execution is subscribed to the effect. When a
  * subscribed property is written, the effect is scheduled to re-run
  * (batched via `setTimeout(…, 0)`: one re-run per effect, however many of its
- * properties were written in the meantime).
+ * properties were written in the meantime). An effect is not re-run by its
+ * own writes made during its getter, such as the `length` that `push()` reads
+ * and then writes; a write to the same key from elsewhere in the same tick
+ * still re-runs it.
  *
  * An optional `setter` receives the return value of `getter`. When the
  * getter returns a `Promise`, `setter` is called with its resolved value,
@@ -417,10 +455,12 @@ export function effect(
     if (disposed) return;
     const id = ++run;
     // An effect created inside another effect's getter, `untrack()`, or a
-    // signal setter tracks its own reads, then restores the caller's tracking.
-    const outer = runtime.active;
+    // signal setter tracks its own reads, and its writes, including its
+    // setter's, are not the caller's; then it restores the caller's tracking.
+    const { active: outer, writer } = runtime;
     unsubscribe(eff);
     runtime.active = eff;
+    runtime.writer = null;
     try {
       const value = getter();
       runtime.active = null;
@@ -434,6 +474,9 @@ export function effect(
       else if (setter) set(value);
     } finally {
       runtime.active = outer;
+      runtime.writer = writer;
+      // Disposed during its own run, the effect drops the reads it tracked after that.
+      if (disposed) unsubscribe(eff);
     }
   };
   const dispose = () => {
@@ -442,6 +485,7 @@ export function effect(
   };
   eff.subs = new Set();
   eff.id = nextEffectId++;
+  eff.dispose = dispose;
   try {
     eff();
   } catch (e) {
@@ -449,5 +493,5 @@ export function effect(
     dispose();
     throw e;
   }
-  return dispose;
+  return Object.assign(dispose, { [RUN]: () => rerun(eff) });
 }
