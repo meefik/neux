@@ -1175,6 +1175,17 @@ suite("render", async () => {
     equal(el.style.backgroundColor, "", "camelCase style cleared");
   });
 
+  await test("sets and clears a CSS custom property with uppercase letters", async () => {
+    const state = signal<{ v?: string }>({ v: "red" });
+    const el = render<HTMLElement>({ style: { "--myColor": () => state.v } });
+    equal(el.style.getPropertyValue("--myColor"), "red");
+
+    state.v = undefined;
+    await tick();
+
+    equal(el.style.getPropertyValue("--myColor"), "");
+  });
+
   await test("clearing a camelCase or kebab-case style reports the same updated detail", async () => {
     const state = signal<{ on?: boolean }>({ on: true });
     const { details, on } = updates();

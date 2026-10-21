@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `style` key for a CSS custom property with uppercase letters (such as `--myColor`) is now applied through the CSS API instead of being set as a plain JS property on the style object.
 - Effects of one update now re-run in creation order, so an effect runs before the effects created during its run. A parent that disposes or replaces its children (such as a reactive `children` list) now does so before a child's binding re-runs against state that no longer fits it, which used to report a spurious error such as reading a property of `undefined`.
 - `i18n()` resolves a requested language to the closest locale — an exact key (case- and separator-insensitive, `ru_RU` ≡ `ru-RU`) or, when none, the longest key the language starts with at a subtag boundary (`de_DE` → `de`, while `run-BI` no longer matches `ru`) — tolerates odd separators such as `ru_RU.UTF-8` (using the leading language subtag), no longer validates tags against a full locale-shape regex or throws on an unparseable language or `fallback`, and reports a missing key once per locale.
 - An `effect()` created inside `untrack()` tracks its own reads instead of never re-running.

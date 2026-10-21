@@ -608,8 +608,9 @@ function createNode(
           if (prop && style) {
             const styleValue = toStr(value);
             newValue = styleValue;
-            if (UPPER_CASE_RE.test(prop)) {
-              // Handle camelCase properties directly on the style object.
+            if (UPPER_CASE_RE.test(prop) && !prop.startsWith("--")) {
+              // Handle camelCase properties directly on the style object;
+              // custom properties (`--myColor`) are case-sensitive and go through the CSS API.
               (style as unknown as Record<string, string>)[prop] =
                 styleValue ?? "";
             } else if (styleValue === undefined) {
