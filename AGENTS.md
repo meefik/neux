@@ -33,19 +33,18 @@ SKILL.md      # AI agent skill guidelines
 
 ## Commands
 
-| Command             | Does                                 |
-| ------------------- | ------------------------------------ |
-| `npm install`       | Install dev dependencies             |
-| `npm run build`     | Build (ESM + UMD) + TS declarations  |
-| `npm test`          | Run unit tests with coverage         |
-| `npm run docs`      | Generate docs → `docs/`              |
-| `npm run typecheck` | Type-check only                      |
-| `npm run format`    | Format sources and docs (Prettier)   |
-| `npm run check`     | Check `dist/` against `browserslist` |
+| Command             | Does                                                                           |
+| ------------------- | ------------------------------------------------------------------------------ |
+| `npm install`       | Install dev dependencies                                                       |
+| `npm run build`     | Build (ESM + UMD) + TS declarations, then check `dist/` against `browserslist` |
+| `npm test`          | Run unit tests with coverage                                                   |
+| `npm run docs`      | Generate docs → `docs/`                                                        |
+| `npm run typecheck` | Type-check only                                                                |
+| `npm run format`    | Format sources and docs (Prettier)                                             |
 
 ## Testing
 
-Tests live alongside source (`src/**/*.test.ts`). `npm test` fails when branch coverage drops below 90%. Follow **Arrange → Act → Assert**. Node built-in imports use the `node:` prefix. JSDOM provides a simulated browser DOM for tests that interact with elements. No external test libraries — just `node:test`, `node:assert/strict`, and `jsdom`.
+Tests live alongside source (`src/**/*.test.ts`). `npm test` fails when branch coverage drops below 95%. Follow **Arrange → Act → Assert**. Node built-in imports use the `node:` prefix. JSDOM provides a simulated browser DOM for tests that interact with elements. No external test libraries — just `node:test`, `node:assert/strict`, and `jsdom`.
 
 ## Docs
 

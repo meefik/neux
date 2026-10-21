@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - A write to a key that no effect reads no longer schedules a re-run, signals keep each object's reactive state in one `WeakMap` entry, and the renderer keeps each node's state on the node under a private symbol instead of in separate `WeakMap` and `WeakSet` collections, making signal writes and list rendering about 10% faster.
+- `npm run build` now checks `dist/` against the `browserslist` targets in a `postbuild` step, replacing the separate `npm run check` script.
 
 ### Fixed
 

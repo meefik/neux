@@ -46,11 +46,11 @@
   ],
   "scripts": {
     "build": "vite build && tsc -p tsconfig.build.json",
+    "postbuild": "es-check checkBrowser 'dist/*.js' --module --checkFeatures",
     "typecheck": "tsc -p tsconfig.json",
     "format": "prettier --write .",
-    "test": "node --import tsx --test --experimental-test-coverage --test-coverage-include='src/**/*.ts' --test-coverage-exclude='src/**/*.test.ts' --test-coverage-branches=90 'src/**/*.test.ts'",
-    "docs": "typedoc && cp docs/README.md docs/llms.txt",
-    "check": "es-check checkBrowser 'dist/*.js' --module --checkFeatures"
+    "test": "node --import tsx --test --experimental-test-coverage --test-coverage-include='src/**/*.ts' --test-coverage-exclude='src/**/*.test.ts' --test-coverage-branches=95 'src/**/*.test.ts'",
+    "docs": "typedoc && cp docs/README.md docs/llms.txt"
   },
   "devDependencies": {
     "@types/jsdom": "^30.0.0",
