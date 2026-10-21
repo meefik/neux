@@ -20,10 +20,9 @@ const MATH_NS = "http://www.w3.org/1998/Math/MathML";
 /** Namespaces auto-detected from the tag name. */
 const NS_BY_TAG: Record<string, string> = { svg: SVG_NS, math: MATH_NS };
 
-/** Patterns for detecting markup, parsing tag selectors, detecting camelCase style keys, and splitting class names. */
+/** Patterns for detecting markup, parsing tag selectors, and splitting class names. */
 const HTML_RE = /[^a-zA-Z0-9-_.#]/u;
 const PARSE_TAG_RE = /([.#]?[^\s#.]+)/gu;
-const UPPER_CASE_RE = /[A-Z]/u;
 const WHITESPACE_RE = /\s+/u;
 
 /**
@@ -152,11 +151,6 @@ function isPlainObjectOrArray(value: unknown): boolean {
   );
 }
 
-/** Converts a value to a string; `null` and `undefined` stay `undefined`. */
-function toStr(value: unknown): string | undefined {
-  return value == null ? undefined : String(value);
-}
-
 /**
  * Dispatches a custom event on the target element.
  */
@@ -165,8 +159,7 @@ function dispatchEvent(
   event: keyof ElementLifecycle,
   detail?: unknown,
 ): void {
-  const { CustomEvent } = window;
-  target.dispatchEvent(new CustomEvent(event, { detail }));
+  target.dispatchEvent(new window.CustomEvent(event, { detail }));
 }
 
 /** Neux state kept on a node, under the private {@link STATE} key. */
@@ -207,12 +200,9 @@ function stateOf(node: Node): NodeState {
  * order matches the documented contract (parent before children) instead of
  * the build order (children before parent).
  */
-const BUILD = {
-  /** Depth of nested builds. */
-  depth: 0,
-  /** Nodes armed for `mounted`, flushed by {@link flushMounts}. */
-  armed: new Set<Node>(),
-};
+let depth = 0;
+/** Nodes armed for `mounted`, flushed by {@link flushMounts}. */
+const armed = new Set<Node>();
 
 /**
  * Lists the child nodes of a node in tree order: those of its shadow root
@@ -232,14 +222,14 @@ function childNodesOf(node: Node): Node[] {
  * disarmed, so none of them receives `mounted` either.
  */
 function destroyNode(root: Node): void {
-  BUILD.armed.delete(root);
+  armed.delete(root);
   (root as StatefulNode)[STATE]?.dispose?.();
   for (const child of childNodesOf(root)) destroyNode(child);
 }
 
 /** Runs `fn` as a build: `mounted` requests armed inside it fire once the outermost build ends. */
 function build<T>(fn: () => T): T {
-  BUILD.depth++;
+  depth++;
   try {
     return fn();
   } finally {
@@ -259,7 +249,7 @@ function build<T>(fn: () => T): T {
 function fireMount(node: Node): void {
   const state = stateOf(node);
   if (state.mounted) return;
-  BUILD.armed.delete(node);
+  armed.delete(node);
   state.mounted = true;
   dispatchEvent(node, "mounted");
   for (const child of childNodesOf(node)) fireMount(child);
@@ -273,16 +263,15 @@ function fireMount(node: Node): void {
  * {@link destroyNode}, preserving the `mounted`/`removed` pairing.
  */
 function flushMounts(): void {
-  BUILD.depth--;
-  if (BUILD.depth > 0 || BUILD.armed.size === 0) return;
+  if (--depth) return;
   // Document order puts an ancestor before its descendants, which `fireMount`
   // reaches through the ancestor's cascade; armed order is children first.
-  const { DOCUMENT_POSITION_FOLLOWING } = window.Node;
-  const armed = [...BUILD.armed].sort((a, b) =>
-    a.compareDocumentPosition(b) & DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+  // 4 is `Node.DOCUMENT_POSITION_FOLLOWING`.
+  const nodes = [...armed].sort((a, b) =>
+    a.compareDocumentPosition(b) & 4 ? -1 : 1,
   );
-  BUILD.armed.clear();
-  for (const node of armed) fireMount(node);
+  armed.clear();
+  for (const node of nodes) fireMount(node);
 }
 
 /**
@@ -435,10 +424,6 @@ function createNode(
     }
   };
 
-  const allocate = (key: string, fn: () => void) => {
-    getOrCreate(bindings, key, () => []).push(fn);
-  };
-
   // Register the disposer so `destroyNode` can release these bindings if
   // this node is discarded without ever being inserted.
   const state = stateOf(el);
@@ -469,11 +454,11 @@ function createNode(
     // The rebuild may create fresh children. Their `mounted` is only armed:
     // no flush happens here, because this runs inside `fireMount`, whose
     // cascade reaches them after this element's own handlers have run.
-    BUILD.depth++;
+    depth++;
     try {
       patchNode(rest);
     } finally {
-      BUILD.depth--;
+      depth--;
     }
   });
 
@@ -502,20 +487,19 @@ function createNode(
       // A function on the way is a reactive map, which re-runs as a whole.
       const keys = String(prop).split(".");
       let parent: any = rest;
-      let depth = 0;
+      let i = 0;
       while (
-        depth < keys.length - 1 &&
+        i < keys.length - 1 &&
         parent &&
-        typeof parent[keys[depth]] !== "function"
+        typeof parent[keys[i]] !== "function"
       ) {
-        parent = parent[keys[depth++]];
+        parent = parent[keys[i++]];
       }
-      const key = keys[depth];
+      const key = keys[i];
       // A property the config does not bind is left as is.
-      if (!parent || !hasOwn(parent, key)) {
-        continue;
+      if (parent && hasOwn(parent, key)) {
+        patchNode({ [key]: parent[key] }, keys.slice(0, i));
       }
-      patchNode({ [key]: parent[key] }, keys.slice(0, depth));
     }
   });
 
@@ -567,7 +551,7 @@ function createNode(
               newNodes,
             );
             for (const node of removed) unmountNode(node);
-            for (const node of added) BUILD.armed.add(node);
+            for (const node of added) armed.add(node);
             // syncDOM may keep an old node and drop a fresh one (structural
             // match). A dropped node never entered the DOM, so it must not fire
             // `removed`; release its bindings silently. Supplied nodes may be
@@ -594,47 +578,32 @@ function createNode(
           const prev = prevValues.get(pathKey) as string[] | undefined;
           newValue = prev?.join(" ") === names.join(" ") ? prev : names;
         }
-        // Attributes.
-        else if (root === "attributes") {
-          if (prop) {
-            newValue = toStr(value);
-            if (newValue === undefined) el.removeAttribute(prop);
-            else el.setAttribute(prop, newValue as string);
-          } else {
-            patchMap(value, subpath, pathKey);
-          }
-        }
-        // Inline style.
-        else if (root === "style") {
-          const style = (el as HTMLElement).style;
-          if (prop && style) {
-            const styleValue = toStr(value);
-            newValue = styleValue;
-            if (UPPER_CASE_RE.test(prop) && !prop.startsWith("--")) {
-              // Handle camelCase properties directly on the style object;
-              // custom properties (`--myColor`) are case-sensitive and go through the CSS API.
-              (style as unknown as Record<string, string>)[prop] =
-                styleValue ?? "";
-            } else if (styleValue === undefined) {
-              style.removeProperty(prop);
+        // Attributes, inline style, and data attributes.
+        else if (
+          root === "attributes" ||
+          root === "style" ||
+          root === "dataset"
+        ) {
+          const { style, dataset } = el as HTMLElement;
+          if (prop && (root === "attributes" || (style && dataset))) {
+            const str = value == null ? undefined : String(value);
+            newValue = str;
+            if (root === "attributes") {
+              if (str === undefined) el.removeAttribute(prop);
+              else el.setAttribute(prop, str);
+            } else if (root === "dataset") {
+              if (str === undefined) delete dataset[prop];
+              else dataset[prop] = str;
+            } else if (prop.includes("-")) {
+              // Kebab-case and custom properties (`--myColor`, case-sensitive)
+              // go through the CSS API; an empty value removes the property.
+              style.setProperty(prop, str ?? "");
             } else {
-              // Handle kebab-case properties via CSS property API.
-              style.setProperty(prop, styleValue);
+              (style as unknown as Record<string, string>)[prop] = str ?? "";
             }
           } else {
             patchMap(value, subpath, pathKey);
-            if (!style?.length) el.removeAttribute("style");
-          }
-        }
-        // Data attributes.
-        else if (root === "dataset") {
-          const data = (el as HTMLElement).dataset;
-          if (prop && data) {
-            newValue = toStr(value);
-            if (newValue === undefined) delete data[prop];
-            else data[prop] = newValue as string;
-          } else {
-            patchMap(value, subpath, pathKey);
+            if (root === "style" && !style?.length) el.removeAttribute("style");
           }
         }
         // Custom properties.
@@ -675,7 +644,9 @@ function createNode(
 
       dispose(pathKey);
       if (typeof getter === "function") {
-        allocate(pathKey, effect.call(context, getter.bind(el), setter));
+        getOrCreate(bindings, pathKey, () => []).push(
+          effect.call(context, getter.bind(el), setter),
+        );
       } else {
         setter(getter);
       }
@@ -714,7 +685,7 @@ function keyOf(node: Node): string {
  */
 function syncDOM(
   parent: Node,
-  oldList: Node[],
+  oldList: (Node | null)[],
   newList: Node[],
 ): [Node[], Node[]] {
   let oldStart = 0;
@@ -726,7 +697,7 @@ function syncDOM(
   while (
     oldStart <= oldEnd &&
     newStart <= newEnd &&
-    isSame(oldList[oldStart], newList[newStart])
+    isSame(oldList[oldStart]!, newList[newStart])
   ) {
     oldStart++;
     newStart++;
@@ -736,35 +707,35 @@ function syncDOM(
   while (
     oldStart <= oldEnd &&
     newStart <= newEnd &&
-    isSame(oldList[oldEnd], newList[newEnd])
+    isSame(oldList[oldEnd]!, newList[newEnd])
   ) {
     oldEnd--;
     newEnd--;
   }
 
-  // Diff remaining nodes. Old nodes are indexed by key, in list order.
-  const used = new Set<number>();
+  // Diff remaining nodes. Old nodes are indexed by key, in list order; a
+  // matched one is cleared from `oldList`, so what is left is removed.
   const added: Node[] = [];
   const index = new Map<string, number[]>();
   for (let j = oldStart; j <= oldEnd; j++) {
-    getOrCreate(index, keyOf(oldList[j]), () => []).push(j);
+    getOrCreate(index, keyOf(oldList[j]!), () => []).push(j);
   }
-  let prev: Node | null = oldStart > 0 ? oldList[oldStart - 1] : null;
+  let prev = oldStart > 0 ? oldList[oldStart - 1] : null;
 
   for (let i = newStart; i <= newEnd; i++) {
     const newNode = newList[i];
-    let match = -1;
+    let existing: Node | null = null;
 
     // Take the first unused old node with the same key that is the same.
     const candidates = index.get(keyOf(newNode));
-    while (candidates?.length && match < 0) {
+    while (candidates?.length && !existing) {
       const j = candidates.shift()!;
-      if (isSame(oldList[j], newNode)) match = j;
+      if (isSame(oldList[j]!, newNode)) {
+        existing = oldList[j];
+        oldList[j] = null;
+      }
     }
-
-    const existing = match < 0 ? newNode : oldList[match];
-    if (match < 0) added.push(newNode);
-    else used.add(match);
+    if (!existing) added.push((existing = newNode));
 
     // Insert if not already in the correct position.
     const target = prev ? prev.nextSibling : parent.firstChild;
@@ -776,10 +747,8 @@ function syncDOM(
   // Remove unmatched old nodes.
   const removed: Node[] = [];
   for (let i = oldEnd; i >= oldStart; i--) {
-    if (!used.has(i)) {
-      removed.push(oldList[i]);
-      parent.removeChild(oldList[i]);
-    }
+    const node = oldList[i];
+    if (node) removed.push(parent.removeChild(node));
   }
 
   return [added, removed];
@@ -873,7 +842,7 @@ export function render(
       // Arm the root(s); the build fires the whole tree top-down.
       for (const node of Array.isArray(el) ? el : [el]) {
         parent.appendChild(node);
-        BUILD.armed.add(node);
+        armed.add(node);
       }
     }
     return el;

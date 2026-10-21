@@ -6,8 +6,7 @@
  * @internal
  */
 export function report(error: unknown): void {
-  if (typeof reportError === "function") reportError(error);
-  else console.error(error);
+  (globalThis.reportError || console.error)(error);
 }
 
 /**

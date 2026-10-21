@@ -12,14 +12,10 @@ import { getOrCreate, hasOwn, report } from "./helpers.js";
 
 /** Internal runtime state used for tracking active effects per context. */
 interface Runtime {
-  /** The effect whose getter is running. */
-  active: Effect | null;
-  /** Set while a batch or a signal write runs, so reads made outside an effect getter (e.g. by setters) are not tracked. */
-  syncing: boolean;
-  /** Set inside `untrack()`. */
-  inactive: boolean;
-  /** Keys written since the last trigger, per object; `null` when no trigger is scheduled. */
-  pending: Map<Meta, Set<PropertyKey>> | null;
+  /** The effect whose getter is running; unset inside `untrack()`, a signal write, or an effect setter, so reads there are not tracked. */
+  active?: Effect | null;
+  /** Keys written since the last trigger, per object; unset when no trigger is scheduled. */
+  pending?: Map<Meta, Set<PropertyKey>> | null;
 }
 
 /** Context object that carries runtime metadata keyed by `RUNTIME_KEY`. */
@@ -62,13 +58,13 @@ function isClass(fn: unknown): boolean {
 
 /** Registers the current active effect as a subscriber of `key` of the object. */
 function track(meta: Meta, key: PropertyKey): void {
-  const runtime = meta.ctx[RUNTIME_KEY];
-  if (!runtime?.active || runtime.syncing || runtime.inactive) return;
+  const active = meta.ctx[RUNTIME_KEY]?.active;
+  if (!active) return;
   const subs = getOrCreate(meta.deps, key, () => new Set<Effect>());
   // Record the subscription once per run; a repeated read adds nothing.
-  if (subs.has(runtime.active)) return;
-  subs.add(runtime.active);
-  runtime.active.subs.add([meta.deps, key]);
+  if (subs.has(active)) return;
+  subs.add(active);
+  active.subs.add([meta.deps, key]);
 }
 
 /** Queues `key` of the object for the context's next trigger, one timer per context. */
@@ -95,7 +91,6 @@ function trigger(runtime: Runtime): void {
       for (const eff of meta.deps.get(key) ?? []) effects.add(eff);
     }
   }
-  runtime.syncing = true;
   // Creation order runs an outer effect before the ones it created, so it can
   // dispose them before they re-run against state they no longer fit.
   for (const eff of [...effects].sort((a, b) => a.id - b.id)) {
@@ -106,7 +101,6 @@ function trigger(runtime: Runtime): void {
       report(e);
     }
   }
-  runtime.syncing = false;
 }
 
 /**
@@ -120,16 +114,7 @@ function getContext(thisArg: Record<PropertyKey, any> | void): Context {
 
 /** Returns the runtime of the context for `thisArg`, creating it on first use. */
 function getRuntime(thisArg: Record<PropertyKey, any> | void): Runtime {
-  const ctx = getContext(thisArg);
-  if (!ctx[RUNTIME_KEY]) {
-    ctx[RUNTIME_KEY] = {
-      active: null,
-      syncing: false,
-      inactive: false,
-      pending: null,
-    };
-  }
-  return ctx[RUNTIME_KEY];
+  return (getContext(thisArg)[RUNTIME_KEY] ||= {});
 }
 
 /** Unsubscribes an effect from all tracked properties, dropping keys left without subscribers. */
@@ -178,13 +163,10 @@ function wrap(
         !Object.getOwnPropertyDescriptor(obj, prop)?.get
       ) {
         if (!isFn) return wrap(val as Record<PropertyKey, unknown>, ctx);
-        return getOrCreate(
-          meta.methods ?? (meta.methods = new Map()),
-          prop,
-          () =>
-            isClass(val)
-              ? val
-              : (val as (...args: unknown[]) => unknown).bind(recv),
+        return getOrCreate((meta.methods ||= new Map()), prop, () =>
+          isClass(val)
+            ? val
+            : (val as (...args: unknown[]) => unknown).bind(recv),
         );
       }
       return val;
@@ -206,36 +188,27 @@ function wrap(
       const val = Object.getOwnPropertyDescriptor(obj, prop)?.set
         ? value
         : (value?.[RAW_KEY] ?? value);
+      // Reads made by a getter or setter do not subscribe the writing effect.
       const runtime = ctx[RUNTIME_KEY];
-      const prev = runtime?.syncing;
-      if (runtime) runtime.syncing = true;
-      let had = false;
+      const active = runtime?.active;
+      if (active) runtime.active = null;
+      let had: boolean;
       let old: unknown;
-      let ok = false;
-      // A throwing getter or setter must not leave the context stuck in syncing.
+      let ok: boolean;
       try {
         had = hasOwn(obj, prop);
         old = (obj as Record<PropertyKey, unknown>)[prop];
         ok = Reflect.set(obj, prop, val, recv);
       } finally {
-        if (runtime) runtime.syncing = prev!;
+        if (active) runtime.active = active;
       }
       // A rejected write (e.g. to a getter-only property) changes nothing.
       if (ok) {
-        if (
-          !Object.is(old, val) ||
-          !had ||
-          (prop === "length" && Array.isArray(obj))
-        ) {
-          flush(prop);
-        }
+        const length = prop === "length" && Array.isArray(obj);
+        if (length || !had || !Object.is(old, val)) flush(prop);
         if (!had) flush(ITERATE);
         // A shorter array drops its tail: notify readers of the dropped indices and of the keys.
-        if (
-          prop === "length" &&
-          Array.isArray(obj) &&
-          (val as number) < (old as number)
-        ) {
+        if (length && (val as number) < (old as number)) {
           for (const k of meta.deps.keys()) {
             if (
               typeof k === "string" &&
@@ -360,12 +333,12 @@ export function signal<
  */
 export function untrack<T = any>(this: object | void, fn: () => T): T {
   const runtime = getRuntime(this);
-  const prev = runtime.inactive;
-  runtime.inactive = true;
+  const prev = runtime.active;
+  runtime.active = null;
   try {
     return fn();
   } finally {
-    runtime.inactive = prev;
+    runtime.active = prev;
   }
 }
 
@@ -435,37 +408,30 @@ export function effect(
   const eff: Effect = () => {
     // A disposed effect can still be queued in a trigger's snapshot; it must not re-subscribe.
     if (disposed) return;
-    let value: unknown;
     const id = ++run;
-    // An effect created inside another effect's getter must not end its tracking.
+    // An effect created inside another effect's getter, `untrack()`, or a
+    // signal setter tracks its own reads, then restores the caller's tracking.
     const outer = runtime.active;
-    // An effect created inside `untrack()` or a signal setter must still track
-    // its own reads, and must leave the caller's reads untracked afterwards.
-    const inactive = runtime.inactive;
-    const syncing = runtime.syncing;
     unsubscribe(eff);
     runtime.active = eff;
-    runtime.syncing = false;
-    runtime.inactive = false;
     try {
-      value = getter();
-    } catch (e) {
-      runtime.active = outer;
-      throw e;
+      const value = getter();
+      runtime.active = null;
+      // A pending promise is dropped once the effect re-runs or is disposed.
+      // A rejection is reported, and the effect keeps running.
+      if (value instanceof Promise)
+        value.then(
+          (v) => !disposed && id === run && set(v),
+          (e) => !disposed && id === run && report(e),
+        );
+      else if (setter) set(value);
     } finally {
-      runtime.inactive = inactive;
-      runtime.syncing = syncing;
+      runtime.active = outer;
     }
-    runtime.active = null;
-    // A pending promise is dropped once the effect re-runs or is disposed.
-    // A rejection is reported, and the effect keeps running.
-    if (value instanceof Promise)
-      value.then(
-        (v) => !disposed && id === run && set(v),
-        (e) => !disposed && id === run && report(e),
-      );
-    else if (setter) set(value);
-    runtime.active = outer;
+  };
+  const dispose = () => {
+    disposed = true;
+    unsubscribe(eff);
   };
   eff.subs = new Set();
   eff.id = nextEffectId++;
@@ -473,12 +439,8 @@ export function effect(
     eff();
   } catch (e) {
     // The caller gets no disposer, so a failed first run must not stay subscribed.
-    disposed = true;
-    unsubscribe(eff);
+    dispose();
     throw e;
   }
-  return () => {
-    disposed = true;
-    unsubscribe(eff);
-  };
+  return dispose;
 }

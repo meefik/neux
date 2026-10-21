@@ -21,7 +21,11 @@ export default defineConfig({
     target: "es2020",
     sourcemap: !IS_PROD,
     minify: IS_PROD,
-    // Vite skips whitespace minification for ESM lib builds; force it.
-    rolldownOptions: IS_PROD ? { output: { minify: true } } : {},
+    // Vite skips whitespace minification for ESM lib builds; force it. Pure
+    // annotations are dropped too: `sideEffects: false` already lets bundlers
+    // tree-shake the library.
+    rolldownOptions: IS_PROD
+      ? { output: { minify: true, comments: false } }
+      : {},
   },
 });

@@ -50,12 +50,11 @@ function norm(tag: string): string {
  * formatting never throws.
  */
 function formatLang(tag: string): string {
-  const [lang, ...rest] = norm(tag).split("-");
-  const base = lang.match(/^[a-z]{2,3}/)?.[0];
-  if (!base) return "en";
-  const script = /^[a-z]{4}$/.test(rest[0]) ? rest.shift() : undefined;
-  const region = /^[a-z]{2}$|^[0-9]{3}$/.test(rest[0]) ? rest[0] : undefined;
-  return [base, script, region].filter(Boolean).join("-");
+  // `(?![^-])` ends a subtag at a `-` or the end of the tag.
+  const m = norm(tag).match(
+    /^([a-z]{2,3})[^-]*(-[a-z]{4}(?![^-]))?(-(?:[a-z]{2}|\d{3})(?![^-]))?/,
+  );
+  return m ? m.slice(1).join("") : "en";
 }
 
 /** Looks up a translation by dot-separated path or flat key from a locale map; a key naming a nested group is not a translation. */
@@ -149,10 +148,8 @@ export function i18n(
   locales: Record<string, Record<string, any>>,
   options?: { language?: string; fallback?: string },
 ): Translator {
-  const {
-    language = (typeof navigator !== "undefined" && navigator.language) || "en",
-    fallback = "en",
-  } = options ?? {};
+  const { language = globalThis.navigator?.language || "en", fallback = "en" } =
+    options ?? {};
   // Locale keys in matching form, longest first, so the nearest match is the
   // first that fits; the original key is kept for lookups.
   const keys = Object.keys(locales)
@@ -164,15 +161,7 @@ export function i18n(
   // `ru` and `zh-Hant-TW` matches `zh-Hant`, while `run-BI` does not match `ru`.
   function find(tag: string): string | undefined {
     const t = norm(tag);
-    for (const [key, orig] of keys) {
-      if (
-        t.startsWith(key) &&
-        (t.length === key.length || t[key.length] === "-")
-      ) {
-        return orig;
-      }
-    }
-    return undefined;
+    return keys.find(([key]) => t === key || t.startsWith(`${key}-`))?.[1];
   }
 
   // The fallback locale and language, resolved once; an unparseable one

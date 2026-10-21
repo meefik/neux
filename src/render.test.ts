@@ -1163,12 +1163,17 @@ suite("render", async () => {
     const el = render<HTMLElement>({
       attributes: { placeholder: () => state.attr, empty: "" },
       dataset: { key: () => state.val },
-      style: { color: () => state.color, backgroundColor: () => state.color },
+      style: {
+        color: () => state.color,
+        backgroundColor: () => state.color,
+        "--myColor": () => state.color,
+      },
     });
     equal(el.getAttribute("placeholder"), "present");
     equal(el.dataset.key, "1");
     equal(el.style.color, "red");
     equal(el.style.backgroundColor, "red", "camelCase key is set");
+    equal(el.style.getPropertyValue("--myColor"), "red", "custom property set");
 
     state.attr = state.val = state.color = undefined;
     await tick();
@@ -1178,17 +1183,11 @@ suite("render", async () => {
     equal(el.hasAttribute("data-key"), false, "data-key removed");
     equal(el.style.getPropertyValue("color"), "", "color cleared");
     equal(el.style.backgroundColor, "", "camelCase style cleared");
-  });
-
-  await test("sets and clears a CSS custom property with uppercase letters", async () => {
-    const state = signal<{ v?: string }>({ v: "red" });
-    const el = render<HTMLElement>({ style: { "--myColor": () => state.v } });
-    equal(el.style.getPropertyValue("--myColor"), "red");
-
-    state.v = undefined;
-    await tick();
-
-    equal(el.style.getPropertyValue("--myColor"), "");
+    equal(
+      el.style.getPropertyValue("--myColor"),
+      "",
+      "custom property cleared",
+    );
   });
 
   await test("clearing a camelCase or kebab-case style reports the same updated detail", async () => {
