@@ -229,45 +229,26 @@ suite("i18n", async () => {
     equal(regionalFallback(1234.5), (1234.5).toLocaleString("en-US"));
   });
 
-  await test("matches locale keys case-insensitively, including regional entries", () => {
-    const tr = i18n(
-      { "en-US": { hello: "Hello US" }, en: { hello: "Hello" } },
-      { language: "en-US" },
-    );
-    equal(
-      tr("hello"),
-      "Hello US",
-      "an exact regional entry wins over its base",
-    );
-    equal(tr("hello", "en"), "Hello", "the base entry still resolves");
-    equal(tr("hello", "en-GB"), "Hello", "an unmatched region uses the base");
-
-    const upper = i18n({ RU: { hello: "Привет" } }, { language: "ru" });
-    equal(upper("hello"), "Привет", "an uppercase key matches a lowercase tag");
-
-    const regionalOnly = i18n(
-      { "ru-RU": { hello: "Привет РФ" } },
-      { language: "ru-RU", fallback: "en" },
-    );
-    equal(regionalOnly("hello"), "Привет РФ", "a regional-only entry resolves");
-  });
-
   await test("matches separator and case variants of a locale", () => {
     const tr = i18n(
       {
         ru: { hello: "RU" },
         ru_RU: { hello: "RURU" },
-        ru_BY: { hello: "RUBY" },
+        RU_BY: { hello: "RUBY" },
       },
       { language: "ru", fallback: "en" },
     );
-    equal(tr("hello", "ru_RU"), "RURU", "an underscore key matches as-is");
+    equal(
+      tr("hello", "ru_RU"),
+      "RURU",
+      "an exact regional key matches, ahead of its base",
+    );
     equal(
       tr("hello", "ru-RU"),
       "RURU",
       "a dash request matches the underscore key",
     );
-    equal(tr("hello", "ru_BY"), "RUBY", "another underscore key");
+    equal(tr("hello", "ru_BY"), "RUBY", "an uppercase key matches too");
     equal(tr("hello"), "RU", "the base `ru` resolves the base key");
     equal(
       tr("hello", "ru-KZ"),
@@ -281,6 +262,11 @@ suite("i18n", async () => {
       { language: "ru", fallback: "en" },
     );
     equal(
+      onlyRegional("hello", "ru-RU"),
+      "RURU",
+      "a regional-only entry resolves",
+    );
+    equal(
       onlyRegional("hello", "ru_KZ"),
       "EN",
       "with no base `ru`, an unknown region falls to the fallback",
@@ -291,7 +277,6 @@ suite("i18n", async () => {
     const tr = i18n(
       {
         aB3: { hello: "AB3" },
-        ru: { hello: "RU" },
         zh: { hello: "ZH" },
         "zh-Hant": { hello: "ZH-HANT" },
       },
@@ -321,12 +306,7 @@ suite("i18n", async () => {
       "hello",
       "nor does one followed by more subtags",
     );
-    equal(
-      tr("hello", "ru-kz"),
-      "RU",
-      "an unknown region still falls back to the base key",
-    );
-    equal(tr("hello", "  "), "hello", "and a blank language reports as given");
+    equal(tr("hello", "  "), "hello", "a blank language reports as given");
   });
 
   await test("does not throw on an unparseable fallback", () => {
@@ -361,7 +341,7 @@ suite("i18n", async () => {
     );
   });
 
-  test("null and undefined values leave the placeholder", () => {
+  await test("null and undefined values leave the placeholder", () => {
     const tr = i18n({ en: { a: "v=%{v}" } }, { language: "en" });
     equal(tr("a", { v: null }), "v=%{v}");
     equal(tr("a", { v: undefined }), "v=%{v}");

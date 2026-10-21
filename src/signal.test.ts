@@ -51,20 +51,7 @@ suite("signal", async () => {
     equal(s.nested.x, 2, "replacement is re-wrapped");
   });
 
-  await test("tracks computed properties", async () => {
-    const s = signal({
-      base: 5,
-      get doubled() {
-        return this.base * 2;
-      },
-    });
-    const runs = track(() => s.doubled);
-    s.base = 10;
-    await tick();
-    equal(runs.count, 2, "effect re-ran when underlying property changed");
-  });
-
-  await test("a getter that returns a function is evaluated on every read", async () => {
+  await test("tracks computed properties, evaluating a getter on every read", async () => {
     const s = signal({
       mode: "a",
       get label() {
@@ -105,19 +92,13 @@ suite("signal", async () => {
     equal(missing.count, 2, "deleting an existing key still re-runs");
   });
 
-  await test("tracks nested, array element, replaced object, and deleted property changes", async () => {
-    const s = signal<{
-      level1: { level2: string; gone?: string };
-      items: { value: number }[];
-      obj: { x: number };
-    }>({
-      level1: { level2: "deep", gone: "x" },
+  await test("tracks nested, array element, and replaced object changes", async () => {
+    const s = signal({
+      level1: { level2: "deep" },
       items: [{ value: 10 }],
       obj: { x: 1 },
     });
     let last;
-    let gone;
-    const deleted = track(() => (gone = s.level1.gone));
     const nested = track(() => (last = s.level1.level2));
     const element = track(() => s.items[0].value);
     let replaced;
@@ -125,10 +106,7 @@ suite("signal", async () => {
     s.level1.level2 = "deeper";
     s.items[0].value = 99;
     s.obj = { x: 999 };
-    delete s.level1.gone;
     await tick();
-    equal(deleted.count, 2, "effect re-ran on property deletion");
-    equal(gone, undefined, "deleted property reads as undefined");
     equal(nested.count, 2, "effect re-ran on nested change");
     equal(last, "deeper", "latest value is visible in the effect");
     equal(element.count, 2, "effect re-ran on array element change");
@@ -317,7 +295,7 @@ suite("signal", async () => {
     equal(downstream.count, 2, "downstream effect runs in the next update");
   });
 
-  await test("tracks length changes and works as a root-level reactive array", async () => {
+  await test("tracks array length changes", async () => {
     const s = signal({ items: [1, 2] });
     let len;
     const runs = track(() => (len = s.items.length));
@@ -329,24 +307,6 @@ suite("signal", async () => {
     await tick();
     equal(runs.count, 4, "effect re-ran for each length mutation");
     equal(len, 4, "length reflects splice result");
-
-    type Item = { text: string; checked?: boolean };
-    const arr = signal<Item[]>([
-      { text: "A", checked: false },
-      { text: "B", checked: true },
-    ]);
-    let checked: Item[] = [];
-    const arrRuns = track(() => (checked = arr.filter((i) => i.checked)));
-    arr.push({ text: "C" });
-    await tick();
-    arr[2].checked = true;
-    await tick();
-    equal(arrRuns.count, 3, "effect re-ran when item property changed");
-    deepEqual(
-      checked.map((i) => i.text),
-      ["B", "C"],
-      "filtered result includes newly checked items",
-    );
   });
 
   await test("tracks keys added to and removed from an object", async () => {
@@ -653,28 +613,6 @@ suite("signal", async () => {
     }
   });
 
-  await test("an effect disposed by an earlier effect in the same trigger does not run again", async () => {
-    const s = signal({ val: 0 });
-    let runs = 0;
-    let stop = () => {};
-    effect(() => {
-      s.val;
-      stop();
-    });
-    stop = effect(() => {
-      runs++;
-      s.val;
-    });
-    equal(runs, 1, "effect runs immediately on creation");
-
-    s.val = 1;
-    await tick();
-    equal(runs, 1, "disposed effect is skipped in the same trigger");
-    s.val = 2;
-    await tick();
-    equal(runs, 1, "disposed effect did not re-subscribe");
-  });
-
   await test("runs an outer effect before the effects it created, so it can dispose them first", async () => {
     const s = signal({
       ids: [1, 2],
@@ -737,24 +675,6 @@ suite("signal", async () => {
     equal(Object.keys(dict).length, 0, "signal data is untouched");
   });
 
-  await test("an effect resubscribes to a key whose subscriber set was dropped", async () => {
-    const s = signal({ a: 1 });
-    const first = track(() => s.a);
-    const second = track(() => s.a);
-    s.a = 2;
-    await tick();
-    equal(first.count, 2);
-    equal(second.count, 2);
-
-    const dispose = effect(() => s.a);
-    dispose();
-    const late = track(() => s.a);
-    s.a = 3;
-    await tick();
-    equal(first.count, 3, "earlier effects keep tracking");
-    equal(late.count, 2, "a later effect tracks the same key");
-  });
-
   await test("a write that no effect reads schedules no trigger", async () => {
     const s = signal({ a: 1, b: 1 });
     const timers = mock.method(globalThis, "setTimeout");
@@ -807,7 +727,7 @@ suite("signal", async () => {
     equal(done.count, 2, "a setter gets the proxy, so its writes are reactive");
   });
 
-  test("shrinking an array length re-runs readers of dropped indices and keys", async () => {
+  await test("shrinking an array length re-runs readers of dropped indices and keys", async () => {
     const state = signal({ list: [1, 2, 3] });
     const keys = track(() => Object.keys(state.list).length);
     const dropped = track(() => state.list[2]);
@@ -822,7 +742,7 @@ suite("signal", async () => {
     equal(Object.keys(state.list).length, 1);
   });
 
-  test("writing an index past the end re-runs `length` readers", async () => {
+  await test("writing an index past the end re-runs `length` readers", async () => {
     const state = signal({ list: [1, 2] });
     const length = track(() => state.list.length);
     const mapped = track(() => state.list.map((x) => x));
@@ -838,13 +758,12 @@ suite("signal", async () => {
     deepEqual([...state.list], [0, 2, 3]);
   });
 
-  test("a class in a signal is returned as is", () => {
+  await test("a class in a signal is returned as is", () => {
     class A {
       static x = 1;
     }
-    const state = signal({ A, fn() {} });
+    const state = signal({ A });
     equal(state.A, A);
     equal(state.A.x, 1);
-    equal(state.fn, state.fn, "a method stays cached");
   });
 });

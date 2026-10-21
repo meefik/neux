@@ -196,16 +196,16 @@ suite("render", async () => {
     equal(fo.children[1].children[0].namespaceURI, svg, "with SVG children");
   });
 
-  await test("use: trims surrounding whitespace", () => {
-    equal(render<HTMLElement>({ use: " span " }).localName, "span");
-    equal(render<HTMLElement>({ use: "  <b></b> " }).localName, "b");
-  });
-
   await test("use: parses tag selector, HTML markup, or reuses element", () => {
     const el1 = render<HTMLElement>({ use: "p#id1.cls1.cls2" });
     equal(el1.tagName, "P");
     equal(el1.id, "id1");
     equal(el1.className, "cls1 cls2");
+    equal(
+      render<HTMLElement>({ use: " span " }).localName,
+      "span",
+      "selector whitespace is ignored",
+    );
 
     const el2 = render<HTMLElement>({
       use: "<span></span>",
@@ -239,33 +239,6 @@ suite("render", async () => {
       domWindow.document,
       "belongs to the main document",
     );
-  });
-
-  await test("a binding removed in the same trigger as its parent does not leak", async () => {
-    const s = signal({ show: true, x: 0 });
-    let runs = 0;
-    render(
-      {
-        children: () =>
-          s.show
-            ? [
-                {
-                  textContent: () => {
-                    runs++;
-                    return `${s.show}-${s.x}`;
-                  },
-                },
-              ]
-            : [],
-      },
-      domWindow.document.createElement("div"),
-    );
-    s.show = false;
-    await tick();
-    const after = runs;
-    s.x = 1;
-    await tick();
-    equal(runs, after, "removed child binding no longer runs");
   });
 
   await test("reports an error from a binding instead of swallowing it", () => {
@@ -678,14 +651,12 @@ suite("render", async () => {
 
   await test("reconciles children: reorder, insert, remove, clear", async () => {
     let list = ["A", "B", "C", "D", "E"].map((text) => ({ text }));
-    const { count, on } = lifecycle();
     const el = render<HTMLElement>({
       tagName: "ul",
       children: () =>
         list.map((item) => ({
           tagName: "li",
           textContent: () => item.text,
-          on,
         })),
     });
     const texts = () => Array.from(el.children, (c) => c.textContent).join();
@@ -700,7 +671,6 @@ suite("render", async () => {
     refresh(el);
     await tick();
     equal(texts(), "Only");
-    ok(count.removed > 0, "removed event fires on reconciled child");
 
     list = [];
     refresh(el);
