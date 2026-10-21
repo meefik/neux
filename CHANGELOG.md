@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Writing an array index past the end (such as `list[list.length] = x` or `Object.assign(list, [...])`) now re-runs effects that read `length`, including `map()`, spread, and `for...of`, so a `children` list renders the new item.
 - Assigning a smaller `length` to an array now re-runs effects that read a dropped index, enumerate the keys, or test an index with `in`, not only those that read `length`.
 - A class stored in a signal is returned as is, keeping its identity and static members, instead of as a bound copy.
 - `i18n()` leaves a `%{key}` placeholder as-is for a `null` value, as it does for `undefined`, instead of printing `null`.

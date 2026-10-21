@@ -822,6 +822,22 @@ suite("signal", async () => {
     equal(Object.keys(state.list).length, 1);
   });
 
+  test("writing an index past the end re-runs `length` readers", async () => {
+    const state = signal({ list: [1, 2] });
+    const length = track(() => state.list.length);
+    const mapped = track(() => state.list.map((x) => x));
+    const first = track(() => state.list[0]);
+    state.list[state.list.length] = 3;
+    await tick();
+    equal(length.count, 2, "a `length` reader re-runs");
+    equal(mapped.count, 2, "an iterating reader re-runs");
+    equal(first.count, 1, "an unrelated index reader does not");
+    state.list[0] = 0;
+    await tick();
+    equal(length.count, 2, "an in-bounds write leaves `length` readers alone");
+    deepEqual([...state.list], [0, 2, 3]);
+  });
+
   test("a class in a signal is returned as is", () => {
     class A {
       static x = 1;

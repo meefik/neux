@@ -192,6 +192,8 @@ function wrap(
       const runtime = ctx[RUNTIME_KEY];
       const active = runtime?.active;
       if (active) runtime.active = null;
+      const isArray = Array.isArray(obj);
+      const oldLength = isArray ? obj.length : 0;
       let had: boolean;
       let old: unknown;
       let ok: boolean;
@@ -204,9 +206,11 @@ function wrap(
       }
       // A rejected write (e.g. to a getter-only property) changes nothing.
       if (ok) {
-        const length = prop === "length" && Array.isArray(obj);
+        const length = prop === "length" && isArray;
         if (length || !had || !Object.is(old, val)) flush(prop);
         if (!had) flush(ITERATE);
+        // An index written past the end grows the array without a `length` write.
+        if (isArray && !length && obj.length !== oldLength) flush("length");
         // A shorter array drops its tail: notify readers of the dropped indices and of the keys.
         if (length && (val as number) < (old as number)) {
           for (const k of meta.deps.keys()) {
