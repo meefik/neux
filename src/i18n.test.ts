@@ -360,4 +360,10 @@ suite("i18n", async () => {
       "and formats as the fallback",
     );
   });
+
+  test("null and undefined values leave the placeholder", () => {
+    const tr = i18n({ en: { a: "v=%{v}" } }, { language: "en" });
+    equal(tr("a", { v: null }), "v=%{v}");
+    equal(tr("a", { v: undefined }), "v=%{v}");
+  });
 });

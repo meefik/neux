@@ -196,6 +196,11 @@ suite("render", async () => {
     equal(fo.children[1].children[0].namespaceURI, svg, "with SVG children");
   });
 
+  await test("use: trims surrounding whitespace", () => {
+    equal(render<HTMLElement>({ use: " span " }).localName, "span");
+    equal(render<HTMLElement>({ use: "  <b></b> " }).localName, "b");
+  });
+
   await test("use: parses tag selector, HTML markup, or reuses element", () => {
     const el1 = render<HTMLElement>({ use: "p#id1.cls1.cls2" });
     equal(el1.tagName, "P");

@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Assigning a smaller `length` to an array now re-runs effects that read a dropped index, enumerate the keys, or test an index with `in`, not only those that read `length`.
+- A class stored in a signal is returned as is, keeping its identity and static members, instead of as a bound copy.
+- `i18n()` leaves a `%{key}` placeholder as-is for a `null` value, as it does for `undefined`, instead of printing `null`.
+- A `use` tag string or markup with surrounding whitespace (such as `"span "`) is trimmed, instead of rendering a `div`.
 - A `style` key for a CSS custom property with uppercase letters (such as `--myColor`) is now applied through the CSS API instead of being set as a plain JS property on the style object.
 - Effects of one update now re-run in creation order, so an effect runs before the effects created during its run. A parent that disposes or replaces its children (such as a reactive `children` list) now does so before a child's binding re-runs against state that no longer fits it, which used to report a spurious error such as reading a property of `undefined`.
 - `i18n()` resolves a requested language to the closest locale — an exact key (case- and separator-insensitive, `ru_RU` ≡ `ru-RU`) or, when none, the longest key the language starts with at a subtag boundary (`de_DE` → `de`, while `run-BI` no longer matches `ru`) — tolerates odd separators such as `ru_RU.UTF-8` (using the leading language subtag), no longer validates tags against a full locale-shape regex or throws on an unparseable language or `fallback`, and reports a missing key once per locale.

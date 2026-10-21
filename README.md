@@ -358,7 +358,7 @@ A computed getter is re-evaluated on every read, so an effect that reads it re-r
 
 - Replacing the entire signal object breaks all existing bindings.
 - Only properties accessed during the synchronous execution of a computed or effect function are tracked. Reads after an `await` are not tracked.
-- Shrinking an array by assigning `length` (`list.length = 0`) re-runs only effects that read `length` (such as `list.map()`), not those that read a dropped index (`list[0]`), enumerate the keys, or test one with `in`. Use `list.splice(0)`, `pop()`, or replace the array.
+- A method stored in a signal reads as a bound copy: `state.fn === fn` is `false`, though `state.fn === state.fn` is `true`. A class is returned as is.
 - Reading a read-only, non-configurable property that holds a nested object, array, or method throws a `TypeError`. This happens with `Object.freeze()` data, such as `signal(Object.freeze({ cfg: {} })).cfg`, but not with primitives or sealed objects. Keep frozen data outside the signal, or leave it unfrozen.
 
 Here is an example of reactivity with nested objects:

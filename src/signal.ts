@@ -55,6 +55,11 @@ const ITERATE: unique symbol = Symbol();
 const GLOBAL: Context = {};
 let nextEffectId = 0;
 
+/** Checks whether a function is a class, which is stored as is: binding would lose its identity and statics. */
+function isClass(fn: unknown): boolean {
+  return /^class[\s{]/.test(Function.prototype.toString.call(fn));
+}
+
 /** Registers the current active effect as a subscriber of `key` of the object. */
 function track(meta: Meta, key: PropertyKey): void {
   const runtime = meta.ctx[RUNTIME_KEY];
@@ -176,7 +181,10 @@ function wrap(
         return getOrCreate(
           meta.methods ?? (meta.methods = new Map()),
           prop,
-          () => (val as (...args: unknown[]) => unknown).bind(recv),
+          () =>
+            isClass(val)
+              ? val
+              : (val as (...args: unknown[]) => unknown).bind(recv),
         );
       }
       return val;
@@ -222,6 +230,22 @@ function wrap(
           flush(prop);
         }
         if (!had) flush(ITERATE);
+        // A shorter array drops its tail: notify readers of the dropped indices and of the keys.
+        if (
+          prop === "length" &&
+          Array.isArray(obj) &&
+          (val as number) < (old as number)
+        ) {
+          for (const k of meta.deps.keys()) {
+            if (
+              typeof k === "string" &&
+              String(+k) === k &&
+              +k >= (val as number)
+            )
+              flush(k);
+          }
+          flush(ITERATE);
+        }
       }
       return ok;
     },
@@ -250,9 +274,10 @@ function wrap(
  * `state.selected = state.items[0]` keeps `state.selected === state.items[0]`;
  * a proxy is stored as its plain object. Wrapping an object a second time, or
  * passing a signal to `signal()`, returns the existing proxy and its context.
- * Assigning a smaller `length` to an array re-runs only effects that read
- * `length`, not those that read a dropped index (`list[0]`) or the keys; use
- * `splice()`, `pop()`, or replace the array instead.
+ * Assigning a smaller `length` to an array re-runs the effects that read
+ * `length`, a dropped index, or the keys.
+ * Methods are returned bound to the proxy (cached, so a method reads as the
+ * same function each time, but not as the original); classes are returned as is.
  * Reading a read-only, non-configurable property (such as one of a frozen
  * object) that holds a nested object, array, or method throws a `TypeError`;
  * keep frozen data outside the signal.

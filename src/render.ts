@@ -330,16 +330,18 @@ function createElement(use: unknown, ns?: string | null): Element {
   let el: Element | undefined;
 
   if (typeof use === "string") {
-    if (HTML_RE.test(use)) {
+    // Surrounding whitespace is not part of a tag or markup.
+    const source = use.trim();
+    if (HTML_RE.test(source)) {
       // Parse HTML markup string. A template accepts any element, such as `<tr>`.
       const template = document.createElement("template");
-      template.innerHTML = use;
+      template.innerHTML = source;
       const content = document.importNode(template.content, true);
       el = content.firstElementChild ?? undefined;
       el?.remove();
     } else {
       // Parse tag string with optional id and class selectors.
-      for (const item of use.match(PARSE_TAG_RE) ?? []) {
+      for (const item of source.match(PARSE_TAG_RE) ?? []) {
         if (item[0] === ".") classList.push(item.slice(1));
         else if (item[0] === "#") id = item.slice(1);
         else tagName = item;

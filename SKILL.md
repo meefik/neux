@@ -43,7 +43,7 @@ const state = signal({
 
 - A **signal** is a reactive `Proxy` wrapping an object or array. Property reads inside an active effect are tracked; writes schedule one batched re-run per tick of subscriber effects that stay in sync.
 - Nested plain objects and arrays (`{}`, `[]`) wrap automatically. Class instances, `Map`, `Set`, `Date`, and null-prototype objects (`Object.create(null)`) do not: they are returned as is and are not reactive, so replace them instead of mutating them.
-- Assigning a smaller `length` to an array (`items.length = 0`) re-runs only effects that read `length` (such as `items.map()`), not those that read a dropped index (`items[0]`), enumerate keys, or test one with `in`. Use `items.splice(0)`, `pop()`, or replace the array.
+- A method stored in a signal reads as a bound copy: `state.fn === fn` is `false`, though `state.fn === state.fn` is `true`. A class is returned as is.
 - Reading a read-only, non-configurable property that holds a nested object, array, or method throws a `TypeError`. This happens with `Object.freeze()` data, such as `signal(Object.freeze({ cfg: {} })).cfg`, but not with primitives or sealed objects. Keep frozen data outside the signal, or leave it unfrozen.
 - Methods bind automatically; access `this.foo` inside them to read reactive fields.
 - Getters become computed derived values that keep their callers in sync.

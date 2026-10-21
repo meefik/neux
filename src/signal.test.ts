@@ -806,4 +806,29 @@ suite("signal", async () => {
     await tick();
     equal(done.count, 2, "a setter gets the proxy, so its writes are reactive");
   });
+
+  test("shrinking an array length re-runs readers of dropped indices and keys", async () => {
+    const state = signal({ list: [1, 2, 3] });
+    const keys = track(() => Object.keys(state.list).length);
+    const dropped = track(() => state.list[2]);
+    const kept = track(() => state.list[0]);
+    const has = track(() => 1 in state.list);
+    state.list.length = 1;
+    await tick();
+    equal(keys.count, 2, "keys readers re-run");
+    equal(dropped.count, 2, "a dropped index reader re-runs");
+    equal(has.count, 2, "an `in` reader re-runs");
+    equal(kept.count, 1, "a kept index reader does not");
+    equal(Object.keys(state.list).length, 1);
+  });
+
+  test("a class in a signal is returned as is", () => {
+    class A {
+      static x = 1;
+    }
+    const state = signal({ A, fn() {} });
+    equal(state.A, A);
+    equal(state.A.x, 1);
+    equal(state.fn, state.fn, "a method stays cached");
+  });
 });
