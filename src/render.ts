@@ -122,7 +122,7 @@ export type ElementConfig = {
 export interface ElementLifecycle {
   /** Fired top-down (this element before its children), the same order as `removed`, when the element is appended to a parent — on both the initial mount and a re-mount. */
   mounted: (this: Node, event: CustomEvent) => void;
-  /** Fired top-down before cleanup when a `children` update removes the element from a parent; DOM removals such as `el.remove()` do not fire it. Always paired with `mounted`: nodes discarded by a reactive re-render are never inserted, so they are disposed internally without firing it. */
+  /** Fired top-down before cleanup when a `children` update removes the element from a parent; DOM removals such as `el.remove()` do not fire it, nor does removing an element that was inserted with DOM APIs (such as into a wrapper built with `document.createElement()`), which never received `mounted`. Always paired with `mounted`: nodes discarded by a reactive re-render are never inserted, so they are disposed internally without firing it. */
   removed: (this: Node, event: CustomEvent) => void;
   /** Fired on the bound element after its property value changes; not fired when a re-run resolves to the same value, for the first applied value, or for a change from a cleared (`null` or `undefined`) binding. For `className`, the values are the applied class names; for `children`, the child nodes in the DOM. */
   updated: (
@@ -794,11 +794,11 @@ export function render(
  * Creates a DOM node from a configuration value.
  *
  * Handles the following config types:
- * - `Node` — returned as-is.
+ * - `Node` — returned as is.
  * - `string` or `number` — becomes a text node.
  * - `Array` — becomes an array of rendered nodes (see the array overload).
  * - `boolean`, `null`, `undefined` — render nothing and return `null`.
- * - `object` — a plain object (or one with a null prototype) is parsed as a {@link ElementConfig} with reactive bindings via effects.
+ * - `object` — a plain object (or one with a null prototype) is parsed as an {@link ElementConfig} with reactive bindings via effects.
  * - anything else, such as a class instance, `Date`, function, or symbol — render nothing and return `null`; a `children` list skips it.
  *
  * Lifecycle events are dispatched by the render layer (see {@link ElementLifecycle}):

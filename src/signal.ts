@@ -251,13 +251,16 @@ function wrap(
  * `state.selected = state.items[0]` keeps `state.selected === state.items[0]`;
  * a proxy is stored as its plain object. Wrapping an object a second time, or
  * passing a signal to `signal()`, returns the existing proxy and its context.
- * Assigning a smaller `length` to an array re-runs the effects that read
+ * Writing an index past the end of an array re-runs the effects that read
+ * `length`; assigning a smaller `length` re-runs the effects that read
  * `length`, a dropped index, or the keys.
  * Methods are returned bound to the proxy (cached, so a method reads as the
  * same function each time, but not as the original); classes are returned as is.
  * Reading a read-only, non-configurable property (such as one of a frozen
  * object) that holds a nested object, array, or method throws a `TypeError`;
  * keep frozen data outside the signal.
+ * Defining a property with `Object.defineProperty()` does not re-run effects;
+ * assign it instead.
  * Writes and deletions schedule one batched re-run per tick of the dependent
  * effects: an effect re-runs once, however many of its properties changed.
  *
@@ -280,12 +283,12 @@ function wrap(
  *   get left() {
  *     return 100 - this.page;
  *   },
- *   // non-reactive methods
+ *   // methods, bound to the proxy
  *   nextPost() {
  *     if (this.page < 100) this.page++;
  *   },
  *   prevPost() {
- *     if (this.page > 0) this.page--;
+ *     if (this.page > 1) this.page--;
  *   },
  *   async fetchPost() {
  *     const response = await fetch(

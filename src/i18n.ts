@@ -68,7 +68,7 @@ function resolve(
   return typeof text === "object" ? undefined : text;
 }
 
-/** Replaces `%{key}` placeholders with own values from data; missing keys (including inherited ones such as `toString`) and `null` or `undefined` values are left as-is. */
+/** Replaces `%{key}` placeholders with own values from data; missing keys (including inherited ones such as `toString`) and `null` or `undefined` values are left as is. */
 function fill(
   text: string,
   lang: string,

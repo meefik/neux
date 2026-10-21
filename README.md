@@ -100,7 +100,7 @@ Use the `render()` function to create one or more DOM nodes from a declarative d
 - `attributes`: (Object or Function) Maps attribute names to their corresponding values. Use a static object for fixed attributes or a function for dynamic assignment. Uses `setAttribute`/`removeAttribute` internally: values are converted to strings (`false` becomes `"false"`), and `null` or `undefined` removes the attribute. For boolean attributes such as `disabled` or `required`, set the element property instead (`disabled: false`). When provided as a function, `this` is bound to the element.
 - `style`: (Object or Function) Sets inline CSS styles via an object where keys are style property names in camelCase (`backgroundColor`) or kebab-case (`background-color`). This can also be defined as a function to handle dynamic styling. When provided as a function, `this` is bound to the element.
 - `dataset`: (Object or Function) Assigns custom data attributes (`data-*`) through a static mapping or a function that returns the mapping. When provided as a function, `this` is bound to the element.
-- `children`: (String, Array of Nodes, or Function) Defines the inner content of the element. This can be a direct string, an array of element definitions, or a function that returns child nodes for dynamic rendering. `null`, `undefined`, and booleans are skipped; strings and numbers render as text nodes (`0` is a value). When provided as a function, `this` is bound to the element.
+- `children`: (String, Number, Node, Object, Array, or Function) Defines the inner content of the element. This can be a direct string, a single element definition or `Node`, an array of them (nested arrays are flattened), or a function that returns them for dynamic rendering. `null`, `undefined`, and booleans are skipped; strings and numbers render as text nodes (`0` is a value). When provided as a function, `this` is bound to the element.
 - `on`: (Object) Adds event listeners to the element. Each key represents an event name (e.g., "click", "change") with its corresponding handler function. Handlers and lifecycle callbacks receive `this` bound to the element.
 - `use`: (String or Element) Specifies a tag selector string (e.g., "div#id1.cls1"), an HTML markup to parse, or an existing Element to reuse directly.
 
@@ -148,6 +148,8 @@ List of lifecycle events:
 - `mounted` fires when the element is appended to a parent — top-down (parent before children), the same order as `removed`, on both the initial mount and a re-mount. A previously removed element can be re-mounted: `mounted` fires again and its reactive bindings are rebuilt.
 - `updated` fires when an element property is updated to a different value; it does not fire for the first applied value, nor for a change from a cleared (`null` or `undefined`) binding. For `className`, the old and new values are arrays of the applied class names; for `children`, arrays of the child nodes in the DOM.
 - `removed` fires top-down when the element is removed from a parent, including children inside a shadow root, and releases its reactive bindings. Only removals made by Neux (a `children` re-render) fire it; removing an element with DOM APIs such as `el.remove()` does not.
+
+Lifecycle events follow only the elements Neux inserts: through a `children` list or a `render()` target. An element added with DOM APIs, such as a rendered element appended to a wrapper built with `document.createElement()`, never receives `mounted`. Removing the wrapper later, even through a `children` re-render, does not fire `removed` on that element, so its reactive bindings stay live. Build the wrapper with Neux too (`{ tagName: "section", children: [inner] }`), or render into it with `render(inner, wrapper)`.
 
 Example of using lifecycle events:
 
@@ -360,6 +362,7 @@ A computed getter is re-evaluated on every read, so an effect that reads it re-r
 - Only properties accessed during the synchronous execution of a computed or effect function are tracked. Reads after an `await` are not tracked.
 - A method stored in a signal reads as a bound copy: `state.fn === fn` is `false`, though `state.fn === state.fn` is `true`. A class is returned as is.
 - Reading a read-only, non-configurable property that holds a nested object, array, or method throws a `TypeError`. This happens with `Object.freeze()` data, such as `signal(Object.freeze({ cfg: {} })).cfg`, but not with primitives or sealed objects. Keep frozen data outside the signal, or leave it unfrozen.
+- Defining a property with `Object.defineProperty()` (or `Reflect.defineProperty()`) on a signal does not re-run effects. Assign the property instead.
 
 Here is an example of reactivity with nested objects:
 
@@ -395,8 +398,8 @@ render(
 
 // Add new item to the array and then re-render the list
 list.push({ id: 3, text: "Item 3" });
-// Replace the existing item with a new one that has the same values
-// you should change the `id` to a unique value to force rerendering
+// Replace an existing item with a new one; its unique `id`
+// makes the new item render as a new element
 list.splice(1, 1, { id: 4, text: "Item 4" });
 // Change the text content of the `li` element without replacing the element
 list[0].text = "Item 1 was changed";
@@ -607,7 +610,7 @@ const msgRu = t("say.hello", { name: "Мир" }, "ru");
 console.log(msgRu); // Привет Мир!
 ```
 
-A missing key, or a key that names a nested group such as `say` in `say.hello`, returns the key itself and is reported once per language through `reportError` (or `console.error` where it is unavailable), so a gap in the translations shows up during development. Numbers and dates follow the language the result comes from: a language with translations formats with its own code, while a language that has no entry, or a key found only in the fallback, formats with the fallback language (`t(1234.5, "fr")` formats as `en` when there is no `fr` locale). A regional language code such as `ru-RU` uses the `ru` translations when it has no entry of its own, and the full code is kept for number and date formatting.
+A missing key, or a key that names a nested group such as `say` in `say.hello`, returns the key itself and is reported once per locale through `reportError` (or `console.error` where it is unavailable), so a gap in the translations shows up during development. Numbers and dates follow the language the result comes from: a language with translations formats with its own code, while a language that has no entry, or a key found only in the fallback, formats with the fallback language (`t(1234.5, "fr")` formats as `en` when there is no `fr` locale). A regional language code such as `ru-RU` uses the `ru` translations when it has no entry of its own, and the full code is kept for number and date formatting.
 
 ## Custom Context
 
@@ -640,8 +643,8 @@ state.count++;
 In this example:
 
 - A custom context object is created.
-- The `signal` function is bound to the custom context using `signal.bind(context)`.
-- The `render` function is also bound to the same custom context using `render.bind(context)`. These bound functions use the custom context as their `this` value.
+- The `signal` function is bound to the custom context using `signal.bind(ctx)`.
+- The `render` function is also bound to the same custom context using `render.bind(ctx)`. These bound functions use the custom context as their `this` value.
 
 An effect tracks only signals of its own context, so bind `effect()` and `untrack()` to the same context when you use them directly.
 
@@ -702,7 +705,7 @@ render(
 );
 // Update state on hash change
 window.addEventListener("hashchange", () => {
-  state.path = location.hash.slice(1);
+  state.path = location.hash.slice(1) || "Home";
 });
 ```
 

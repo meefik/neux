@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- A write to a key that no effect reads no longer schedules a re-run, and internal state uses one `WeakMap` instead of nine module-level collections, making signal writes and list rendering about 10% faster.
+- A write to a key that no effect reads no longer schedules a re-run, signals keep each object's reactive state in one `WeakMap` entry, and the renderer keeps each node's state on the node under a private symbol instead of in separate `WeakMap` and `WeakSet` collections, making signal writes and list rendering about 10% faster.
 
 ### Fixed
 
@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Writing an array index past the end (such as `list[list.length] = x` or `Object.assign(list, [...])`) now re-runs effects that read `length`, including `map()`, spread, and `for...of`, so a `children` list renders the new item.
 - Assigning a smaller `length` to an array now re-runs effects that read a dropped index, enumerate the keys, or test an index with `in`, not only those that read `length`.
 - A class stored in a signal is returned as is, keeping its identity and static members, instead of as a bound copy.
-- `i18n()` leaves a `%{key}` placeholder as-is for a `null` value, as it does for `undefined`, instead of printing `null`.
+- `i18n()` leaves a `%{key}` placeholder as is for a `null` value, as it does for `undefined`, instead of printing `null`.
 - A `use` tag string or markup with surrounding whitespace (such as `"span "`) is trimmed, instead of rendering a `div`.
 - A `style` key for a CSS custom property with uppercase letters (such as `--myColor`) is now applied through the CSS API instead of being set as a plain JS property on the style object.
 - Effects of one update now re-run in creation order, so an effect runs before the effects created during its run. A parent that disposes or replaces its children (such as a reactive `children` list) now does so before a child's binding re-runs against state that no longer fits it, which used to report a spurious error such as reading a property of `undefined`.
@@ -29,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A signal object reads as one proxy wherever it is reached from: `state.selected = state.items[0]` keeps `state.selected === state.items[0]`, an assigned proxy is stored as its plain object instead of being wrapped again, and assigning a proxy back to its own object no longer re-runs effects.
 - `removed` cascades through elements Neux did not build (such as a supplied wrapper element), so the Neux elements inside release their bindings and receive `mounted` again on re-insertion.
 - `i18n()` keeps a script subtag when formatting, so `sr-Latn` text gets Latin rather than Cyrillic dates and `zh-Hant` text gets Traditional Chinese formatting.
-- Documentation: `README.md`, `SKILL.md`, `AGENTS.md`, and TypeDoc comments corrected to match the current behavior, with fixed examples.
+- Documentation: `README.md`, `SKILL.md`, `AGENTS.md`, and TypeDoc comments corrected to match the current behavior, with fixed examples. They also note that `Object.defineProperty()` on a signal does not re-run effects, and that an element inserted with DOM APIs (such as into a wrapper built with `document.createElement()`) never receives `mounted` or `removed`, so its bindings stay live.
 
 ## [0.18.0] - 2026-10-09
 

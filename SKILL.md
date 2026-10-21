@@ -45,12 +45,13 @@ const state = signal({
 - Nested plain objects and arrays (`{}`, `[]`) wrap automatically. Class instances, `Map`, `Set`, `Date`, and null-prototype objects (`Object.create(null)`) do not: they are returned as is and are not reactive, so replace them instead of mutating them.
 - A method stored in a signal reads as a bound copy: `state.fn === fn` is `false`, though `state.fn === state.fn` is `true`. A class is returned as is.
 - Reading a read-only, non-configurable property that holds a nested object, array, or method throws a `TypeError`. This happens with `Object.freeze()` data, such as `signal(Object.freeze({ cfg: {} })).cfg`, but not with primitives or sealed objects. Keep frozen data outside the signal, or leave it unfrozen.
+- Defining a property with `Object.defineProperty()` (or `Reflect.defineProperty()`) on a signal does not re-run effects. Assign the property instead.
 - Methods bind automatically; access `this.foo` inside them to read reactive fields.
 - Getters become computed derived values that keep their callers in sync.
 - Replacing a nested property (`state.items = []`) keeps everything in sync — the new value is auto-wrapped reactively, and effects track the replacement on next run.
 - Transitive tracking through getters and methods — reading a computed getter or calling a method inside an effect subscribes to both the outer access **and** any underlying `this` fields it reads. For example, `state.double` where the getter reads `this.count` stays in sync with changes to `double` **and** `count`, just as if you had read `state.count` directly.
 
-**Done when:** state shape matches the UI requirements and all mutable operations are expressed as methods or computed getters on the signal.
+**Done when:** state shape matches the UI requirements, mutations are expressed as methods, and derived values as computed getters on the signal.
 
 ### 2. Define components
 
@@ -301,7 +302,7 @@ effect(() => {
 
 - The getter runs immediately; every signal property read inside is subscribed. Re-runs are batched: one per tick (`setTimeout`), however many subscribed properties changed. Conditional branches subscribe only the active path — stale dependencies are pruned when conditions flip.
 - Returns value → setter receives the synchronous result.
-- Returns `Promise` → setter receives the resolved value in sync when ready.
+- Returns `Promise` → setter receives the resolved value, unless the effect re-ran or was disposed before it resolved.
 - A getter that throws on a re-run unsubscribes the effect permanently — handle errors inside the getter if recovery is needed. An error from a re-run getter, from the setter, or from a rejected promise of the latest run is reported through `reportError` (or `console.error` where unavailable), so it reaches `window.onerror`; the first run's getter error is thrown to the caller and leaves the effect disposed.
 - Always call the returned dispose function when the effect is no longer needed — wire it to `removed` in lifecycle handlers (step 7).
 
@@ -312,8 +313,8 @@ effect(() => {
 Neux dispatches custom DOM events you can listen for in `on`:
 
 - `mounted` — Element appended to parent (top-down, same order as `removed`, on both the initial mount and a re-mount; no detail). A previously removed node may be re-mounted; `mounted` fires again and its reactive bindings are rebuilt.
-- `removed` — Element removed from a parent (top-down, no detail); dispatched to children inside shadow roots as well. Its reactive bindings are released. Always paired with `mounted`: children replaced by identical nodes in a re-render are destroyed silently (no `mounted`/`removed` for them).
-- `updated` — A bound property changed to a different value on the element; a re-run that resolves to the same value, the first applied value, and a change from a cleared (`null` or `undefined`) binding do not fire it. Detail: `{ property, oldValue, newValue }`; for `className`, the values are arrays of the applied class names, and for `children`, arrays of the child nodes in the DOM
+- `removed` — Element removed from a parent (top-down, no detail); dispatched to children inside shadow roots as well. Its reactive bindings are released. Always paired with `mounted`: fresh nodes that a re-render discards because an identical child is already there are destroyed silently (no `mounted`/`removed` for them).
+- `updated` — A bound property changed to a different value on the element; a re-run that resolves to the same value, the first applied value, and a change from a cleared (`null` or `undefined`) binding do not fire it. Detail: `{ property, oldValue, newValue }`; for `className`, the values are arrays of the applied class names, and for `children`, arrays of the child nodes in the DOM.
 
 Clean up effects and subscriptions in `removed`:
 
@@ -343,6 +344,8 @@ render(
 
 `removed` fires only for elements removed by Neux's reactive tree. Wire direct-DOM removals (`el.remove()`, `parent.removeChild(el)`) to their own cleanup path instead.
 
+Lifecycle events follow only the elements Neux inserts (a `children` list or a `render()` target). A rendered element appended with DOM APIs, such as into a wrapper built with `document.createElement()`, never receives `mounted`; removing the wrapper later does not fire its `removed`, so its bindings stay live. Build the wrapper with Neux (`{ tagName: "section", children: [inner] }`) or render into it with `render(inner, wrapper)`.
+
 **Done when:** effects are created on mount and disposed on removal, with every dispose path accounted for.
 
 ### 8. Add internationalization with i18n
@@ -370,7 +373,7 @@ const t = i18n(
 t("greeting", { name: "Mundo" }); // Hello, Mundo!
 t("nav.home"); // Home
 t("nav"); // nav — a group of keys is not a translation, so the key is returned
-// a key found in no locale is also reported once per language through reportError (console.error as a fallback)
+// a key found in no locale is also reported once per locale through reportError (console.error as a fallback)
 // formatting follows the language the result comes from: t(1234.5, "fr") formats as the fallback ("en") when there is no `fr` locale
 
 // Intl formatting via placeholder arrays [value, options] or direct calls
